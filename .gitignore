@@ -1,0 +1,43 @@
+# .gitignore — raiz do monorepo 3T Engenharia
+
+# ── Node ──────────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ── Builds ────────────────────────────────────────────────────────────────────
+dist/
+build/
+.next/
+out/
+
+# ── Ambiente ──────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# ── Prisma ────────────────────────────────────────────────────────────────────
+# Client gerado — não versionar (gerado no deploy)
+# Migrations: VERSIONAR (são os scripts de banco)
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Cache ─────────────────────────────────────────────────────────────────────
+.cache/
+.turbo/
+.vite/
