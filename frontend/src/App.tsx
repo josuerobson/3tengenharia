@@ -7,6 +7,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 
 // ── Páginas reais (Etapa 5) ───────────────────────────────────────────────────
 import TripStartPage           from '@/pages/vehicles/TripStartPage'
+import TripHistoryPage         from '@/pages/vehicles/TripHistoryPage'
 import MaintenanceAlertsPage   from '@/pages/vehicles/MaintenanceAlertsPage'
 import MaintenanceTypesPage    from '@/pages/vehicles/MaintenanceTypesPage'
 import AssetCatalogPage        from '@/pages/assets/AssetCatalogPage'
@@ -60,7 +61,7 @@ export default function App() {
 
                 {/* Módulo 1 — Veículos */}
                 <Route path="vehicles/trips/new"        element={<TripStartPage />} />
-                <Route path="vehicles/trips"             element={<PlaceholderPage title="Histórico de Viagens" />} />
+                <Route path="vehicles/trips"             element={<TripHistoryPage />} />
                 <Route path="vehicles/maintenance"       element={<MaintenanceAlertsPage />} />
                 <Route path="vehicles/maintenance-types" element={<MaintenanceTypesPage />} />
 
