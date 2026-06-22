@@ -4,8 +4,8 @@
 
 import { useState } from 'react'
 import {
-  Plus, Pencil, X, Check, Car, Gauge, Calendar,
-  Fuel, Palette, FileText, ChevronDown, AlertTriangle,
+  Plus, Pencil, X, Check, Car, Gauge,
+  Fuel, Palette, FileText, ChevronDown,
   Search, Filter, CheckCircle2, Wrench, Ban,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -25,8 +25,6 @@ interface Vehicle {
   fuelType: string | null
   currentKm: number
   status: VehicleStatus
-  maintenanceKmThreshold: number | null
-  maintenanceDayThreshold: number | null
   notes: string | null
 }
 
@@ -42,17 +40,16 @@ const STATUS_CONFIG: Record<VehicleStatus, { label: string; color: string; icon:
 
 const EMPTY_FORM = {
   licensePlate: '', brand: '', model: '', year: String(new Date().getFullYear()),
-  color: '', fuelType: 'Flex', currentKm: '0',
-  maintenanceKmThreshold: '', maintenanceDayThreshold: '', notes: '',
+  color: '', fuelType: 'Flex', currentKm: '0', notes: '',
 }
 
 // ── Mock data (substituir por fetch real) ─────────────────────────────────────
 
 const MOCK_VEHICLES: Vehicle[] = [
-  { id: 'v1', licensePlate: 'ABC1D23', brand: 'Ford', model: 'Ranger', year: 2022, color: 'Branco', fuelType: 'Diesel', currentKm: 48320, status: 'ACTIVE', maintenanceKmThreshold: 10000, maintenanceDayThreshold: 180, notes: null },
-  { id: 'v2', licensePlate: 'XYZ5E67', brand: 'Volkswagen', model: 'Amarok', year: 2021, color: 'Prata', fuelType: 'Diesel', currentKm: 72100, status: 'MAINTENANCE', maintenanceKmThreshold: 10000, maintenanceDayThreshold: 180, notes: 'Aguardando troca de correia dentada' },
-  { id: 'v3', licensePlate: 'QRS9H12', brand: 'Toyota', model: 'Hilux', year: 2023, color: 'Preto', fuelType: 'Diesel', currentKm: 12450, status: 'ACTIVE', maintenanceKmThreshold: 10000, maintenanceDayThreshold: null, notes: null },
-  { id: 'v4', licensePlate: 'DEF2G34', brand: 'Fiat', model: 'Strada', year: 2020, color: 'Cinza', fuelType: 'Flex', currentKm: 91200, status: 'INACTIVE', maintenanceKmThreshold: null, maintenanceDayThreshold: null, notes: 'Vendido em 01/2026' },
+  { id: 'v1', licensePlate: 'ABC1D23', brand: 'Ford',       model: 'Ranger',  year: 2022, color: 'Branco', fuelType: 'Diesel', currentKm: 48320, status: 'ACTIVE',      notes: null },
+  { id: 'v2', licensePlate: 'XYZ5E67', brand: 'Volkswagen', model: 'Amarok',  year: 2021, color: 'Prata',  fuelType: 'Diesel', currentKm: 72100, status: 'MAINTENANCE', notes: 'Aguardando troca de correia dentada' },
+  { id: 'v3', licensePlate: 'QRS9H12', brand: 'Toyota',     model: 'Hilux',   year: 2023, color: 'Preto',  fuelType: 'Diesel', currentKm: 12450, status: 'ACTIVE',      notes: null },
+  { id: 'v4', licensePlate: 'DEF2G34', brand: 'Fiat',       model: 'Strada',  year: 2020, color: 'Cinza',  fuelType: 'Flex',   currentKm: 91200, status: 'INACTIVE',   notes: 'Vendido em 01/2026' },
 ]
 
 // ── Componente principal ───────────────────────────────────────────────────────
@@ -104,31 +101,27 @@ export default function VehicleRegistrationPage() {
     if (editingId) {
       setVehicles(prev => prev.map(v => v.id === editingId ? {
         ...v,
-        licensePlate:            plate,
-        brand:                   form.brand,
-        model:                   form.model,
-        year:                    Number(form.year),
-        color:                   form.color || null,
-        fuelType:                form.fuelType || null,
-        currentKm:               Number(form.currentKm),
-        maintenanceKmThreshold:  form.maintenanceKmThreshold  ? Number(form.maintenanceKmThreshold)  : null,
-        maintenanceDayThreshold: form.maintenanceDayThreshold ? Number(form.maintenanceDayThreshold) : null,
-        notes:                   form.notes || null,
+        licensePlate: plate,
+        brand:        form.brand,
+        model:        form.model,
+        year:         Number(form.year),
+        color:        form.color || null,
+        fuelType:     form.fuelType || null,
+        currentKm:    Number(form.currentKm),
+        notes:        form.notes || null,
       } : v))
     } else {
       const newVehicle: Vehicle = {
-        id:                      `v${Date.now()}`,
-        licensePlate:            plate,
-        brand:                   form.brand,
-        model:                   form.model,
-        year:                    Number(form.year),
-        color:                   form.color || null,
-        fuelType:                form.fuelType || null,
-        currentKm:               Number(form.currentKm),
-        status:                  'ACTIVE',
-        maintenanceKmThreshold:  form.maintenanceKmThreshold  ? Number(form.maintenanceKmThreshold)  : null,
-        maintenanceDayThreshold: form.maintenanceDayThreshold ? Number(form.maintenanceDayThreshold) : null,
-        notes:                   form.notes || null,
+        id:           `v${Date.now()}`,
+        licensePlate: plate,
+        brand:        form.brand,
+        model:        form.model,
+        year:         Number(form.year),
+        color:        form.color || null,
+        fuelType:     form.fuelType || null,
+        currentKm:    Number(form.currentKm),
+        status:       'ACTIVE',
+        notes:        form.notes || null,
       }
       setVehicles(prev => [newVehicle, ...prev])
     }
@@ -142,16 +135,14 @@ export default function VehicleRegistrationPage() {
   function startEdit(v: Vehicle) {
     setEditingId(v.id)
     setForm({
-      licensePlate:            v.licensePlate,
-      brand:                   v.brand,
-      model:                   v.model,
-      year:                    String(v.year),
-      color:                   v.color ?? '',
-      fuelType:                v.fuelType ?? 'Flex',
-      currentKm:               String(v.currentKm),
-      maintenanceKmThreshold:  v.maintenanceKmThreshold?.toString()  ?? '',
-      maintenanceDayThreshold: v.maintenanceDayThreshold?.toString() ?? '',
-      notes:                   v.notes ?? '',
+      licensePlate: v.licensePlate,
+      brand:        v.brand,
+      model:        v.model,
+      year:         String(v.year),
+      color:        v.color ?? '',
+      fuelType:     v.fuelType ?? 'Flex',
+      currentKm:    String(v.currentKm),
+      notes:        v.notes ?? '',
     })
     setErrors({})
     setShowForm(true)
@@ -256,27 +247,6 @@ export default function VehicleRegistrationPage() {
                 <input type="number" inputMode="numeric" placeholder="0" value={form.currentKm} onChange={e => f('currentKm', e.target.value)} className={`${inputCls(!!errors.currentKm)} pl-8`} />
               </div>
             </Field>
-          </div>
-
-          {/* Linha 3 — Alertas de manutenção */}
-          <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 space-y-2">
-            <p className="text-xs font-semibold text-amber-700 flex items-center gap-1.5">
-              <AlertTriangle size={13} /> Alertas de Manutenção Preventiva (opcional)
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Alerta a cada (km)">
-                <div className="relative">
-                  <Gauge size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input type="number" inputMode="numeric" placeholder="10000" value={form.maintenanceKmThreshold} onChange={e => f('maintenanceKmThreshold', e.target.value)} className={`${inputCls(false)} pl-8`} />
-                </div>
-              </Field>
-              <Field label="Alerta a cada (dias)">
-                <div className="relative">
-                  <Calendar size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input type="number" inputMode="numeric" placeholder="180" value={form.maintenanceDayThreshold} onChange={e => f('maintenanceDayThreshold', e.target.value)} className={`${inputCls(false)} pl-8`} />
-                </div>
-              </Field>
-            </div>
           </div>
 
           {/* Observações */}
@@ -394,8 +364,6 @@ export default function VehicleRegistrationPage() {
                     {/* Detalhes */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                       {v.color && <Detail label="Cor" value={v.color} />}
-                      {v.maintenanceKmThreshold && <Detail label="Alerta km" value={`a cada ${v.maintenanceKmThreshold.toLocaleString('pt-BR')} km`} />}
-                      {v.maintenanceDayThreshold && <Detail label="Alerta dias" value={`a cada ${v.maintenanceDayThreshold} dias`} />}
                     </div>
                     {v.notes && (
                       <p className="text-xs text-gray-500 bg-white rounded-lg px-3 py-2 border border-gray-100">{v.notes}</p>

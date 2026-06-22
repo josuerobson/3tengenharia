@@ -145,4 +145,66 @@ export async function maintenanceTypeRoutes(app: FastifyInstance): Promise<void>
       return reply.status(204).send()
     },
   )
+
+  // ── POST /vehicles/:vehicleId/maintenance-types/:id/complete ───────────────
+  // Registra que um serviço foi realizado — atualiza lastServiceKm e lastServiceDate
+  app.post(
+    '/:vehicleId/maintenance-types/:id/complete',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Vehicles'],
+        summary: 'Registra conclusão de serviço de manutenção',
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['vehicleId', 'id'],
+          properties: {
+            vehicleId: { type: 'string' },
+            id:        { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['serviceKm'],
+          properties: {
+            serviceKm:   { type: 'integer', minimum: 0 },
+            serviceDate: { type: 'string', format: 'date' },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { vehicleId, id } = request.params as { vehicleId: string; id: string }
+      const { serviceKm, serviceDate } = request.body as { serviceKm: number; serviceDate?: string }
+      const result = await svc.completeService(id, vehicleId, serviceKm, serviceDate)
+      if ('notFound' in result) return reply.status(404).send({ message: 'Tipo não encontrado.' })
+      return reply.status(200).send(result.type)
+    },
+  )
+
+  // ── GET /vehicles/:vehicleId/alerts ─────────────────────────────────────────
+  // Calcula e retorna todos os alertas de manutenção do veículo, por tipo de serviço
+  app.get(
+    '/:vehicleId/alerts',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Vehicles'],
+        summary: 'Alertas de manutenção por tipo de serviço',
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['vehicleId'],
+          properties: { vehicleId: { type: 'string' } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { vehicleId } = request.params as { vehicleId: string }
+      const result = await svc.getAlerts(vehicleId)
+      if ('notFound' in result) return reply.status(404).send({ message: 'Veículo não encontrado.' })
+      return reply.status(200).send({ alerts: result.alerts })
+    },
+  )
 }

@@ -362,8 +362,128 @@ export const MOCK_ASSETS: Asset[] = [
   },
 ]
 
+// ── Tipos de Manutenção por Veículo ──────────────────────────────────────────
+
+export interface VehicleMaintenanceType {
+  id: string
+  vehicleId: string
+  name: string
+  description: string | null
+  isActive: boolean
+  intervalKm: number | null
+  intervalDays: number | null
+  lastServiceKm: number | null
+  lastServiceDate: string | null
+}
+
+export interface MaintenanceAlert {
+  maintenanceTypeId: string
+  vehicleId: string
+  name: string              // ex: "Troca de óleo do motor"
+  description: string | null
+  licensePlate: string
+  vehicleBrand: string
+  vehicleModel: string
+  currentKm: number
+  intervalKm: number | null
+  intervalDays: number | null
+  lastServiceKm: number | null
+  lastServiceDate: string | null
+  kmRemaining: number | null     // negativo = vencido em km
+  daysRemaining: number | null   // negativo = vencido em dias
+  urgency: 'ok' | 'medium' | 'high' | 'critical'
+}
+
+export const MOCK_MAINTENANCE_TYPES: VehicleMaintenanceType[] = [
+  // ── Volkswagen Saveiro (veh-001, currentKm: 48.320) ─────────────────────────
+  { id: 'mt-001', vehicleId: 'veh-001', name: 'Troca de óleo do motor',     description: 'Óleo 5W30 sintético + filtro de óleo',           isActive: true,  intervalKm: 10_000, intervalDays: 180, lastServiceKm: 46_000, lastServiceDate: '2026-04-01' },
+  { id: 'mt-002', vehicleId: 'veh-001', name: 'Óleo da caixa de câmbio',    description: null,                                               isActive: true,  intervalKm: 40_000, intervalDays: null, lastServiceKm: 20_000, lastServiceDate: '2024-10-10' },
+  { id: 'mt-003', vehicleId: 'veh-001', name: 'Correia dentada',             description: 'Substituir conjunto correia + tensor + polia',    isActive: true,  intervalKm: 60_000, intervalDays: null, lastServiceKm: 0,      lastServiceDate: null },
+  { id: 'mt-004', vehicleId: 'veh-001', name: 'Filtro de ar do motor',      description: null,                                               isActive: true,  intervalKm: 15_000, intervalDays: 365,  lastServiceKm: 40_000, lastServiceDate: '2026-01-15' },
+  { id: 'mt-005', vehicleId: 'veh-001', name: 'Pneus dianteiros',           description: 'Verificar desgaste e calibragem — trocar se < 2mm', isActive: true, intervalKm: 40_000, intervalDays: null, lastServiceKm: 12_000, lastServiceDate: '2023-06-01' },
+
+  // ── Ford Ranger (veh-002, currentKm: 102.150) ────────────────────────────────
+  { id: 'mt-006', vehicleId: 'veh-002', name: 'Troca de óleo do motor',     description: 'Óleo 10W40 diesel semi-sintético',                isActive: true,  intervalKm: 10_000, intervalDays: 180, lastServiceKm: 96_200, lastServiceDate: '2026-02-15' },
+  { id: 'mt-007', vehicleId: 'veh-002', name: 'Filtro de combustível',      description: null,                                               isActive: true,  intervalKm: 20_000, intervalDays: null, lastServiceKm: 90_000, lastServiceDate: '2025-11-01' },
+  { id: 'mt-008', vehicleId: 'veh-002', name: 'Correia dentada',             description: 'Substituir conjunto completo',                    isActive: true,  intervalKm: 60_000, intervalDays: null, lastServiceKm: 60_000, lastServiceDate: '2024-08-20' },
+
+  // ── Toyota Hilux (veh-003, currentKm: 75.840) ────────────────────────────────
+  { id: 'mt-009', vehicleId: 'veh-003', name: 'Troca de óleo do motor',     description: 'Óleo 5W40 diesel sintético',                     isActive: true,  intervalKm: 10_000, intervalDays: 180, lastServiceKm: 70_100, lastServiceDate: '2026-05-01' },
+  { id: 'mt-010', vehicleId: 'veh-003', name: 'Pastilhas de freio dianteiro', description: null,                                             isActive: true,  intervalKm: 25_000, intervalDays: null, lastServiceKm: 50_000, lastServiceDate: '2025-07-10' },
+
+  // ── Fiat Fiorino (veh-004, currentKm: 31.200) ────────────────────────────────
+  { id: 'mt-011', vehicleId: 'veh-004', name: 'Troca de óleo do motor',     description: 'Óleo 5W30 mineral',                              isActive: true,  intervalKm: 5_000,  intervalDays: 120, lastServiceKm: 28_000, lastServiceDate: '2026-04-20' },
+  { id: 'mt-012', vehicleId: 'veh-004', name: 'Pneus dianteiros',           description: null,                                               isActive: true,  intervalKm: 40_000, intervalDays: null, lastServiceKm: 0,      lastServiceDate: null },
+]
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * Calcula alertas de manutenção por tipo de serviço para um veículo.
+ * Retorna um alerta por tipo cadastrado (com intervalKm ou intervalDays),
+ * ordenados por urgência (crítico → urgente → atenção → ok).
+ */
+export function computeMaintenanceAlerts(
+  vehicle: Vehicle,
+  types: VehicleMaintenanceType[],
+): MaintenanceAlert[] {
+  const urgencyOrder = { critical: 0, high: 1, medium: 2, ok: 3 }
+  const today = new Date()
+
+  return types
+    .filter(t => t.isActive && (t.intervalKm !== null || t.intervalDays !== null))
+    .map(t => {
+      // ── KM ──────────────────────────────────────────────────────────────────
+      let kmRemaining: number | null = null
+      let kmUrgency: 'ok' | 'medium' | 'high' | 'critical' | null = null
+
+      if (t.intervalKm !== null) {
+        const baseKm = t.lastServiceKm ?? 0
+        const dueAtKm = baseKm + t.intervalKm
+        kmRemaining = dueAtKm - vehicle.currentKm
+        const pct = Math.min(100, ((vehicle.currentKm - baseKm) / t.intervalKm) * 100)
+        kmUrgency = pct >= 100 ? 'critical' : pct >= 85 ? 'high' : pct >= 65 ? 'medium' : 'ok'
+      }
+
+      // ── Dias ────────────────────────────────────────────────────────────────
+      let daysRemaining: number | null = null
+      let daysUrgency: 'ok' | 'medium' | 'high' | 'critical' | null = null
+
+      if (t.intervalDays !== null) {
+        const baseDate = t.lastServiceDate ? new Date(t.lastServiceDate) : new Date(0)
+        const dueMs = baseDate.getTime() + t.intervalDays * 86_400_000
+        daysRemaining = Math.ceil((dueMs - today.getTime()) / 86_400_000)
+        const elapsed = t.intervalDays - daysRemaining
+        const pct = Math.min(100, (elapsed / t.intervalDays) * 100)
+        daysUrgency = pct >= 100 ? 'critical' : pct >= 85 ? 'high' : pct >= 65 ? 'medium' : 'ok'
+      }
+
+      // Urgência = a mais severa entre km e dias
+      const urgency = ([kmUrgency, daysUrgency].filter(Boolean) as ('ok' | 'medium' | 'high' | 'critical')[])
+        .sort((a, b) => urgencyOrder[a] - urgencyOrder[b])[0] ?? 'ok'
+
+      return {
+        maintenanceTypeId: t.id,
+        vehicleId:         vehicle.id,
+        name:              t.name,
+        description:       t.description,
+        licensePlate:      vehicle.licensePlate,
+        vehicleBrand:      `${vehicle.brand} ${vehicle.model}`,
+        vehicleModel:      vehicle.model,
+        currentKm:         vehicle.currentKm,
+        intervalKm:        t.intervalKm,
+        intervalDays:      t.intervalDays,
+        lastServiceKm:     t.lastServiceKm,
+        lastServiceDate:   t.lastServiceDate,
+        kmRemaining,
+        daysRemaining,
+        urgency,
+      } satisfies MaintenanceAlert
+    })
+    .sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency])
+}
+
+/** @deprecated — use computeMaintenanceAlerts. Mantido para compatibilidade com a timeline de viagens. */
 export function getVehicleMaintenanceInfo(vehicle: Vehicle): {
   kmSinceLast: number
   percentage: number
@@ -385,19 +505,14 @@ export function getVehicleMaintenanceInfo(vehicle: Vehicle): {
 
 export function formatDateTime(isoString: string): string {
   return new Date(isoString).toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
   })
 }
 
 export function formatDate(isoString: string): string {
   return new Date(isoString).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+    day: '2-digit', month: 'short', year: 'numeric',
   })
 }
 
