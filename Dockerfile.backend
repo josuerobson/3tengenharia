@@ -64,8 +64,5 @@ USER app
 
 EXPOSE 3333
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD wget -qO- http://localhost:3333/health || exit 1
-
 # Limpa e recria o schema completo (seguro no primeiro deploy - sem dados reais)
 CMD ["sh", "-c", "npx --yes prisma@5.22.0 db push --schema=./prisma/schema.prisma --force-reset && node dist/server.js"]
