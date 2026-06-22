@@ -31,10 +31,12 @@ export const maintenanceTypesService = {
     const type = await prisma.vehicleMaintenanceType.create({
       data: {
         vehicleId,
-        name:         data.name,
-        description:  data.description ?? null,
-        intervalKm:   data.intervalKm   ?? null,
-        intervalDays: data.intervalDays ?? null,
+        name:            data.name,
+        description:     data.description ?? null,
+        intervalKm:      data.intervalKm   ?? null,
+        intervalDays:    data.intervalDays ?? null,
+        lastServiceKm:   data.lastServiceKm   ?? null,
+        lastServiceDate: data.lastServiceDate ? new Date(data.lastServiceDate) : null,
       },
     })
 
@@ -49,11 +51,13 @@ export const maintenanceTypesService = {
     const type = await prisma.vehicleMaintenanceType.update({
       where: { id },
       data: {
-        ...(data.name         !== undefined ? { name:         data.name }         : {}),
-        ...(data.description  !== undefined ? { description:  data.description }  : {}),
-        ...(data.intervalKm   !== undefined ? { intervalKm:   data.intervalKm }   : {}),
-        ...(data.intervalDays !== undefined ? { intervalDays: data.intervalDays } : {}),
-        ...(data.isActive     !== undefined ? { isActive:     data.isActive }     : {}),
+        ...(data.name            !== undefined ? { name:            data.name }            : {}),
+        ...(data.description     !== undefined ? { description:     data.description }     : {}),
+        ...(data.intervalKm      !== undefined ? { intervalKm:      data.intervalKm }      : {}),
+        ...(data.intervalDays    !== undefined ? { intervalDays:    data.intervalDays }    : {}),
+        ...(data.isActive        !== undefined ? { isActive:        data.isActive }        : {}),
+        ...(data.lastServiceKm   !== undefined ? { lastServiceKm:   data.lastServiceKm }   : {}),
+        ...(data.lastServiceDate !== undefined ? { lastServiceDate: data.lastServiceDate ? new Date(data.lastServiceDate) : null } : {}),
       },
     })
 
