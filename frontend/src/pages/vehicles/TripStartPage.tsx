@@ -27,11 +27,13 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge, VEHICLE_STATUS_BADGE } from '@/components/ui/badge'
 import {
-  MOCK_VEHICLES,
   formatKm,
   formatDuration,
-  type Vehicle,
 } from '@/data/mockData'
+import { vehiclesApi, tripsApi, type ApiVehicle } from '@/lib/api'
+
+// Usa ApiVehicle como tipo Vehicle para este componente
+type Vehicle = ApiVehicle
 
 // ── Stepper visual ────────────────────────────────────────────────────────────
 
@@ -105,9 +107,11 @@ interface VehicleComboboxProps {
   value: Vehicle | null
   onChange: (v: Vehicle | null) => void
   error?: string
+  vehicles: Vehicle[]
+  loadingVehicles?: boolean
 }
 
-function VehicleCombobox({ value, onChange, error }: VehicleComboboxProps) {
+function VehicleCombobox({ value, onChange, error, vehicles, loadingVehicles }: VehicleComboboxProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -131,13 +135,13 @@ function VehicleCombobox({ value, onChange, error }: VehicleComboboxProps) {
 
   const filtered = useMemo(
     () =>
-      MOCK_VEHICLES.filter(
+      vehicles.filter(
         (v) =>
           v.licensePlate.toLowerCase().includes(search.toLowerCase()) ||
           v.model.toLowerCase().includes(search.toLowerCase()) ||
           v.brand.toLowerCase().includes(search.toLowerCase()),
       ),
-    [search],
+    [search, vehicles],
   )
 
   const handleSelect = useCallback(
@@ -237,7 +241,9 @@ function VehicleCombobox({ value, onChange, error }: VehicleComboboxProps) {
 
           {/* Options */}
           <div className="max-h-52 overflow-y-auto scrollbar-thin py-1">
-            {filtered.length === 0 ? (
+            {loadingVehicles ? (
+              <div className="py-6 text-center text-gray-400 text-sm">Carregando veículos...</div>
+            ) : filtered.length === 0 ? (
               <div className="py-6 text-center text-gray-400 text-sm">
                 Nenhum veículo encontrado
               </div>
@@ -313,6 +319,21 @@ type TripPageState = 'STEP_1' | 'STEP_2' | 'COMPLETED'
 export default function TripStartPage() {
   const navigate = useNavigate()
 
+  // ── Lista de veículos da API ───────────────────────────────────────────────
+  const [vehiclesList, setVehiclesList] = useState<Vehicle[]>([])
+  const [loadingVehicles, setLoadingVehicles] = useState(true)
+
+  useEffect(() => {
+    vehiclesApi.list()
+      .then(res => setVehiclesList(res.vehicles))
+      .catch(() => {})
+      .finally(() => setLoadingVehicles(false))
+  }, [])
+
+  // ── Trip ID salvo após startTrip (para encerrar no passo 2) ────────────
+  const [activeTripId, setActiveTripId] = useState<string | null>(null)
+  const [apiError, setApiError] = useState<string | null>(null)
+
   // ── Estado da máquina ──────────────────────────────────────────────────
   const [pageState, setPageState] = useState<TripPageState>('STEP_1')
 
@@ -385,27 +406,51 @@ export default function TripStartPage() {
   }, [departureData, finalKm])
 
   // ── Handlers ──────────────────────────────────────────────────────────
-  const handleStep1Submit = useCallback(() => {
+  const handleStep1Submit = useCallback(async () => {
     if (!validateStep1() || !selectedVehicle) return
-    setDepartureData({
-      vehicle: selectedVehicle,
-      initialKm: parseInt(initialKm.replace(/\D/g, ''), 10),
-      origin: origin.trim(),
-      destination: destination.trim(),
-      purpose: purpose.trim(),
-      departureTime: new Date(),
-    })
-    setPageState('STEP_2')
+    const initialKmValue = parseInt(initialKm.replace(/\D/g, ''), 10)
+    setIsSubmitting(true)
+    setApiError(null)
+    try {
+      const res = await tripsApi.start({
+        vehicleId:   selectedVehicle.id,
+        initialKm:   initialKmValue,
+        origin:      origin.trim(),
+        destination: destination.trim(),
+        purpose:     purpose.trim() || undefined,
+      })
+      setActiveTripId(res.trip.id)
+      setDepartureData({
+        vehicle: selectedVehicle,
+        initialKm: initialKmValue,
+        origin: origin.trim(),
+        destination: destination.trim(),
+        purpose: purpose.trim(),
+        departureTime: new Date(res.trip.departureDateTime),
+      })
+      setPageState('STEP_2')
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : 'Erro ao iniciar viagem.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }, [validateStep1, selectedVehicle, initialKm, origin, destination, purpose])
 
   const handleStep2Submit = useCallback(async () => {
-    if (!validateStep2()) return
+    if (!validateStep2() || !activeTripId) return
+    const finalKmValue = parseInt(finalKm.replace(/\D/g, ''), 10)
     setIsSubmitting(true)
-    // Simulação de chamada à API (substituir por chamada real na Etapa 6)
-    await new Promise((resolve) => setTimeout(resolve, 1_200))
-    setIsSubmitting(false)
-    setPageState('COMPLETED')
-  }, [validateStep2])
+    setApiError(null)
+    try {
+      await tripsApi.end(activeTripId, { finalKm: finalKmValue })
+      setPageState('COMPLETED')
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : 'Erro ao encerrar viagem.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [validateStep2, activeTripId, finalKm])
+
 
   const handleReset = useCallback(() => {
     setPageState('STEP_1')
@@ -418,6 +463,8 @@ export default function TripStartPage() {
     setDepartureData(null)
     setStep1Errors({})
     setStep2Errors({})
+    setActiveTripId(null)
+    setApiError(null)
   }, [])
 
   // ────────────────────────────────────────────────────────────────────────
@@ -495,6 +542,8 @@ export default function TripStartPage() {
                 value={selectedVehicle}
                 onChange={setSelectedVehicle}
                 error={step1Errors.vehicle}
+                vehicles={vehiclesList}
+                loadingVehicles={loadingVehicles}
               />
             </div>
 
@@ -567,14 +616,22 @@ export default function TripStartPage() {
               />
             </div>
 
+            {apiError && (
+              <p className="text-sm text-red-500 flex items-center gap-1.5 bg-red-50 rounded-xl px-3 py-2 border border-red-200">
+                <AlertCircle size={14} /> {apiError}
+              </p>
+            )}
+
             <Button
               size="lg"
               className="w-full mt-2"
-              onClick={handleStep1Submit}
+              onClick={() => void handleStep1Submit()}
+              disabled={isSubmitting}
             >
-              Registrar Saída
+              {isSubmitting ? 'Registrando...' : 'Registrar Saída'}
               <ArrowRight size={18} />
             </Button>
+
           </div>
         )}
 

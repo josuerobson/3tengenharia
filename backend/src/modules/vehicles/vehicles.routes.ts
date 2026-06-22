@@ -68,6 +68,26 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
     controller.deleteVehicle,
   )
 
+  // ── GET /vehicles/trips ──────────────────────────────────────────────────────
+  app.get(
+    '/trips',
+    {
+      onRequest: [app.authenticate],
+      schema: schema({
+        tags: ['Vehicles'], summary: 'Lista histórico de viagens', security: [{ bearerAuth: [] }],
+        querystring: {
+          type: 'object',
+          properties: {
+            vehicleId: { type: 'string' },
+            limit:     { type: 'integer', minimum: 1, maximum: 500 },
+            offset:    { type: 'integer', minimum: 0 },
+          },
+        },
+      }),
+    },
+    controller.listTrips,
+  )
+
   // ── POST /vehicles/trips/start ───────────────────────────────────────────────
   app.post(
     '/trips/start',

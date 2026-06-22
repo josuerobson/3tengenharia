@@ -92,6 +92,19 @@ export function vehiclesController(_app: FastifyInstance) {
       return reply.status(200).send({ vehicles })
     },
 
+    // ── GET /vehicles/trips ──────────────────────────────────────────────────
+    async listTrips(request: FastifyRequest, reply: FastifyReply) {
+      const q = request.query as { vehicleId?: string; limit?: string; offset?: string }
+      const limitVal  = q.limit  ? parseInt(q.limit,  10) : undefined
+      const offsetVal = q.offset ? parseInt(q.offset, 10) : undefined
+      const result = await vehiclesService.listTrips({
+        ...(q.vehicleId !== undefined && { vehicleId: q.vehicleId }),
+        ...(limitVal  !== undefined  && { limit:  limitVal  }),
+        ...(offsetVal !== undefined  && { offset: offsetVal }),
+      })
+      return reply.status(200).send(result)
+    },
+
     // ── POST /vehicles (createVehicle) ───────────────────────────────────────
     async createVehicle(request: FastifyRequest, reply: FastifyReply) {
       const body = request.body as {

@@ -280,7 +280,52 @@ export const vehiclesService = {
     }
   },
 
-  // ── Admin CRUD ────────────────────────────────────────────────────────────
+  // ── GET /vehicles/trips ────────────────────────────────────────────────────
+  async listTrips(opts?: { vehicleId?: string; limit?: number; offset?: number }) {
+    const where = opts?.vehicleId ? { vehicleId: opts.vehicleId } : {}
+    const [total, trips] = await prisma.$transaction([
+      prisma.vehicleTrip.count({ where }),
+      prisma.vehicleTrip.findMany({
+        where,
+        orderBy: { departureDateTime: 'desc' },
+        take:  opts?.limit  ?? 100,
+        skip:  opts?.offset ?? 0,
+        select: {
+          id:                    true,
+          origin:                true,
+          destination:           true,
+          purpose:               true,
+          departureDateTime:     true,
+          arrivalDateTime:       true,
+          initialKm:             true,
+          finalKm:               true,
+          distanceTraveled:      true,
+          maintenanceAlertActive: true,
+          notes:                 true,
+          createdAt:             true,
+          vehicle: {
+            select: {
+              id:           true,
+              licensePlate: true,
+              brand:        true,
+              model:        true,
+              year:         true,
+              currentKm:    true,
+              status:       true,
+            },
+          },
+          driverEmployee: {
+            select: {
+              id:           true,
+              fullName:     true,
+              registration: true,
+            },
+          },
+        },
+      }),
+    ])
+    return { trips, total }
+  },
 
   async listAll() {
     return prisma.vehicle.findMany({
@@ -294,6 +339,7 @@ export const vehiclesService = {
       },
     })
   },
+
 
   async create(data: {
     licensePlate: string; brand: string; model: string; year: number; currentKm: number

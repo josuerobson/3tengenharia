@@ -1,15 +1,19 @@
 // src/pages/vehicles/TripHistoryPage.tsx
 // Histórico completo de viagens — filtros, busca, detalhes e KPIs de frota.
+// Dados reais do backend via API REST (GET /vehicles/trips).
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   MapPin, User, Gauge, Clock, Search,
   ChevronDown, ChevronUp, X, Filter, Download,
   AlertTriangle, CheckCircle2, TrendingUp, Car,
-  Navigation, Route, ArrowRight, Eye,
+  Navigation, Route, ArrowRight, Eye, RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { MOCK_TRIPS, MOCK_VEHICLES, type Trip } from '@/data/mockData'
+import { tripsApi, vehiclesApi, type ApiTrip, type ApiVehicle } from '@/lib/api'
+
+// ── Alias de tipo local para compatibilidade com o restante do componente ─────
+type Trip = ApiTrip
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -42,7 +46,7 @@ function buildKpis(trips: Trip[]) {
   const ongoing   = trips.filter(t => isOngoing(t))
   const withAlert = trips.filter(t => t.maintenanceAlertActive)
   const totalKm   = completed.reduce((s, t) => s + (t.distanceTraveled ?? 0), 0)
-  const uniqueVehicles = new Set(trips.map(t => t.vehicleId)).size
+  const uniqueVehicles = new Set(trips.map(t => t.vehicle.id)).size
   return { total: trips.length, completed: completed.length, ongoing: ongoing.length, withAlert: withAlert.length, totalKm, uniqueVehicles }
 }
 
@@ -139,8 +143,8 @@ function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void })
             </div>
             <div>
               <p className="text-xs text-gray-400 font-medium">Motorista</p>
-              <p className="text-sm font-semibold text-gray-800">{trip.driverName}</p>
-              <p className="text-xs text-gray-400">{trip.driverRegistration}</p>
+              <p className="text-sm font-semibold text-gray-800">{trip.driverEmployee?.fullName ?? 'Motorista não informado'}</p>
+              <p className="text-xs text-gray-400">{trip.driverEmployee?.registration ?? ''}</p>
             </div>
           </div>
 
@@ -235,44 +239,66 @@ type FilterStatus = 'all' | 'ongoing' | 'completed' | 'alert'
 type SortKey = 'date_desc' | 'date_asc' | 'km_desc' | 'duration_desc'
 
 export default function TripHistoryPage() {
-  const [search, setSearch] = useState('')
+  // ── Dados reais da API ────────────────────────────────────────────────────
+  const [trips, setTrips]       = useState<Trip[]>([])
+  const [vehicles, setVehicles] = useState<ApiVehicle[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [tripsRes, vehiclesRes] = await Promise.all([
+        tripsApi.list({ limit: 500 }),
+        vehiclesApi.list(),
+      ])
+      setTrips(tripsRes.trips)
+      setVehicles(vehiclesRes.vehicles)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar dados.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void fetchData() }, [])
+
+  // ── Filtros ───────────────────────────────────────────────────────────────
+  const [search, setSearch]           = useState('')
   const [filterVehicle, setFilterVehicle] = useState('all')
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
-  const [sortKey, setSortKey] = useState<SortKey>('date_desc')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [detailTrip, setDetailTrip] = useState<Trip | null>(null)
+  const [filterStatus, setFilterStatus]   = useState<FilterStatus>('all')
+  const [sortKey, setSortKey]         = useState<SortKey>('date_desc')
+  const [expandedId, setExpandedId]   = useState<string | null>(null)
+  const [detailTrip, setDetailTrip]   = useState<Trip | null>(null)
   const [showFilters, setShowFilters] = useState(false)
 
-  const kpis = useMemo(() => buildKpis(MOCK_TRIPS), [])
+  const kpis = useMemo(() => buildKpis(trips), [trips])
 
   // ── Filtros + ordenação ─────────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
-    let list = [...MOCK_TRIPS]
+    let list = [...trips]
 
-    // Busca por texto
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(t =>
         t.vehicle.licensePlate.toLowerCase().includes(q) ||
         t.vehicle.model.toLowerCase().includes(q) ||
         t.vehicle.brand.toLowerCase().includes(q) ||
-        t.driverName.toLowerCase().includes(q) ||
+        (t.driverEmployee?.fullName ?? '').toLowerCase().includes(q) ||
         t.origin.toLowerCase().includes(q) ||
         t.destination.toLowerCase().includes(q) ||
-        t.purpose.toLowerCase().includes(q)
+        (t.purpose ?? '').toLowerCase().includes(q)
       )
     }
 
-    // Filtro de veículo
-    if (filterVehicle !== 'all') list = list.filter(t => t.vehicleId === filterVehicle)
+    if (filterVehicle !== 'all') list = list.filter(t => t.vehicle.id === filterVehicle)
 
-    // Filtro de status
     if (filterStatus === 'ongoing')   list = list.filter(t => isOngoing(t))
     if (filterStatus === 'completed') list = list.filter(t => !isOngoing(t))
     if (filterStatus === 'alert')     list = list.filter(t => t.maintenanceAlertActive)
 
-    // Ordenação
     list.sort((a, b) => {
       if (sortKey === 'date_desc') return new Date(b.departureDateTime).getTime() - new Date(a.departureDateTime).getTime()
       if (sortKey === 'date_asc')  return new Date(a.departureDateTime).getTime() - new Date(b.departureDateTime).getTime()
@@ -286,7 +312,7 @@ export default function TripHistoryPage() {
     })
 
     return list
-  }, [search, filterVehicle, filterStatus, sortKey])
+  }, [trips, search, filterVehicle, filterStatus, sortKey])
 
   const activeFiltersCount = [
     filterVehicle !== 'all',
@@ -301,14 +327,60 @@ export default function TripHistoryPage() {
 
       {/* Cabeçalho */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Route className="text-[#00475B]" size={26} />
-          Histórico de Viagens
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Route className="text-[#00475B]" size={26} />
+            Histórico de Viagens
+          </h1>
+          <button
+            onClick={() => void fetchData()}
+            disabled={loading}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#00475B] transition-colors disabled:opacity-50"
+            title="Atualizar"
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            {loading ? 'Carregando...' : 'Atualizar'}
+          </button>
+        </div>
         <p className="text-sm text-gray-500 mt-1">
           Registro completo de deslocamentos da frota com rastreamento de quilometragem e motoristas.
         </p>
       </div>
+
+      {/* Erro */}
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-center gap-3">
+          <AlertTriangle size={18} className="text-red-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-700">Erro ao carregar viagens</p>
+            <p className="text-xs text-red-500">{error}</p>
+          </div>
+          <button onClick={() => void fetchData()} className="text-xs font-medium text-red-600 hover:underline">
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
+      {/* Loading skeleton */}
+      {loading && trips.length === 0 && (
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="rounded-2xl border border-gray-100 bg-white p-4 animate-pulse">
+              <div className="flex gap-3">
+                <div className="w-12 space-y-1.5">
+                  <div className="h-3 bg-gray-100 rounded" />
+                  <div className="h-5 bg-gray-100 rounded" />
+                  <div className="h-3 bg-gray-100 rounded" />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-100 rounded w-3/4" />
+                  <div className="h-3 bg-gray-100 rounded w-1/2" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -414,7 +486,7 @@ export default function TripHistoryPage() {
                   className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#00475B]/30"
                 >
                   <option value="all">Todos os veículos</option>
-                  {MOCK_VEHICLES.map(v => (
+                  {vehicles.map(v => (
                     <option key={v.id} value={v.id}>
                       {v.licensePlate} — {v.brand} {v.model}
                     </option>
@@ -540,7 +612,7 @@ export default function TripHistoryPage() {
                     {/* Motorista */}
                     <div className="flex items-center gap-1 mt-0.5">
                       <User size={10} className="text-gray-300" />
-                      <span className="text-xs text-gray-400 truncate">{trip.driverName}</span>
+                      <span className="text-xs text-gray-400 truncate">{trip.driverEmployee?.fullName ?? '—'}</span>
                     </div>
                   </div>
 
