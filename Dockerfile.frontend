@@ -6,18 +6,18 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# ARG/ENV antes do COPY para invalidar cache quando VITE_API_URL mudar
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 # Copia manifesto de dependências
 COPY frontend/package*.json ./
 
-# Instala dependências
-RUN npm ci
+# Instala dependências e garante permissões de execução nos binários (Alpine fix)
+RUN npm ci && chmod -R +x ./node_modules/.bin/
 
 # Copia todo o código-fonte do frontend
 COPY frontend/ ./
-
-# ARG permite passar VITE_API_URL em build time via EasyPanel
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
 
 # Build de produção (TypeScript + Vite bundle + SW injectManifest)
 RUN npm run build
