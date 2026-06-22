@@ -2,15 +2,17 @@
 // Cadastro dinâmico de tipos de manutenção por veículo.
 // CRUD completo: listar, criar, editar inline e desativar/remover.
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Plus, Pencil, Trash2, X, Check,
   Wrench, Gauge, Calendar, ChevronDown, ChevronUp,
   ToggleLeft, ToggleRight, AlertCircle, History,
+  Search, ChevronDown as CaretDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { MOCK_VEHICLES, type Vehicle } from '@/data/mockData'
 
-// ── Tipos ──────────────────────────────────────────────────────────────────────
+// ── Tipos locais ───────────────────────────────────────────────────────────────
 
 interface MaintenanceType {
   id: string
@@ -23,8 +25,6 @@ interface MaintenanceType {
   lastServiceDate: string | null   // YYYY-MM-DD
 }
 
-// ── Formulário ─────────────────────────────────────────────────────────────────
-
 interface FormState {
   name: string
   description: string
@@ -35,57 +35,200 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
-  name: '',
-  description: '',
-  intervalKm: '',
-  intervalDays: '',
-  lastServiceKm: '',
-  lastServiceDate: '',
+  name: '', description: '', intervalKm: '', intervalDays: '',
+  lastServiceKm: '', lastServiceDate: '',
 }
-
-// ── Mock de veículos (substituir por fetch real) ───────────────────────────────
-
-const MOCK_VEHICLES = [
-  { id: 'v1', label: 'ABC-1D23 — Ford Ranger 2022' },
-  { id: 'v2', label: 'XYZ-5E67 — Volkswagen Amarok 2021' },
-  { id: 'v3', label: 'QRS-9H12 — Toyota Hilux 2023' },
-]
 
 // ── Mock inicial de tipos por veículo ─────────────────────────────────────────
 
 const INITIAL_TYPES: Record<string, MaintenanceType[]> = {
-  v1: [
-    {
-      id: 't1', name: 'Troca de óleo do motor', description: 'Óleo 5W30 sintético + filtro',
-      isActive: true, intervalKm: 10000, intervalDays: 180,
-      lastServiceKm: 46000, lastServiceDate: '2024-12-10',
-    },
-    {
-      id: 't2', name: 'Óleo da caixa de câmbio', description: null,
-      isActive: true, intervalKm: 40000, intervalDays: null,
-      lastServiceKm: 20000, lastServiceDate: '2023-08-15',
-    },
-    {
-      id: 't3', name: 'Correia dentada', description: 'Substituir conjunto correia + tensor',
-      isActive: true, intervalKm: 60000, intervalDays: null,
-      lastServiceKm: null, lastServiceDate: null,
-    },
-    {
-      id: 't4', name: 'Filtro de combustível', description: null,
-      isActive: false, intervalKm: 20000, intervalDays: null,
-      lastServiceKm: 30000, lastServiceDate: '2024-01-20',
-    },
+  'veh-001': [
+    { id: 't1', name: 'Troca de óleo do motor',  description: 'Óleo 5W30 sintético + filtro',            isActive: true,  intervalKm: 10000, intervalDays: 180, lastServiceKm: 46000, lastServiceDate: '2024-12-10' },
+    { id: 't2', name: 'Óleo da caixa de câmbio', description: null,                                        isActive: true,  intervalKm: 40000, intervalDays: null, lastServiceKm: 20000, lastServiceDate: '2023-08-15' },
+    { id: 't3', name: 'Correia dentada',          description: 'Substituir conjunto correia + tensor',     isActive: true,  intervalKm: 60000, intervalDays: null, lastServiceKm: null,  lastServiceDate: null },
+    { id: 't4', name: 'Filtro de combustível',    description: null,                                        isActive: false, intervalKm: 20000, intervalDays: null, lastServiceKm: 30000, lastServiceDate: '2024-01-20' },
   ],
-  v2: [],
-  v3: [],
+  'veh-002': [],
+  'veh-003': [],
+  'veh-004': [],
+  'veh-005': [],
 }
 
-// ── Helper ────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string | null) {
   if (!iso) return null
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
+}
+
+function vehicleLabel(v: Vehicle) {
+  return `${v.licensePlate} — ${v.brand} ${v.model} ${v.year}`
+}
+
+function vehicleKmLabel(v: Vehicle) {
+  return `KM atual: ${v.currentKm.toLocaleString('pt-BR')}`
+}
+
+// ── Componente: VehicleSearchSelect ───────────────────────────────────────────
+
+interface VehicleSearchSelectProps {
+  vehicles: Vehicle[]
+  selectedId: string
+  onSelect: (id: string) => void
+}
+
+function VehicleSearchSelect({ vehicles, selectedId, onSelect }: VehicleSearchSelectProps) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const selected = vehicles.find(v => v.id === selectedId)
+
+  // Fecha ao clicar fora
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Foca o input ao abrir
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 50)
+  }, [open])
+
+  const filtered = query.trim()
+    ? vehicles.filter(v => {
+        const q = query.toLowerCase()
+        return (
+          v.licensePlate.toLowerCase().includes(q) ||
+          v.brand.toLowerCase().includes(q) ||
+          v.model.toLowerCase().includes(q) ||
+          v.year.toString().includes(q)
+        )
+      })
+    : vehicles
+
+  const statusDot = (v: Vehicle) => {
+    if (v.status === 'ACTIVE')       return 'bg-emerald-400'
+    if (v.status === 'MAINTENANCE')  return 'bg-amber-400'
+    return 'bg-gray-300'
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={() => { setOpen(o => !o); setQuery('') }}
+        className="w-full flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm hover:border-[#00475B]/40 focus:outline-none focus:ring-2 focus:ring-[#00475B]/30 transition-colors"
+      >
+        {selected ? (
+          <>
+            <span className={cn('w-2 h-2 rounded-full flex-shrink-0 mt-0.5', statusDot(selected))} />
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-semibold text-gray-800 truncate">
+                {vehicleLabel(selected)}
+              </span>
+              <span className="block text-xs text-[#00475B] font-medium">
+                {vehicleKmLabel(selected)}
+              </span>
+            </span>
+          </>
+        ) : (
+          <span className="flex-1 text-sm text-gray-400">Selecione um veículo...</span>
+        )}
+        <CaretDown
+          size={16}
+          className={cn('flex-shrink-0 text-gray-400 transition-transform duration-200', open && 'rotate-180')}
+        />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden">
+          {/* Campo de pesquisa */}
+          <div className="p-2 border-b border-gray-100">
+            <div className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2">
+              <Search size={14} className="text-gray-400 flex-shrink-0" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Buscar por placa, marca ou modelo..."
+                className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
+              />
+              {query && (
+                <button onClick={() => setQuery('')} className="text-gray-300 hover:text-gray-500 transition-colors">
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Lista de veículos */}
+          <div className="max-h-64 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-sm text-gray-400">Nenhum veículo encontrado</p>
+                <p className="text-xs text-gray-300 mt-0.5">Tente outro termo de busca</p>
+              </div>
+            ) : (
+              filtered.map(v => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => { onSelect(v.id); setOpen(false); setQuery('') }}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors',
+                    v.id === selectedId
+                      ? 'bg-[#00475B]/8 text-[#00475B]'
+                      : 'hover:bg-gray-50 text-gray-700'
+                  )}
+                >
+                  <span className={cn('w-2 h-2 rounded-full flex-shrink-0 mt-0.5', statusDot(v))} />
+                  <span className="flex-1 min-w-0">
+                    <span className={cn(
+                      'block text-sm font-semibold truncate',
+                      v.id === selectedId ? 'text-[#00475B]' : 'text-gray-800'
+                    )}>
+                      {vehicleLabel(v)}
+                    </span>
+                    <span className={cn(
+                      'block text-xs font-medium',
+                      v.id === selectedId ? 'text-[#00475B]/70' : 'text-gray-400'
+                    )}>
+                      {vehicleKmLabel(v)}
+                    </span>
+                  </span>
+                  {v.id === selectedId && (
+                    <Check size={14} className="text-[#00475B] flex-shrink-0" />
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+
+          {/* Legenda status */}
+          <div className="border-t border-gray-100 px-4 py-2 flex items-center gap-4">
+            <span className="flex items-center gap-1.5 text-xs text-gray-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"/>Ativo
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-gray-400">
+              <span className="w-2 h-2 rounded-full bg-amber-400"/>Manutenção
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-gray-400">
+              <span className="w-2 h-2 rounded-full bg-gray-300"/>Inativo
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Componente principal ───────────────────────────────────────────────────────
@@ -99,8 +242,8 @@ export default function MaintenanceTypesPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [formError, setFormError] = useState('')
 
-  const types = typesByVehicle[selectedVehicleId] ?? []
   const selectedVehicle = MOCK_VEHICLES.find(v => v.id === selectedVehicleId)!
+  const types = typesByVehicle[selectedVehicleId] ?? []
 
   // ── Criar ──────────────────────────────────────────────────────────────────
 
@@ -197,20 +340,20 @@ export default function MaintenanceTypesPage() {
         </p>
       </div>
 
-      {/* Seletor de veículo */}
+      {/* Seletor de veículo com busca */}
       <div className="space-y-1">
         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Veículo
         </label>
-        <select
-          value={selectedVehicleId}
-          onChange={e => { setSelectedVehicleId(e.target.value); setShowForm(false); setEditingId(null) }}
-          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00475B]/30"
-        >
-          {MOCK_VEHICLES.map(v => (
-            <option key={v.id} value={v.id}>{v.label}</option>
-          ))}
-        </select>
+        <VehicleSearchSelect
+          vehicles={MOCK_VEHICLES}
+          selectedId={selectedVehicleId}
+          onSelect={(id) => {
+            setSelectedVehicleId(id)
+            setShowForm(false)
+            setEditingId(null)
+          }}
+        />
       </div>
 
       {/* Botão adicionar */}
@@ -228,7 +371,7 @@ export default function MaintenanceTypesPage() {
       {showForm && (
         <div className="rounded-2xl border border-[#00475B]/20 bg-[#00475B]/5 p-4 space-y-3 shadow-sm">
           <p className="text-sm font-semibold text-[#00475B]">
-            Novo tipo para: {selectedVehicle.label.split('—')[1]?.trim()}
+            Novo tipo para: {selectedVehicle.brand} {selectedVehicle.model} ({selectedVehicle.licensePlate})
           </p>
 
           <input
@@ -248,9 +391,7 @@ export default function MaintenanceTypesPage() {
 
           {/* Intervalos de manutenção */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">
-              Intervalos de manutenção
-            </p>
+            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Intervalos de manutenção</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-xs text-gray-500 flex items-center gap-1"><Gauge size={12} /> A cada (km)</label>
@@ -273,7 +414,7 @@ export default function MaintenanceTypesPage() {
             </div>
           </div>
 
-          {/* Último serviço — primeiro registro */}
+          {/* Último serviço */}
           <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-2">
             <p className="text-xs font-semibold text-amber-700 flex items-center gap-1.5">
               <History size={13} />
@@ -284,7 +425,7 @@ export default function MaintenanceTypesPage() {
               <div className="space-y-1">
                 <label className="text-xs text-amber-700 flex items-center gap-1"><Gauge size={12} /> KM do veículo</label>
                 <input
-                  type="number" inputMode="numeric" placeholder="ex: 46000"
+                  type="number" inputMode="numeric" placeholder={`ex: ${selectedVehicle.currentKm.toLocaleString('pt-BR')}`}
                   value={form.lastServiceKm}
                   onChange={e => setForm(p => ({ ...p, lastServiceKm: e.target.value }))}
                   className="w-full rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30"
@@ -356,7 +497,6 @@ export default function MaintenanceTypesPage() {
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#00475B]/30"
                     placeholder="Descrição (opcional)"
                   />
-                  {/* Intervalos */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs text-gray-500 flex items-center gap-1"><Gauge size={11}/> A cada (km)</label>
@@ -375,7 +515,6 @@ export default function MaintenanceTypesPage() {
                       />
                     </div>
                   </div>
-                  {/* Último serviço */}
                   <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-2">
                     <p className="text-xs font-semibold text-amber-700 flex items-center gap-1.5">
                       <History size={12}/> Último serviço
@@ -415,14 +554,12 @@ export default function MaintenanceTypesPage() {
                 /* ── Modo visualização ── */
                 <>
                   <div className="flex items-center gap-3 px-4 py-3">
-                    {/* Ícone */}
                     <div className={cn(
                       'w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0',
                       t.isActive ? 'bg-[#00475B]/10' : 'bg-gray-100'
                     )}>
                       <Wrench size={16} className={t.isActive ? 'text-[#00475B]' : 'text-gray-400'} />
                     </div>
-
                     <div className="flex-1 min-w-0">
                       <p className={cn('text-sm font-semibold truncate', t.isActive ? 'text-gray-800' : 'text-gray-400')}>
                         {t.name}
@@ -438,23 +575,20 @@ export default function MaintenanceTypesPage() {
                             <Calendar size={10}/> a cada {t.intervalDays} dias
                           </span>
                         )}
-                        {(t.lastServiceKm || t.lastServiceDate) && (
+                        {(t.lastServiceKm || t.lastServiceDate) ? (
                           <span className="text-xs text-amber-600 flex items-center gap-1">
                             <History size={10}/>
-                            {t.lastServiceKm ? `Últ. serv.: ${t.lastServiceKm.toLocaleString('pt-BR')} km` : ''}
+                            {t.lastServiceKm ? `Últ.: ${t.lastServiceKm.toLocaleString('pt-BR')} km` : ''}
                             {t.lastServiceKm && t.lastServiceDate ? ' · ' : ''}
                             {t.lastServiceDate ? formatDate(t.lastServiceDate) : ''}
                           </span>
-                        )}
-                        {!t.lastServiceKm && !t.lastServiceDate && (
+                        ) : (
                           <span className="text-xs text-gray-300 flex items-center gap-1">
                             <History size={10}/> Nenhum serviço registrado
                           </span>
                         )}
                       </div>
                     </div>
-
-                    {/* Ações */}
                     <div className="flex items-center gap-1">
                       <button onClick={() => toggleActive(t.id)}
                         title={t.isActive ? 'Desativar' : 'Ativar'}
@@ -480,8 +614,6 @@ export default function MaintenanceTypesPage() {
                       )}
                     </div>
                   </div>
-
-                  {/* Descrição expandida */}
                   {expandedId === t.id && t.description && (
                     <div className="px-4 pb-3 -mt-1">
                       <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 leading-relaxed">
@@ -496,7 +628,6 @@ export default function MaintenanceTypesPage() {
         </div>
       )}
 
-      {/* Contagem */}
       {types.length > 0 && (
         <p className="text-xs text-gray-400 text-center">
           {types.filter(t => t.isActive).length} ativo(s) · {types.filter(t => !t.isActive).length} inativo(s)
