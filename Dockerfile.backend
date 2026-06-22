@@ -53,8 +53,8 @@ RUN npm ci --omit=dev
 COPY prisma ./prisma
 
 # 3. Prisma Client gerado (inclui binário linux-musl)
-COPY --from=builder /build/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /build/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /build/node_modules/.prisma    ./node_modules/.prisma
+COPY --from=builder /build/node_modules/@prisma    ./node_modules/@prisma
 
 # 4. Build compilado
 COPY --from=builder /build/dist ./dist
