@@ -3,6 +3,8 @@
 // Usa o token JWT armazenado em localStorage pelo AuthContext.
 // Base URL configurável via variável de ambiente VITE_API_URL.
 
+import type { AuthUser } from '@/types/auth'
+
 let rawUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
   ?? 'https://3tbackend.j4sistemas.com.br/api/v1'
 
@@ -24,7 +26,8 @@ async function request<T>(
 
   // Se não houver token ou se for o token mock de desenvolvimento,
   // tenta obter um token válido através de login automático com o admin padrão.
-  if (!token || token === 'dev-mock-token') {
+  // Ignora o auto-login se a requisição for explicitamente para o endpoint de login.
+  if (path !== '/auth/login' && (!token || token === 'dev-mock-token')) {
     try {
       const loginRes = await fetch(`${BASE_URL}/auth/login`, {
         method: 'POST',
@@ -184,5 +187,18 @@ export const tripsApi = {
     notes?: string
   }): Promise<{ message: string; trip: ApiTrip; distanceTraveled: number }> {
     return request(`/vehicles/trips/${tripId}/end`, { method: 'POST', body: JSON.stringify(data) })
+  },
+}
+
+// ── Endpoints de Autenticação ──────────────────────────────────────────────────
+
+export const authApi = {
+  login(data: { email: string; password: string }): Promise<{
+    accessToken: string
+    tokenType: 'Bearer'
+    expiresIn: string
+    user: AuthUser
+  }> {
+    return request('/auth/login', { method: 'POST', body: JSON.stringify(data) })
   },
 }

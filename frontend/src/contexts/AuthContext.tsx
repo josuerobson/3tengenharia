@@ -25,22 +25,25 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-// ── Usuário mock para desenvolvimento (remover ao integrar com a API real) ────
-
-const DEV_MOCK_USER: AuthUser = {
-  id: 'cuid-admin-001',
-  email: 'admin@3tengenharia.com.br',
-  role: 'ADMIN',
-  name: 'Carlos Henrique',
-  employeeId: null,
-}
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Inicializa com o mock em dev; em prod, recuperar de localStorage/cookie
-  const [user, setUser] = useState<AuthUser | null>(DEV_MOCK_USER)
-  const [token, setToken] = useState<string | null>('dev-mock-token')
+  // Inicializa a partir do localStorage para persistência e login real
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    const stored = localStorage.getItem('3t:user')
+    if (stored) {
+      try {
+        return JSON.parse(stored) as AuthUser
+      } catch {
+        return null
+      }
+    }
+    return null
+  })
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem('3t:token')
+  })
 
   const login = useCallback((newUser: AuthUser, newToken: string) => {
     setUser(newUser)

@@ -2,8 +2,9 @@
 // Raiz da aplicação — define as rotas e envolve tudo no AuthProvider e DashboardLayout.
 
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from '@/contexts/AuthContext'
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import DashboardLayout from '@/components/layout/DashboardLayout'
+import LoginPage from '@/pages/auth/LoginPage'
 
 // ── Páginas reais (Etapa 5) ───────────────────────────────────────────────────
 import TripStartPage           from '@/pages/vehicles/TripStartPage'
@@ -41,14 +42,23 @@ function PlaceholderPage({ title, description }: { title: string; description?: 
   )
 }
 
+function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+  return <DashboardLayout>{children}</DashboardLayout>
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
+        <Route path="/login" element={<LoginPage />} />
         <Route
           path="/*"
           element={
-            <DashboardLayout>
+            <ProtectedLayout>
               <Routes>
                 {/* Redireciona raiz para /dashboard */}
                 <Route index element={<Navigate to="/dashboard" replace />} />
@@ -90,7 +100,7 @@ export default function App() {
                   element={<PlaceholderPage title="Página não encontrada" description="A rota solicitada não existe." />}
                 />
               </Routes>
-            </DashboardLayout>
+            </ProtectedLayout>
           }
         />
       </Routes>
