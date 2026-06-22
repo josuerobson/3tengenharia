@@ -3,8 +3,14 @@
 // Usa o token JWT armazenado em localStorage pelo AuthContext.
 // Base URL configurável via variável de ambiente VITE_API_URL.
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
+let rawUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
   ?? 'https://3tbackend.j4sistemas.com.br/api/v1'
+
+if (rawUrl && !rawUrl.endsWith('/api/v1')) {
+  rawUrl = `${rawUrl}/api/v1`
+}
+
+const BASE_URL = rawUrl
 
 function getToken(): string | null {
   return localStorage.getItem('3t:token')
