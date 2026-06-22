@@ -38,6 +38,9 @@ import {
   Building2,
   Truck,
   X,
+  ClipboardCheck,
+  CheckSquare,
+  ListChecks,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -138,6 +141,25 @@ const MENU_ITEMS: MenuItem[] = [
         label: 'Relatório por C.C.',
         path: '/time-logs/report',
         icon: BarChart2,
+      },
+    ],
+  },
+  {
+    id: 'fiveS',
+    label: 'Auditorias 5S',
+    icon: ClipboardCheck,
+    subItems: [
+      {
+        id: 'fiveS-audit-new',
+        label: 'Nova Auditoria',
+        path: '/5s/audit/new',
+        icon: CheckSquare,
+      },
+      {
+        id: 'fiveS-panel',
+        label: 'Painel de Qualidade',
+        path: '/5s/panel',
+        icon: ListChecks,
       },
     ],
   },
