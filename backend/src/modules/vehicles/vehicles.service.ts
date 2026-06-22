@@ -319,26 +319,29 @@ export const vehiclesService = {
   async findById(id: string) {
     return prisma.vehicle.findUnique({
       where: { id },
-      include: { maintenanceTypes: { where: { isActive: true }, orderBy: { name: 'asc' } } },
     })
   },
 
-  async update(id: string, data: Record<string, unknown>) {
+  async update(id: string, data: {
+    brand?: string; model?: string; year?: number; color?: string | null
+    fuelType?: string | null; currentKm?: number; status?: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE'
+    maintenanceKmThreshold?: number | null; maintenanceDayThreshold?: number | null; notes?: string | null
+  }) {
     const exists = await prisma.vehicle.findUnique({ where: { id } })
     if (!exists) return null
     return prisma.vehicle.update({
       where: { id },
       data: {
-        ...(data.brand                   !== undefined ? { brand:                   String(data.brand) }                   : {}),
-        ...(data.model                   !== undefined ? { model:                   String(data.model) }                   : {}),
-        ...(data.year                    !== undefined ? { year:                    Number(data.year) }                    : {}),
-        ...(data.color                   !== undefined ? { color:                   data.color ? String(data.color) : null } : {}),
-        ...(data.fuelType                !== undefined ? { fuelType:                data.fuelType ? String(data.fuelType) : null } : {}),
-        ...(data.currentKm               !== undefined ? { currentKm:               Number(data.currentKm) }               : {}),
-        ...(data.status                  !== undefined ? { status:                  String(data.status) as 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE' } : {}),
-        ...(data.maintenanceKmThreshold  !== undefined ? { maintenanceKmThreshold:  data.maintenanceKmThreshold  ? Number(data.maintenanceKmThreshold)  : null } : {}),
-        ...(data.maintenanceDayThreshold !== undefined ? { maintenanceDayThreshold: data.maintenanceDayThreshold ? Number(data.maintenanceDayThreshold) : null } : {}),
-        ...(data.notes                   !== undefined ? { notes:                   data.notes ? String(data.notes) : null } : {}),
+        ...(data.brand                   !== undefined ? { brand:                   data.brand }                   : {}),
+        ...(data.model                   !== undefined ? { model:                   data.model }                   : {}),
+        ...(data.year                    !== undefined ? { year:                    data.year }                    : {}),
+        ...(data.color                   !== undefined ? { color:                   data.color }                   : {}),
+        ...(data.fuelType                !== undefined ? { fuelType:                data.fuelType }                : {}),
+        ...(data.currentKm               !== undefined ? { currentKm:               data.currentKm }               : {}),
+        ...(data.status                  !== undefined ? { status:                  data.status }                  : {}),
+        ...(data.maintenanceKmThreshold  !== undefined ? { maintenanceKmThreshold:  data.maintenanceKmThreshold }  : {}),
+        ...(data.maintenanceDayThreshold !== undefined ? { maintenanceDayThreshold: data.maintenanceDayThreshold } : {}),
+        ...(data.notes                   !== undefined ? { notes:                   data.notes }                   : {}),
       },
     })
   },

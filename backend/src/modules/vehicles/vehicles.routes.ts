@@ -1,7 +1,13 @@
 // src/modules/vehicles/vehicles.routes.ts
 
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifySchema } from 'fastify'
 import { vehiclesController } from './vehicles.controller.js'
+
+// Helper para tipar corretamente os schemas com campos do swagger (@fastify/swagger)
+// sem acionar o erro TS2353 em objetos inline de app.get/post/patch/delete
+function schema(s: FastifySchema & { tags?: string[]; summary?: string; security?: unknown[] }) {
+  return s
+}
 
 export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   const controller = vehiclesController(app)
@@ -9,7 +15,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   // ── GET /vehicles ────────────────────────────────────────────────────────────
   app.get(
     '/',
-    { onRequest: [app.authenticate], schema: { tags: ['Vehicles'], summary: 'Lista todos os veículos', security: [{ bearerAuth: [] }] } },
+    { onRequest: [app.authenticate], schema: schema({ tags: ['Vehicles'], summary: 'Lista todos os veículos', security: [{ bearerAuth: [] }] }) },
     controller.listAll,
   )
 
@@ -18,7 +24,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
     '/',
     {
       onRequest: [app.authenticate],
-      schema: {
+      schema: schema({
         tags: ['Vehicles'], summary: 'Cadastra novo veículo', security: [{ bearerAuth: [] }],
         body: {
           type: 'object',
@@ -36,7 +42,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
             notes:                   { type: 'string' },
           },
         },
-      },
+      }),
     },
     controller.createVehicle,
   )
@@ -44,21 +50,21 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   // ── GET /vehicles/:id ────────────────────────────────────────────────────────
   app.get(
     '/:id',
-    { onRequest: [app.authenticate], schema: { tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } } },
+    { onRequest: [app.authenticate], schema: schema({ tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } }) },
     controller.getById,
   )
 
   // ── PATCH /vehicles/:id ──────────────────────────────────────────────────────
   app.patch(
     '/:id',
-    { onRequest: [app.authenticate], schema: { tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } } },
+    { onRequest: [app.authenticate], schema: schema({ tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } }) },
     controller.updateVehicle,
   )
 
   // ── DELETE /vehicles/:id ─────────────────────────────────────────────────────
   app.delete(
     '/:id',
-    { onRequest: [app.authenticate], schema: { tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } } },
+    { onRequest: [app.authenticate], schema: schema({ tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } }) },
     controller.deleteVehicle,
   )
 
@@ -67,7 +73,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
     '/trips/start',
     {
       onRequest: [app.authenticate],
-      schema: {
+      schema: schema({
         tags: ['Vehicles'], summary: 'Iniciar uma viagem', security: [{ bearerAuth: [] }],
         body: {
           type: 'object',
@@ -81,7 +87,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
             purpose:          { type: 'string' },
           },
         },
-      },
+      }),
     },
     controller.startTrip,
   )
@@ -91,7 +97,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
     '/trips/:id/end',
     {
       onRequest: [app.authenticate],
-      schema: {
+      schema: schema({
         tags: ['Vehicles'], summary: 'Encerrar uma viagem', security: [{ bearerAuth: [] }],
         params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
         body: {
@@ -103,7 +109,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
             notes:           { type: 'string' },
           },
         },
-      },
+      }),
     },
     controller.endTrip,
   )

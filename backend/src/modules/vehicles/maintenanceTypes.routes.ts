@@ -7,7 +7,7 @@ import {
 } from './maintenanceTypes.schema.js'
 
 export async function maintenanceTypeRoutes(app: FastifyInstance): Promise<void> {
-  const svc = maintenanceTypesService(app.prisma)
+  const svc = maintenanceTypesService
 
   // ── GET /vehicles/:vehicleId/maintenance-types ──────────────────────────────
   app.get(
