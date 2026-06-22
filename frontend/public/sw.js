@@ -8,24 +8,21 @@ const STATIC_CACHE  = `3t-static-${CACHE_VERSION}`
 const API_CACHE     = `3t-api-${CACHE_VERSION}`
 const IMAGE_CACHE   = `3t-images-${CACHE_VERSION}`
 
-// ── Assets estáticos para pré-cache (Precache) ───────────────────────────────
-// O vite-plugin-pwa injetará automaticamente a lista de assets do build.
-// Este fallback garante os recursos mínimos offline.
-const PRECACHE_URLS = [
-  '/',
-  '/manifest.webmanifest',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png',
-  '/logo-sistema.png',
-]
+// ── PRECACHE: Workbox injeta aqui a lista de assets do build ─────────────────
+// O vite-plugin-pwa substitui self.__WB_MANIFEST pela lista real em build time.
+// OBRIGATÓRIO no modo injectManifest — não remover.
+const PRECACHE_MANIFEST = self.__WB_MANIFEST ?? []
 
-// ── INSTALL: pré-cacheia assets críticos ────────────────────────────────────
+// ── INSTALL: pré-cacheia assets do build ────────────────────────────────────
 self.addEventListener('install', (event) => {
   console.log('[SW 3T] Instalando Service Worker...')
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => {
-      return cache.addAll(PRECACHE_URLS)
+      // Precacheia todos os assets injetados pelo Workbox
+      const urls = PRECACHE_MANIFEST.map((entry) =>
+        typeof entry === 'string' ? entry : entry.url
+      )
+      return cache.addAll(urls)
     }).then(() => {
       console.log('[SW 3T] Assets pré-cacheados com sucesso.')
       return self.skipWaiting()
