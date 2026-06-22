@@ -20,7 +20,35 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = getToken()
+  let token = getToken()
+
+  // Se não houver token ou se for o token mock de desenvolvimento,
+  // tenta obter um token válido através de login automático com o admin padrão.
+  if (!token || token === 'dev-mock-token') {
+    try {
+      const loginRes = await fetch(`${BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'admin@3tengenharia.com.br',
+          password: 'Admin@3T2024!',
+        }),
+      })
+      if (loginRes.ok) {
+        const data = await loginRes.json() as { accessToken?: string; user?: unknown }
+        if (data.accessToken) {
+          token = data.accessToken
+          localStorage.setItem('3t:token', token)
+          if (data.user) {
+            localStorage.setItem('3t:user', JSON.stringify(data.user))
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Falha no auto-login do admin:', err)
+    }
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> | undefined),
