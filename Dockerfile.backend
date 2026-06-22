@@ -1,61 +1,67 @@
-# Dockerfile — Backend 3T Engenharia (Fastify + Prisma)
-# Multi-stage build: compila TypeScript em stage separado, copia apenas o necessário.
+# Dockerfile.backend — 3T Engenharia (Fastify + Prisma + TypeScript)
+# Multi-stage: compila TS no builder, produção mínima no runner.
 
-# ── Stage 1: Dependências + Build ────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 1 — builder: instala deps e compila TypeScript
+# ─────────────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
-WORKDIR /app
+# Contexto de build é a RAIZ do monorepo.
+# Todo WORKDIR e COPY é relativo ao contexto raiz.
+WORKDIR /build
 
-# Copia os arquivos de manifesto de dependências
-COPY backend/package*.json ./backend/
-COPY prisma/                ./prisma/
+# 1. Copia manifesto de dependências do backend
+COPY backend/package.json backend/package-lock.json ./
 
-# Instala TODAS as dependências (incluindo devDeps para compilar)
-WORKDIR /app/backend
+# 2. Instala TODAS as dependências (devDeps necessárias para compilar)
 RUN npm ci
 
-# Copia o código-fonte do backend
+# 3. Copia o schema Prisma (necessário antes do generate)
+COPY prisma ./prisma
+
+# 4. Gera o Prisma Client
+RUN npx --yes prisma@5.22.0 generate --schema=./prisma/schema.prisma
+
+# 5. Copia todo o código-fonte do backend
 COPY backend/src ./src
-COPY backend/tsconfig*.json ./
+COPY backend/tsconfig.json ./
+COPY backend/tsconfig.build.json ./
 
-# Gera o Prisma Client
-RUN npx --yes prisma@5.22.0 generate --schema=../prisma/schema.prisma
+# 6. Compila TypeScript → ./dist
+RUN npx tsc --project tsconfig.build.json
 
-# Compila TypeScript → JavaScript (output em ./dist)
-RUN npm run build
-
-# ── Stage 2: Imagem de Produção ───────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2 — runner: imagem mínima de produção
+# ─────────────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 
-# Usuário não-root por segurança
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# Usuário não-root para segurança
+RUN addgroup -S app && adduser -S app -G app
 
 WORKDIR /app
 
-# Copia apenas as dependências de produção
-COPY backend/package*.json ./
+# 1. Copia manifesto e instala APENAS deps de produção
+COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev
 
-# Copia o schema Prisma (necessário para migrations em runtime)
-COPY --from=builder /app/prisma ../prisma
+# 2. Copia schema Prisma para migrations em runtime
+COPY prisma ./prisma
 
-# Copia o build compilado
-COPY --from=builder /app/backend/dist ./dist
+# 3. Copia o Prisma Client gerado no builder
+COPY --from=builder /build/node_modules/.prisma ./node_modules/.prisma
 
-# Copia o Prisma Client gerado
-COPY --from=builder /app/backend/node_modules/.prisma ./node_modules/.prisma
+# 4. Copia o build compilado (./dist)
+COPY --from=builder /build/dist ./dist
 
-# Define o usuário não-root
-USER appuser
+# 5. Aplica permissões
+RUN chown -R app:app /app
+USER app
 
-# Expõe a porta configurada no .env (padrão 3333)
 EXPOSE 3333
 
-# Healthcheck para o EasyPanel monitorar
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+# Healthcheck (aguarda 30s antes da primeira checagem — migrations podem demorar)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:3333/health || exit 1
 
-# Comando de inicialização:
-# 1. Aplica migrations pendentes
-# 2. Sobe o servidor
-CMD ["sh", "-c", "npx --yes prisma@5.22.0 migrate deploy --schema=../prisma/schema.prisma && node dist/server.js"]
+# Aplica migrations e sobe o servidor
+CMD ["sh", "-c", "npx --yes prisma@5.22.0 migrate deploy --schema=./prisma/schema.prisma && node dist/server.js"]
