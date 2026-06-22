@@ -167,6 +167,10 @@ export const vehiclesApi = {
   update(id: string, data: Partial<ApiVehicle>): Promise<ApiVehicle> {
     return request(`/vehicles/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
   },
+
+  delete(id: string): Promise<void> {
+    return request(`/vehicles/${id}`, { method: 'DELETE' })
+  },
 }
 
 // ── Endpoints de Viagens ──────────────────────────────────────────────────────

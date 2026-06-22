@@ -1,32 +1,23 @@
-// src/pages/admin/VehicleRegistrationPage.tsx
-// Administração › Cadastro de Veículos
-// CRUD completo: listar frota, cadastrar, editar e inativar veículos.
+// src/pages/vehicles/VehicleRegistrationPage.tsx
+// Controle de Veículos › Cadastro de Veículos
+// CRUD completo integrado ao backend real (GET /vehicles, POST /vehicles, PATCH /vehicles/:id, DELETE /vehicles/:id).
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Plus, Pencil, X, Check, Car, Gauge,
   Fuel, Palette, FileText, ChevronDown,
   Search, Filter, CheckCircle2, Wrench, Ban,
+  RefreshCw, AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { vehiclesApi, type ApiVehicle } from '@/lib/api'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
 type VehicleStatus = 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE'
 type FuelType = 'Flex' | 'Gasolina' | 'Diesel' | 'GNV' | 'Elétrico' | 'Híbrido'
 
-interface Vehicle {
-  id: string
-  licensePlate: string
-  brand: string
-  model: string
-  year: number
-  color: string | null
-  fuelType: string | null
-  currentKm: number
-  status: VehicleStatus
-  notes: string | null
-}
+type Vehicle = ApiVehicle
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
@@ -43,19 +34,13 @@ const EMPTY_FORM = {
   color: '', fuelType: 'Flex', currentKm: '0', notes: '',
 }
 
-// ── Mock data (substituir por fetch real) ─────────────────────────────────────
-
-const MOCK_VEHICLES: Vehicle[] = [
-  { id: 'v1', licensePlate: 'ABC1D23', brand: 'Ford',       model: 'Ranger',  year: 2022, color: 'Branco', fuelType: 'Diesel', currentKm: 48320, status: 'ACTIVE',      notes: null },
-  { id: 'v2', licensePlate: 'XYZ5E67', brand: 'Volkswagen', model: 'Amarok',  year: 2021, color: 'Prata',  fuelType: 'Diesel', currentKm: 72100, status: 'MAINTENANCE', notes: 'Aguardando troca de correia dentada' },
-  { id: 'v3', licensePlate: 'QRS9H12', brand: 'Toyota',     model: 'Hilux',   year: 2023, color: 'Preto',  fuelType: 'Diesel', currentKm: 12450, status: 'ACTIVE',      notes: null },
-  { id: 'v4', licensePlate: 'DEF2G34', brand: 'Fiat',       model: 'Strada',  year: 2020, color: 'Cinza',  fuelType: 'Flex',   currentKm: 91200, status: 'INACTIVE',   notes: 'Vendido em 01/2026' },
-]
-
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export default function VehicleRegistrationPage() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(MOCK_VEHICLES)
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+  
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -64,11 +49,29 @@ export default function VehicleRegistrationPage() {
   const [filterStatus, setFilterStatus] = useState<VehicleStatus | 'ALL'>('ALL')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
+  // ── Carregar veículos do backend ──────────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await vehiclesApi.list()
+      setVehicles(res.vehicles)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar veículos.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
+
   // ── Filtros ────────────────────────────────────────────────────────────────
 
   const filtered = vehicles.filter(v => {
     const matchSearch = !search ||
-      v.licensePlate.includes(search.toUpperCase()) ||
+      v.licensePlate.toUpperCase().includes(search.toUpperCase()) ||
       v.brand.toLowerCase().includes(search.toLowerCase()) ||
       v.model.toLowerCase().includes(search.toLowerCase())
     const matchStatus = filterStatus === 'ALL' || v.status === filterStatus
@@ -93,43 +96,40 @@ export default function VehicleRegistrationPage() {
 
   // ── Salvar (criar ou editar) ───────────────────────────────────────────────
 
-  function handleSave() {
+  async function handleSave() {
     if (!validate()) return
 
     const plate = form.licensePlate.toUpperCase().replace(/[^A-Z0-9]/g, '')
-
-    if (editingId) {
-      setVehicles(prev => prev.map(v => v.id === editingId ? {
-        ...v,
-        licensePlate: plate,
-        brand:        form.brand,
-        model:        form.model,
-        year:         Number(form.year),
-        color:        form.color || null,
-        fuelType:     form.fuelType || null,
-        currentKm:    Number(form.currentKm),
-        notes:        form.notes || null,
-      } : v))
-    } else {
-      const newVehicle: Vehicle = {
-        id:           `v${Date.now()}`,
-        licensePlate: plate,
-        brand:        form.brand,
-        model:        form.model,
-        year:         Number(form.year),
-        color:        form.color || null,
-        fuelType:     form.fuelType || null,
-        currentKm:    Number(form.currentKm),
-        status:       'ACTIVE',
-        notes:        form.notes || null,
-      }
-      setVehicles(prev => [newVehicle, ...prev])
+    const payload = {
+      licensePlate: plate,
+      brand:        form.brand.trim(),
+      model:        form.model.trim(),
+      year:         Number(form.year),
+      color:        form.color.trim() || undefined,
+      fuelType:     form.fuelType || undefined,
+      currentKm:    Number(form.currentKm),
+      notes:        form.notes.trim() || undefined,
     }
 
-    setForm(EMPTY_FORM)
-    setErrors({})
-    setShowForm(false)
-    setEditingId(null)
+    setLoading(true)
+    setError(null)
+    try {
+      if (editingId) {
+        const updated = await vehiclesApi.update(editingId, payload)
+        setVehicles(prev => prev.map(v => v.id === editingId ? updated : v))
+      } else {
+        const created = await vehiclesApi.create(payload)
+        setVehicles(prev => [created, ...prev])
+      }
+      setForm(EMPTY_FORM)
+      setErrors({})
+      setShowForm(false)
+      setEditingId(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao salvar veículo.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   function startEdit(v: Vehicle) {
@@ -156,8 +156,20 @@ export default function VehicleRegistrationPage() {
     setErrors({})
   }
 
-  function toggleStatus(id: string, newStatus: VehicleStatus) {
-    setVehicles(prev => prev.map(v => v.id === id ? { ...v, status: newStatus } : v))
+  async function toggleStatus(id: string, newStatus: VehicleStatus) {
+    setError(null)
+    try {
+      if (newStatus === 'INACTIVE') {
+        // O endpoint DELETE faz o soft delete para INACTIVE preservando histórico de viagens
+        await vehiclesApi.delete(id)
+        setVehicles(prev => prev.map(v => v.id === id ? { ...v, status: 'INACTIVE' } : v))
+      } else {
+        const updated = await vehiclesApi.update(id, { status: newStatus })
+        setVehicles(prev => prev.map(v => v.id === id ? updated : v))
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar status do veículo.')
+    }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -178,10 +190,20 @@ export default function VehicleRegistrationPage() {
       {/* Cabeçalho */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Car className="text-[#00475B]" size={26} />
-            Cadastro de Veículos
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Car className="text-[#00475B]" size={26} />
+              Cadastro de Veículos
+            </h1>
+            <button
+              onClick={() => void fetchData()}
+              disabled={loading}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#00475B] transition-colors disabled:opacity-50 mt-1"
+              title="Atualizar"
+            >
+              <RefreshCw size={12} className={loading && !showForm ? 'animate-spin' : ''} />
+            </button>
+          </div>
           <p className="text-sm text-gray-500 mt-1">
             Gerencie a frota da 3T Engenharia — {vehicles.filter(v => v.status === 'ACTIVE').length} veículo(s) ativo(s)
           </p>
@@ -196,9 +218,23 @@ export default function VehicleRegistrationPage() {
         )}
       </div>
 
+      {/* Erro */}
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-center gap-3 animate-slide-down">
+          <AlertTriangle size={18} className="text-red-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-700">Erro na operação</p>
+            <p className="text-xs text-red-500">{error}</p>
+          </div>
+          <button onClick={() => setError(null)} className="text-xs font-semibold text-red-600 hover:underline">
+            Dispensar
+          </button>
+        </div>
+      )}
+
       {/* Formulário de cadastro / edição */}
       {showForm && (
-        <div className="rounded-2xl border border-[#00475B]/20 bg-[#00475B]/5 p-5 space-y-4 shadow-sm">
+        <div className="rounded-2xl border border-[#00475B]/20 bg-[#00475B]/5 p-5 space-y-4 shadow-sm animate-slide-down">
           <h2 className="text-base font-bold text-[#00475B]">
             {editingId ? '✏️ Editar Veículo' : '🚗 Novo Veículo'}
           </h2>
@@ -265,12 +301,12 @@ export default function VehicleRegistrationPage() {
 
           {/* Ações */}
           <div className="flex gap-2 pt-1">
-            <button onClick={handleSave}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#00475B] text-white py-3 text-sm font-semibold hover:bg-[#003d4f] transition-colors">
+            <button onClick={handleSave} disabled={loading}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#00475B] text-white py-3 text-sm font-semibold hover:bg-[#003d4f] transition-colors disabled:opacity-50">
               <Check size={16} /> {editingId ? 'Salvar Alterações' : 'Cadastrar Veículo'}
             </button>
-            <button onClick={cancelForm}
-              className="flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-gray-600 hover:bg-gray-50 transition-colors">
+            <button onClick={cancelForm} disabled={loading}
+              className="flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
               <X size={16} />
             </button>
           </div>
@@ -303,8 +339,20 @@ export default function VehicleRegistrationPage() {
         </div>
       </div>
 
+      {/* Loading Skeleton */}
+      {loading && vehicles.length === 0 && (
+        <div className="space-y-2">
+          {[1, 2].map(i => (
+            <div key={i} className="rounded-2xl border border-gray-150 bg-white p-4 animate-pulse">
+              <div className="h-5 bg-gray-100 rounded w-1/3 mb-2" />
+              <div className="h-4 bg-gray-100 rounded w-1/2" />
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Lista de veículos */}
-      {filtered.length === 0 ? (
+      {!loading && filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-16 text-center">
           <Car className="mx-auto text-gray-300 mb-3" size={36} />
           <p className="text-sm text-gray-400 font-medium">Nenhum veículo encontrado.</p>
@@ -398,7 +446,7 @@ export default function VehicleRegistrationPage() {
       )}
 
       {/* Contagem */}
-      {vehicles.length > 0 && (
+      {!loading && vehicles.length > 0 && (
         <p className="text-xs text-gray-400 text-center">
           {vehicles.filter(v => v.status === 'ACTIVE').length} ativo(s) ·{' '}
           {vehicles.filter(v => v.status === 'MAINTENANCE').length} em manutenção ·{' '}

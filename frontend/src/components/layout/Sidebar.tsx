@@ -88,6 +88,12 @@ const MENU_ITEMS: MenuItem[] = [
         icon: History,
       },
       {
+        id: 'vehicles-fleet',
+        label: 'Cadastro de Veículos',
+        path: '/vehicles/fleet',
+        icon: Truck,
+      },
+      {
         id: 'vehicles-maintenance',
         label: 'Alertas de Manutenção',
         path: '/vehicles/maintenance',
@@ -186,12 +192,6 @@ const MENU_ITEMS: MenuItem[] = [
         label: 'Cadastro de Obras',
         path: '/admin/worksites',
         icon: Building2,
-      },
-      {
-        id: 'admin-vehicles',
-        label: 'Cadastro de Veículos',
-        path: '/admin/vehicles',
-        icon: Truck,
       },
     ],
   },

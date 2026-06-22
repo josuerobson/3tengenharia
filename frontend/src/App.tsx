@@ -22,7 +22,7 @@ import DailyAuditForm5S        from '@/pages/fiveS/DailyAuditForm5S'
 import QualityValidationPanel5S from '@/pages/fiveS/QualityValidationPanel5S'
 
 // ── Páginas reais (Admin) ───────────────────────────────────────────────────────────────────────────
-import VehicleRegistrationPage from '@/pages/admin/VehicleRegistrationPage'
+import VehicleRegistrationPage from '@/pages/vehicles/VehicleRegistrationPage'
 
 // ── Página placeholder genérica (substituir pelas páginas reais na Etapa 5) ──
 
@@ -74,6 +74,7 @@ export default function App() {
                 <Route path="vehicles/trips"             element={<TripHistoryPage />} />
                 <Route path="vehicles/maintenance"       element={<MaintenanceAlertsPage />} />
                 <Route path="vehicles/maintenance-types" element={<MaintenanceTypesPage />} />
+                <Route path="vehicles/fleet"             element={<VehicleRegistrationPage />} />
 
                 {/* Módulo 2 — Ferramentas */}
                 <Route path="assets/catalog" element={<AssetCatalogPage />} />
@@ -92,7 +93,6 @@ export default function App() {
                 {/* Admin */}
                 <Route path="admin/users"    element={<PlaceholderPage title="Usuários" />} />
                 <Route path="admin/worksites" element={<PlaceholderPage title="Cadastro de Obras" />} />
-                <Route path="admin/vehicles"  element={<VehicleRegistrationPage />} />
 
                 {/* 404 interno */}
                 <Route
