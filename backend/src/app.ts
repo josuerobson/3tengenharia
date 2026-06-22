@@ -49,7 +49,7 @@ export async function buildApp() {
   await app.register(errorHandlerPlugin) // 3. Error handler global
 
   // ── Rotas de saúde / health check (sem prefixo de versão) ────────────────
-  app.get('/health', { schema: { tags: ['Health'] } }, async (_req, reply) => {
+  app.get('/health', async (_req, reply) => {
     return reply.send({
       status: 'ok',
       timestamp: new Date().toISOString(),

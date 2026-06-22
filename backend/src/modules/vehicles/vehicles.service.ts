@@ -134,8 +134,8 @@ function checkMaintenanceThresholds(
       `⚠️ Manutenção preventiva necessária para o veículo ${vehicle.licensePlate}. ` +
       parts.join(' | ') +
       '.',
-    kmSinceLastMaintenance: kmSince,
-    daysSinceLastMaintenance: daysSince,
+    ...(kmSince !== undefined && { kmSinceLastMaintenance: kmSince }),
+    ...(daysSince !== undefined && { daysSinceLastMaintenance: daysSince }),
   }
 }
 
@@ -187,10 +187,10 @@ export const vehiclesService = {
     const trip = await prisma.vehicleTrip.create({
       data: {
         vehicleId: body.vehicleId,
-        driverEmployeeId: resolvedDriverId,
+        driverEmployeeId: resolvedDriverId ?? null,
         origin: body.origin,
         destination: body.destination,
-        purpose: body.purpose,
+        purpose: body.purpose ?? null,
         departureDateTime: new Date(),
         initialKm: body.initialKm,
         maintenanceAlertActive,
@@ -253,7 +253,7 @@ export const vehiclesService = {
           finalKm: body.finalKm,
           distanceTraveled,
           arrivalDateTime,
-          notes: body.notes,
+          notes: body.notes ?? null,
         },
         include: {
           vehicle: { select: { id: true, licensePlate: true, model: true } },

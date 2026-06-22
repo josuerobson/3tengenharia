@@ -32,7 +32,8 @@ export class AssetWrittenOffError extends Error {
   readonly statusCode = 409
   constructor(assetTag: string) {
     super(
-      `O bem "${assetTag}" foi baixado (WRITTEN_OFF) e não aceita novos chamados de manutenção.`,
+      `O bem "${assetTag}" está em manutenção (MAINTENANCE) e não aceita novos chamados de avaria. ` +
+      'Finalize o chamado em aberto antes de registrar um novo.',
     )
     this.name = 'AssetWrittenOffError'
   }
@@ -83,34 +84,32 @@ export const assetsService = {
 
     if (!borrower) throw new EmployeeNotFoundError(body.borrowerEmployeeId)
 
-    // 4. Executa em transação: cria o empréstimo + muda status para LOANED atomicamente
-    const [loan] = await prisma.$transaction([
-      prisma.assetLoan.create({
-        data: {
-          assetId: body.assetId,
-          borrowerEmployeeId: body.borrowerEmployeeId,
-          destinationWorksiteId: body.destinationWorksiteId,
-          createdByUserId,
-          checkoutAt: new Date(),
-          expectedReturnAt: body.expectedReturnAt,
-          checkoutNotes: body.checkoutNotes,
-          isReturned: false,
+    // 4. Cria o empréstimo com include das relações
+    const loan = await prisma.assetLoan.create({
+      data: {
+        assetId: body.assetId,
+        borrowerEmployeeId: body.borrowerEmployeeId,
+        destinationWorksiteId: body.destinationWorksiteId ?? null,
+        createdByUserId,
+        checkoutAt: new Date(),
+        expectedReturnAt: body.expectedReturnAt ?? null,
+        checkoutNotes: body.checkoutNotes ?? null,
+        isReturned: false,
+      },
+      include: {
+        asset: { select: assetBaseSelect },
+        borrowerEmployee: {
+          select: { id: true, fullName: true, registration: true },
         },
-        include: {
-          asset: { select: assetBaseSelect },
-          borrowerEmployee: {
-            select: { id: true, fullName: true, registration: true },
-          },
-          destinationWorksite: { select: { id: true, code: true, name: true } },
-        },
-      }),
+        destinationWorksite: { select: { id: true, code: true, name: true } },
+      },
+    })
 
-      // ⚙️ REGRA DE NEGÓCIO: Atualiza status do bem para LOANED
-      prisma.asset.update({
-        where: { id: body.assetId },
-        data: { currentStatus: 'LOANED' },
-      }),
-    ])
+    // ⚙️ REGRA DE NEGÓCIO: Atualiza status do bem para LOANED
+    await prisma.asset.update({
+      where: { id: body.assetId },
+      data: { currentStatus: 'LOANED' },
+    })
 
     return loan
   },
@@ -128,33 +127,31 @@ export const assetsService = {
 
     if (!asset) throw new AssetNotFoundError(body.assetId)
 
-    // 2. ⚙️ REGRA DE NEGÓCIO: Bens baixados não aceitam novos chamados
-    if (asset.currentStatus === 'WRITTEN_OFF') {
+    // 2. ⚙️ REGRA DE NEGÓCIO: Bens já em manutenção não aceitam novos chamados
+    if (asset.currentStatus === 'MAINTENANCE') {
       throw new AssetWrittenOffError(asset.assetTag)
     }
 
-    // 3. Executa em transação: cria o log de manutenção + altera status do bem atomicamente
-    const [maintenanceLog] = await prisma.$transaction([
-      prisma.assetMaintenanceLog.create({
-        data: {
-          assetId: body.assetId,
-          issueDescription: body.issueDescription,
-          defectPhotoUrl: body.defectPhotoUrl,
-          maintenanceStatus: 'OPEN',
-          reportedByUserId,
-          reportedAt: new Date(),
-        },
-        include: {
-          asset: { select: assetBaseSelect },
-        },
-      }),
+    // 3. Cria o log de manutenção com include
+    const maintenanceLog = await prisma.assetMaintenanceLog.create({
+      data: {
+        assetId: body.assetId,
+        issueDescription: body.issueDescription,
+        defectPhotoUrl: body.defectPhotoUrl ?? null,
+        maintenanceStatus: 'OPEN',
+        reportedByUserId,
+        reportedAt: new Date(),
+      },
+      include: {
+        asset: { select: assetBaseSelect },
+      },
+    })
 
-      // ⚙️ REGRA DE NEGÓCIO: Muda status imediatamente para MAINTENANCE
-      prisma.asset.update({
-        where: { id: body.assetId },
-        data: { currentStatus: 'MAINTENANCE' },
-      }),
-    ])
+    // ⚙️ REGRA DE NEGÓCIO: Muda status imediatamente para MAINTENANCE
+    await prisma.asset.update({
+      where: { id: body.assetId },
+      data: { currentStatus: 'MAINTENANCE' },
+    })
 
     return {
       ...maintenanceLog,
