@@ -6,11 +6,12 @@ import Fastify from 'fastify'
 import { corsPlugin } from './plugins/cors.js'
 import { jwtPlugin } from './plugins/jwt.js'
 import { errorHandlerPlugin } from './plugins/error-handler.js'
-import { authRoutes }     from './modules/auth/auth.routes.js'
-import { vehicleRoutes }  from './modules/vehicles/vehicles.routes.js'
-import { assetRoutes }    from './modules/assets/assets.routes.js'
-import { timeLogRoutes }  from './modules/time-logs/time-logs.routes.js'
-import { fiveSRoutes }    from './modules/fiveS/fiveS.routes.js'
+import { authRoutes }              from './modules/auth/auth.routes.js'
+import { vehicleRoutes }           from './modules/vehicles/vehicles.routes.js'
+import { maintenanceTypeRoutes }   from './modules/vehicles/maintenanceTypes.routes.js'
+import { assetRoutes }             from './modules/assets/assets.routes.js'
+import { timeLogRoutes }           from './modules/time-logs/time-logs.routes.js'
+import { fiveSRoutes }             from './modules/fiveS/fiveS.routes.js'
 import { env } from './lib/env.js'
 
 export async function buildApp() {
@@ -70,11 +71,12 @@ export async function buildApp() {
   // ── Módulos de negócio (prefixo /api/v1) ──────────────────────────────────
   await app.register(
     async (v1) => {
-      await v1.register(authRoutes,    { prefix: '/auth' })       // Módulo: Autenticação
-      await v1.register(vehicleRoutes, { prefix: '/vehicles' })   // Módulo 1: Veículos
-      await v1.register(assetRoutes,   { prefix: '/assets' })     // Módulo 2: Patrimônio
-      await v1.register(timeLogRoutes, { prefix: '/time-logs' })  // Módulo 3: Horas
-      await v1.register(fiveSRoutes,   { prefix: '/5s' })         // Módulo 5S: Auditorias
+      await v1.register(authRoutes,             { prefix: '/auth' })       // Módulo: Autenticação
+      await v1.register(vehicleRoutes,          { prefix: '/vehicles' })   // Módulo 1: Veículos
+      await v1.register(maintenanceTypeRoutes,  { prefix: '/vehicles' })   // Módulo 1: Tipos de manutenção
+      await v1.register(assetRoutes,            { prefix: '/assets' })     // Módulo 2: Patrimônio
+      await v1.register(timeLogRoutes,          { prefix: '/time-logs' })  // Módulo 3: Horas
+      await v1.register(fiveSRoutes,            { prefix: '/5s' })         // Módulo 5S: Auditorias
     },
     { prefix: '/api/v1' },
   )

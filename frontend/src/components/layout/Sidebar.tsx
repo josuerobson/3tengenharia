@@ -41,6 +41,7 @@ import {
   ClipboardCheck,
   CheckSquare,
   ListChecks,
+  Settings2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -91,6 +92,12 @@ const MENU_ITEMS: MenuItem[] = [
         label: 'Alertas de Manutenção',
         path: '/vehicles/maintenance',
         icon: AlertTriangle,
+      },
+      {
+        id: 'vehicles-maintenance-types',
+        label: 'Tipos de Manutenção',
+        path: '/vehicles/maintenance-types',
+        icon: Settings2,
       },
     ],
   },

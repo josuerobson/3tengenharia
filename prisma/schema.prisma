@@ -212,8 +212,34 @@ model Vehicle {
   trips VehicleTrip[]
 
   @@index([licensePlate])
+  maintenanceTypes VehicleMaintenanceType[]
+
   @@index([status])
   @@map("vehicles")
+}
+
+/// Catálogo dinâmico de tipos de manutenção por veículo
+/// Ex: "Troca de óleo do motor", "Correia dentada", "Óleo da caixa de câmbio"
+model VehicleMaintenanceType {
+  id          String  @id @default(cuid())
+  name        String  @db.VarChar(120)       // Nome do tipo de manutenção
+  description String? @db.Text               // Descrição detalhada (opcional)
+  isActive    Boolean @default(true) @map("is_active")
+
+  // Intervalos de manutenção preventiva (opcionais)
+  intervalKm   Int? @map("interval_km")   // Alerta a cada N km
+  intervalDays Int? @map("interval_days") // Alerta a cada N dias
+
+  // Vínculo com veículo — cada tipo pertence a um veículo específico
+  vehicleId String  @map("vehicle_id")
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  @@index([vehicleId])
+  @@index([vehicleId, isActive])
+  @@map("vehicle_maintenance_types")
 }
 
 /// Registro de cada viagem realizada com um veículo
