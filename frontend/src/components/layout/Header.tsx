@@ -312,7 +312,7 @@ export default function Header({
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
   }, [])
 
-  const firstName = user?.name.split(' ')[0] ?? 'Usuário'
+  const firstName = user?.name?.split(' ')[0] ?? 'Usuário'
 
   return (
     <header

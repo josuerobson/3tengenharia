@@ -14,6 +14,16 @@ if (rawUrl && !rawUrl.endsWith('/api/v1')) {
 
 const BASE_URL = rawUrl
 
+export function mapBackendUser(user: any): AuthUser {
+  return {
+    id: user.id,
+    email: user.email,
+    role: user.role as any,
+    name: user.employee?.fullName ?? (user.role === 'ADMIN' ? 'Administrador' : user.email.split('@')[0]),
+    employeeId: user.employee?.id ?? null,
+  }
+}
+
 function getToken(): string | null {
   return localStorage.getItem('3t:token')
 }
@@ -43,7 +53,8 @@ async function request<T>(
           token = data.accessToken
           localStorage.setItem('3t:token', token)
           if (data.user) {
-            localStorage.setItem('3t:user', JSON.stringify(data.user))
+            const mapped = mapBackendUser(data.user)
+            localStorage.setItem('3t:user', JSON.stringify(mapped))
           }
         }
       }
@@ -193,12 +204,23 @@ export const tripsApi = {
 // ── Endpoints de Autenticação ──────────────────────────────────────────────────
 
 export const authApi = {
-  login(data: { email: string; password: string }): Promise<{
+  async login(data: { email: string; password: string }): Promise<{
     accessToken: string
     tokenType: 'Bearer'
     expiresIn: string
     user: AuthUser
   }> {
-    return request('/auth/login', { method: 'POST', body: JSON.stringify(data) })
+    const res = await request<{
+      accessToken: string
+      tokenType: 'Bearer'
+      expiresIn: string
+      user: any
+    }>('/auth/login', { method: 'POST', body: JSON.stringify(data) })
+
+    const mappedUser = mapBackendUser(res.user)
+    return {
+      ...res,
+      user: mappedUser,
+    }
   },
 }
