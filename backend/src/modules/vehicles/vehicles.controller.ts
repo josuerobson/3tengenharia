@@ -85,5 +85,47 @@ export function vehiclesController(_app: FastifyInstance) {
         }),
       })
     },
+
+    // ── GET /vehicles (listAll) ──────────────────────────────────────────────
+    async listAll(_request: FastifyRequest, reply: FastifyReply) {
+      const vehicles = await vehiclesService.listAll()
+      return reply.status(200).send({ vehicles })
+    },
+
+    // ── POST /vehicles (createVehicle) ───────────────────────────────────────
+    async createVehicle(request: FastifyRequest, reply: FastifyReply) {
+      const body = request.body as {
+        licensePlate: string; brand: string; model: string; year: number
+        currentKm: number; color?: string; fuelType?: string; notes?: string
+        maintenanceKmThreshold?: number; maintenanceDayThreshold?: number
+      }
+      const vehicle = await vehiclesService.create(body)
+      return reply.status(201).send(vehicle)
+    },
+
+    // ── GET /vehicles/:id (getById) ──────────────────────────────────────────
+    async getById(request: FastifyRequest, reply: FastifyReply) {
+      const { id } = request.params as { id: string }
+      const vehicle = await vehiclesService.findById(id)
+      if (!vehicle) return reply.status(404).send({ message: 'Veículo não encontrado.' })
+      return reply.status(200).send(vehicle)
+    },
+
+    // ── PATCH /vehicles/:id (updateVehicle) ──────────────────────────────────
+    async updateVehicle(request: FastifyRequest, reply: FastifyReply) {
+      const { id } = request.params as { id: string }
+      const body = request.body as Record<string, unknown>
+      const vehicle = await vehiclesService.update(id, body)
+      if (!vehicle) return reply.status(404).send({ message: 'Veículo não encontrado.' })
+      return reply.status(200).send(vehicle)
+    },
+
+    // ── DELETE /vehicles/:id (deleteVehicle) ─────────────────────────────────
+    async deleteVehicle(request: FastifyRequest, reply: FastifyReply) {
+      const { id } = request.params as { id: string }
+      const ok = await vehiclesService.remove(id)
+      if (!ok) return reply.status(404).send({ message: 'Veículo não encontrado.' })
+      return reply.status(204).send()
+    },
   }
 }

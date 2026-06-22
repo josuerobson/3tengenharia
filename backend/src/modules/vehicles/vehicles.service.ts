@@ -275,9 +275,79 @@ export const vehiclesService = {
     return {
       trip: updatedTrip,
       distanceTraveled,
-      // Alert presente apenas quando o limiar foi atingido nesta viagem
       maintenanceAlert: alert,
       vehicleStatusChanged: needsMaintenance ? 'MAINTENANCE' : null,
     }
+  },
+
+  // ── Admin CRUD ────────────────────────────────────────────────────────────
+
+  async listAll() {
+    return prisma.vehicle.findMany({
+      orderBy: [{ status: 'asc' }, { brand: 'asc' }, { model: 'asc' }],
+      select: {
+        id: true, licensePlate: true, brand: true, model: true,
+        year: true, color: true, fuelType: true, currentKm: true,
+        status: true, maintenanceKmThreshold: true, maintenanceDayThreshold: true,
+        lastMaintenanceKm: true, lastMaintenanceDate: true, notes: true,
+        createdAt: true, updatedAt: true,
+      },
+    })
+  },
+
+  async create(data: {
+    licensePlate: string; brand: string; model: string; year: number; currentKm: number
+    color?: string; fuelType?: string; notes?: string
+    maintenanceKmThreshold?: number; maintenanceDayThreshold?: number
+  }) {
+    return prisma.vehicle.create({
+      data: {
+        licensePlate:            data.licensePlate.toUpperCase().replace(/[^A-Z0-9]/g, ''),
+        brand:                   data.brand,
+        model:                   data.model,
+        year:                    data.year,
+        currentKm:               data.currentKm,
+        color:                   data.color             ?? null,
+        fuelType:                data.fuelType          ?? null,
+        notes:                   data.notes             ?? null,
+        maintenanceKmThreshold:  data.maintenanceKmThreshold  ?? null,
+        maintenanceDayThreshold: data.maintenanceDayThreshold ?? null,
+      },
+    })
+  },
+
+  async findById(id: string) {
+    return prisma.vehicle.findUnique({
+      where: { id },
+      include: { maintenanceTypes: { where: { isActive: true }, orderBy: { name: 'asc' } } },
+    })
+  },
+
+  async update(id: string, data: Record<string, unknown>) {
+    const exists = await prisma.vehicle.findUnique({ where: { id } })
+    if (!exists) return null
+    return prisma.vehicle.update({
+      where: { id },
+      data: {
+        ...(data.brand                   !== undefined ? { brand:                   String(data.brand) }                   : {}),
+        ...(data.model                   !== undefined ? { model:                   String(data.model) }                   : {}),
+        ...(data.year                    !== undefined ? { year:                    Number(data.year) }                    : {}),
+        ...(data.color                   !== undefined ? { color:                   data.color ? String(data.color) : null } : {}),
+        ...(data.fuelType                !== undefined ? { fuelType:                data.fuelType ? String(data.fuelType) : null } : {}),
+        ...(data.currentKm               !== undefined ? { currentKm:               Number(data.currentKm) }               : {}),
+        ...(data.status                  !== undefined ? { status:                  String(data.status) as 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE' } : {}),
+        ...(data.maintenanceKmThreshold  !== undefined ? { maintenanceKmThreshold:  data.maintenanceKmThreshold  ? Number(data.maintenanceKmThreshold)  : null } : {}),
+        ...(data.maintenanceDayThreshold !== undefined ? { maintenanceDayThreshold: data.maintenanceDayThreshold ? Number(data.maintenanceDayThreshold) : null } : {}),
+        ...(data.notes                   !== undefined ? { notes:                   data.notes ? String(data.notes) : null } : {}),
+      },
+    })
+  },
+
+  async remove(id: string) {
+    const exists = await prisma.vehicle.findUnique({ where: { id } })
+    if (!exists) return false
+    // Soft delete — muda status para INACTIVE preservando histórico de viagens
+    await prisma.vehicle.update({ where: { id }, data: { status: 'INACTIVE' } })
+    return true
   },
 }
