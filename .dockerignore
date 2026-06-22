@@ -1,0 +1,32 @@
+# .dockerignore — exclui arquivos desnecessários do build context do Docker
+# CRÍTICO: sem isso, node_modules do Windows é enviado e sobrescreve
+# o node_modules instalado pelo Docker (causando Permission denied em .bin/)
+
+# ── Node Modules (NUNCA enviar ao Docker) ─────────────────────────────────────
+**/node_modules
+node_modules
+
+# ── Builds locais ─────────────────────────────────────────────────────────────
+**/dist
+frontend/dist
+backend/dist
+
+# ── Ambiente ──────────────────────────────────────────────────────────────────
+**/.env
+**/.env.*
+*.env
+
+# ── Git ───────────────────────────────────────────────────────────────────────
+.git
+.gitignore
+
+# ── IDEs e cache ──────────────────────────────────────────────────────────────
+.vscode
+.idea
+**/.cache
+**/.turbo
+**/.vite
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
