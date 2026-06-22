@@ -10,7 +10,7 @@ import {
   Navigation, Route, ArrowRight, Eye, RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { tripsApi, vehiclesApi, type ApiTrip, type ApiVehicle } from '@/lib/api'
+import { tripsApi, type ApiTrip } from '@/lib/api'
 
 // ── Alias de tipo local para compatibilidade com o restante do componente ─────
 type Trip = ApiTrip
@@ -36,7 +36,7 @@ function formatDuration(dep: string, arr: string | null): string {
 }
 
 function isOngoing(trip: Trip): boolean {
-  return trip.arrivalDateTime === null
+  return trip.arrivalDateTime === null || trip.finalKm === null
 }
 
 // ── KPIs ──────────────────────────────────────────────────────────────────────
@@ -241,7 +241,6 @@ type SortKey = 'date_desc' | 'date_asc' | 'km_desc' | 'duration_desc'
 export default function TripHistoryPage() {
   // ── Dados reais da API ────────────────────────────────────────────────────
   const [trips, setTrips]       = useState<Trip[]>([])
-  const [vehicles, setVehicles] = useState<ApiVehicle[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
 
@@ -249,12 +248,8 @@ export default function TripHistoryPage() {
     setLoading(true)
     setError(null)
     try {
-      const [tripsRes, vehiclesRes] = await Promise.all([
-        tripsApi.list({ limit: 500 }),
-        vehiclesApi.list(),
-      ])
+      const tripsRes = await tripsApi.list({ limit: 500 })
       setTrips(tripsRes.trips)
-      setVehicles(vehiclesRes.vehicles)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados.')
     } finally {
@@ -263,6 +258,22 @@ export default function TripHistoryPage() {
   }
 
   useEffect(() => { void fetchData() }, [])
+
+  // Computa a lista de veículos únicos a partir das viagens reais carregadas
+  const vehicles = useMemo(() => {
+    const map = new Map<string, { id: string; licensePlate: string; brand: string; model: string }>()
+    for (const trip of trips) {
+      if (trip.vehicle && !map.has(trip.vehicle.id)) {
+        map.set(trip.vehicle.id, {
+          id: trip.vehicle.id,
+          licensePlate: trip.vehicle.licensePlate,
+          brand: trip.vehicle.brand,
+          model: trip.vehicle.model,
+        })
+      }
+    }
+    return Array.from(map.values())
+  }, [trips])
 
   // ── Filtros ───────────────────────────────────────────────────────────────
   const [search, setSearch]           = useState('')
@@ -554,7 +565,12 @@ export default function TripHistoryPage() {
       </div>
 
       {/* Lista de viagens */}
-      {filtered.length === 0 ? (
+      {trips.length === 0 ? (
+        <div className="flex flex-col items-center justify-center border border-dashed border-gray-200 bg-gray-50/50 rounded-2xl py-20 text-center">
+          <Route className="mx-auto text-gray-300 mb-3" size={48} />
+          <p className="text-sm font-semibold text-gray-500">Nenhuma viagem registrada no momento.</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-16 text-center">
           <Route className="mx-auto text-gray-300 mb-3" size={36} />
           <p className="text-sm text-gray-400 font-medium">Nenhuma viagem encontrada</p>
