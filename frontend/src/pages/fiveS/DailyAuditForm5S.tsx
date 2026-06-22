@@ -1,0 +1,523 @@
+// src/pages/fiveS/DailyAuditForm5S.tsx
+// Tela de Registro de Auditoria 5S — Mobile-First.
+// Preencher no campo pelo supervisor/encarregado ao final da inspeção.
+
+import { useState, useRef, useCallback, type ChangeEvent } from 'react'
+import {
+  Building2,
+  MapPin,
+  Camera,
+  X,
+  CheckCircle2,
+  AlertTriangle,
+  ChevronDown,
+  Search,
+  Send,
+  Loader2,
+  RotateCcw,
+  ImagePlus,
+  Info,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import {
+  MOCK_WORKSITES,
+  AREA_TYPES_5S,
+  type AuditStatus5S,
+  type AreaType5S,
+  type Worksite,
+} from '@/data/mockData'
+
+// ── Tipos locais ──────────────────────────────────────────────────────────────
+
+interface PhotoPreview {
+  id: string
+  objectUrl: string
+  fileName: string
+  sizeKb: number
+}
+
+type PageState = 'FORM' | 'SUBMITTING' | 'SUCCESS'
+
+// ── Combobox de Obras (reutiliza o padrão do DailyLogPage) ───────────────────
+
+interface WorksiteComboboxProps {
+  value: Worksite | null
+  onChange: (w: Worksite | null) => void
+  error?: string
+}
+
+function WorksiteCombobox({ value, onChange, error }: WorksiteComboboxProps) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const filtered = MOCK_WORKSITES.filter(
+    (w) =>
+      w.status === 'ACTIVE' &&
+      (w.name.toLowerCase().includes(q.toLowerCase()) ||
+        w.costCenter.toLowerCase().includes(q.toLowerCase())),
+  )
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen((p) => !p); setTimeout(() => inputRef.current?.focus(), 60) }}
+        className={cn(
+          'flex items-center justify-between w-full h-14 px-4 rounded-2xl border bg-white text-sm',
+          'transition-all duration-150 focus-visible:outline-none',
+          open ? 'border-brand-primary ring-2 ring-brand-primary/20'
+               : error ? 'border-red-400' : 'border-gray-200 hover:border-brand-primary/50',
+        )}
+      >
+        {value ? (
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 bg-brand-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Building2 size={17} className="text-brand-primary" />
+            </div>
+            <div className="text-left min-w-0">
+              <p className="font-bold text-gray-900 text-sm truncate">{value.name}</p>
+              <p className="text-xs text-gray-400 truncate">{value.costCenter} · {value.city}</p>
+            </div>
+          </div>
+        ) : (
+          <span className="text-gray-400 flex items-center gap-2">
+            <Building2 size={16} />
+            Selecione a obra auditada...
+          </span>
+        )}
+        <ChevronDown size={16} className={cn('text-gray-400 flex-shrink-0 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {error && <p className="mt-1.5 text-xs text-red-500 font-medium">⚠ {error}</p>}
+
+      {open && (
+        <div className="absolute inset-x-0 top-full mt-1.5 z-30 bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden animate-slide-down">
+          <div className="p-2 border-b border-gray-100">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input ref={inputRef} type="search" value={q} onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar obra..." className="w-full h-9 pl-8 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary" />
+            </div>
+          </div>
+          <div className="max-h-48 overflow-y-auto scrollbar-thin py-1">
+            {filtered.map((w) => (
+              <button key={w.id} type="button"
+                onClick={() => { onChange(w); setOpen(false); setQ('') }}
+                className={cn('flex items-center gap-3 w-full px-3 py-3 text-left transition-colors',
+                  value?.id === w.id ? 'bg-brand-primary/8 text-brand-primary' : 'hover:bg-gray-50')}>
+                <Building2 size={14} className={value?.id === w.id ? 'text-brand-primary' : 'text-gray-400'} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{w.name}</p>
+                  <p className="text-xs text-gray-400">{w.costCenter} · {w.city}</p>
+                </div>
+                {value?.id === w.id && <CheckCircle2 size={14} className="text-brand-primary flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Toggle de Status 5S (CONFORME / NAO_CONFORME) ────────────────────────────
+
+interface StatusToggleProps {
+  value: AuditStatus5S | null
+  onChange: (v: AuditStatus5S) => void
+  error?: string
+}
+
+function StatusToggle({ value, onChange, error }: StatusToggleProps) {
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3">
+        {/* CONFORME */}
+        <button
+          type="button"
+          onClick={() => onChange('CONFORME')}
+          className={cn(
+            'flex flex-col items-center justify-center gap-2 h-24 rounded-2xl border-2',
+            'transition-all duration-150 active:scale-[0.97]',
+            value === 'CONFORME'
+              ? 'bg-emerald-50 border-emerald-500 shadow-md shadow-emerald-100'
+              : 'bg-white border-gray-200 hover:border-emerald-300',
+          )}
+        >
+          <div className={cn(
+            'w-10 h-10 rounded-full flex items-center justify-center transition-all',
+            value === 'CONFORME' ? 'bg-emerald-500' : 'bg-gray-100',
+          )}>
+            <CheckCircle2 size={22} className={value === 'CONFORME' ? 'text-white' : 'text-gray-400'} />
+          </div>
+          <span className={cn('text-sm font-bold', value === 'CONFORME' ? 'text-emerald-700' : 'text-gray-500')}>
+            Conforme
+          </span>
+        </button>
+
+        {/* NAO_CONFORME */}
+        <button
+          type="button"
+          onClick={() => onChange('NAO_CONFORME')}
+          className={cn(
+            'flex flex-col items-center justify-center gap-2 h-24 rounded-2xl border-2',
+            'transition-all duration-150 active:scale-[0.97]',
+            value === 'NAO_CONFORME'
+              ? 'bg-red-50 border-red-500 shadow-md shadow-red-100'
+              : 'bg-white border-gray-200 hover:border-red-300',
+          )}
+        >
+          <div className={cn(
+            'w-10 h-10 rounded-full flex items-center justify-center transition-all',
+            value === 'NAO_CONFORME' ? 'bg-red-500' : 'bg-gray-100',
+          )}>
+            <AlertTriangle size={22} className={value === 'NAO_CONFORME' ? 'text-white' : 'text-gray-400'} />
+          </div>
+          <span className={cn('text-sm font-bold', value === 'NAO_CONFORME' ? 'text-red-700' : 'text-gray-500')}>
+            Não Conforme
+          </span>
+        </button>
+      </div>
+      {error && <p className="mt-1.5 text-xs text-red-500 font-medium">⚠ {error}</p>}
+    </div>
+  )
+}
+
+// ── Thumbnail de Preview de Foto ──────────────────────────────────────────────
+
+function PhotoThumb({ photo, onRemove }: { photo: PhotoPreview; onRemove: () => void }) {
+  return (
+    <div className="relative group aspect-square">
+      <img
+        src={photo.objectUrl}
+        alt={photo.fileName}
+        className="w-full h-full object-cover rounded-xl border-2 border-gray-100"
+        loading="lazy"
+      />
+      {/* Overlay escuro no hover */}
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-xl transition-colors" />
+      {/* Botão remover */}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-500 text-white rounded-full
+                   flex items-center justify-center shadow-lg
+                   opacity-0 group-hover:opacity-100 sm:opacity-100
+                   transition-opacity duration-150 hover:bg-red-600"
+        aria-label={`Remover foto ${photo.fileName}`}
+      >
+        <X size={12} strokeWidth={3} />
+      </button>
+      {/* Tamanho */}
+      <span className="absolute bottom-1 left-1 text-[9px] text-white bg-black/50 rounded px-1 font-medium">
+        {photo.sizeKb}kb
+      </span>
+    </div>
+  )
+}
+
+// ── Página Principal ──────────────────────────────────────────────────────────
+
+export default function DailyAuditForm5S() {
+  const [worksite, setWorksite]     = useState<Worksite | null>(null)
+  const [areaType, setAreaType]     = useState<AreaType5S | ''>('')
+  const [status, setStatus]         = useState<AuditStatus5S | null>(null)
+  const [description, setDescription] = useState('')
+  const [photos, setPhotos]         = useState<PhotoPreview[]>([])
+  const [errors, setErrors]         = useState<Record<string, string>>({})
+  const [pageState, setPageState]   = useState<PageState>('FORM')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const isNaoConforme = status === 'NAO_CONFORME'
+  const descTooShort  = isNaoConforme && description.trim().length > 0 && description.trim().length < 20
+  const descCharCount = description.trim().length
+
+  // ── Fotos ─────────────────────────────────────────────────────────────────
+  const handleFilesChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    const newPreviews: PhotoPreview[] = files.map((f) => ({
+      id:        crypto.randomUUID(),
+      objectUrl: URL.createObjectURL(f),
+      fileName:  f.name,
+      sizeKb:    Math.round(f.size / 1024),
+    }))
+    setPhotos((prev) => [...prev, ...newPreviews].slice(0, 10)) // máx 10 fotos
+    // Reset input para permitir selecionar os mesmos arquivos novamente
+    e.target.value = ''
+  }, [])
+
+  const removePhoto = useCallback((id: string) => {
+    setPhotos((prev) => {
+      const ph = prev.find((p) => p.id === id)
+      if (ph) URL.revokeObjectURL(ph.objectUrl)
+      return prev.filter((p) => p.id !== id)
+    })
+  }, [])
+
+  // ── Validação e Submit ────────────────────────────────────────────────────
+  const handleSubmit = useCallback(async () => {
+    const errs: Record<string, string> = {}
+    if (!worksite)   errs.worksite  = 'Selecione a obra auditada.'
+    if (!areaType)   errs.areaType  = 'Selecione o tipo de área.'
+    if (!status)     errs.status    = 'Indique se a área está conforme ou não.'
+    if (photos.length === 0) errs.photos = 'Pelo menos 1 foto é obrigatória.'
+
+    if (isNaoConforme) {
+      if (!description.trim())
+        errs.description = 'A descrição da irregularidade é obrigatória para Não Conformidades.'
+      else if (description.trim().length < 20)
+        errs.description = 'Descreva com pelo menos 20 caracteres a irregularidade encontrada.'
+    }
+
+    setErrors(errs)
+    if (Object.keys(errs).length > 0) return
+
+    setPageState('SUBMITTING')
+    // Simula envio à API — em produção: POST /api/v1/5s/audits
+    await new Promise((r) => setTimeout(r, 1_800))
+    setPageState('SUCCESS')
+  }, [worksite, areaType, status, description, photos, isNaoConforme])
+
+  const handleReset = useCallback(() => {
+    photos.forEach((p) => URL.revokeObjectURL(p.objectUrl))
+    setWorksite(null); setAreaType(''); setStatus(null)
+    setDescription(''); setPhotos([]); setErrors({})
+    setPageState('FORM')
+  }, [photos])
+
+  // ── Tela de Sucesso ───────────────────────────────────────────────────────
+  if (pageState === 'SUCCESS') {
+    return (
+      <div className="max-w-md mx-auto pt-4 animate-fade-in-up">
+        <div className="bg-white rounded-3xl shadow-card border border-gray-100 p-8 text-center">
+          <div className={cn(
+            'w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5',
+            status === 'NAO_CONFORME' ? 'bg-red-100' : 'bg-emerald-100',
+          )}>
+            {status === 'NAO_CONFORME'
+              ? <AlertTriangle size={36} className="text-red-500" />
+              : <CheckCircle2 size={36} className="text-emerald-500" />}
+          </div>
+          <h2 className="text-2xl font-extrabold text-gray-900 mb-1">Auditoria Registrada!</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            {status === 'NAO_CONFORME'
+              ? 'Não conformidade enviada ao Setor de Qualidade para avaliação.'
+              : 'Conformidade registrada com sucesso.'}
+          </p>
+          <div className="bg-slate-50 rounded-2xl p-4 text-left space-y-2 mb-6">
+            <Row icon={Building2} label="Obra"   value={worksite?.name ?? ''} />
+            <Row icon={MapPin}    label="Área"   value={areaType} />
+            <Row icon={Camera}    label="Fotos"  value={`${photos.length} foto(s) enviada(s)`} />
+          </div>
+          <div className="flex flex-col gap-3">
+            <Button size="lg" variant="accent" className="w-full" onClick={handleReset}>
+              <RotateCcw size={16} /> Nova Auditoria
+            </Button>
+            <Button size="lg" variant="ghost" className="w-full" onClick={() => window.location.assign('/5s/panel')}>
+              Ver Painel de Qualidade
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Formulário ────────────────────────────────────────────────────────────
+  return (
+    <div className="max-w-xl mx-auto space-y-5">
+      {/* Cabeçalho */}
+      <div>
+        <h1 className="text-2xl font-extrabold text-gray-900">Auditoria 5S</h1>
+        <p className="text-gray-500 text-sm mt-0.5">Registro de conformidade de área</p>
+      </div>
+
+      {/* ── 1. Obra ────────────────────────────────────────────────────── */}
+      <section className="bg-white rounded-2xl border border-gray-100 shadow-card p-4 space-y-3">
+        <h2 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+          <Building2 size={15} className="text-brand-primary" /> Local da Auditoria
+        </h2>
+        <div>
+          <Label required>Obra / Centro de Custo</Label>
+          <WorksiteCombobox value={worksite} onChange={setWorksite} error={errors.worksite} />
+        </div>
+        <div>
+          <Label htmlFor="area-type" required>Tipo de Área</Label>
+          <div className="relative">
+            <select
+              id="area-type"
+              value={areaType}
+              onChange={(e) => setAreaType(e.target.value as AreaType5S)}
+              className={cn(
+                'flex h-14 w-full rounded-2xl border bg-white px-4 text-sm font-semibold',
+                'text-gray-900 focus:outline-none transition-all appearance-none',
+                errors.areaType
+                  ? 'border-red-400 focus:border-red-400'
+                  : 'border-gray-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20',
+              )}
+            >
+              <option value="">Selecione o tipo de área...</option>
+              {AREA_TYPES_5S.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+          {errors.areaType && <p className="mt-1.5 text-xs text-red-500 font-medium">⚠ {errors.areaType}</p>}
+        </div>
+      </section>
+
+      {/* ── 2. Status ──────────────────────────────────────────────────── */}
+      <section className="bg-white rounded-2xl border border-gray-100 shadow-card p-4 space-y-3">
+        <h2 className="text-sm font-bold text-gray-700">Resultado da Inspeção</h2>
+        <StatusToggle value={status} onChange={setStatus} error={errors.status} />
+      </section>
+
+      {/* ── 3. Descrição (condicional) ─────────────────────────────────── */}
+      <section className={cn(
+        'rounded-2xl border shadow-card p-4 space-y-3 transition-all duration-200',
+        isNaoConforme ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100',
+      )}>
+        <h2 className={cn('text-sm font-bold flex items-center gap-2', isNaoConforme ? 'text-red-800' : 'text-gray-700')}>
+          <AlertTriangle size={15} className={isNaoConforme ? 'text-red-500' : 'text-gray-400'} />
+          Descrição da Irregularidade
+          {isNaoConforme && <span className="text-red-500">*</span>}
+        </h2>
+
+        {!isNaoConforme && (
+          <p className="text-xs text-gray-400 flex items-center gap-1.5">
+            <Info size={11} />
+            Opcional para áreas conformes. Selecione "Não Conforme" para habilitar o campo obrigatório.
+          </p>
+        )}
+
+        <div>
+          <textarea
+            id="description"
+            rows={isNaoConforme ? 5 : 3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={isNaoConforme
+              ? 'Descreva detalhadamente a irregularidade encontrada...\n\nEx: Materiais empilhados sem cinto de segurança nas bordas, próximo à circulação.'
+              : 'Observação opcional sobre a área auditada...'}
+            className={cn(
+              'flex w-full rounded-xl border px-4 py-3 text-sm resize-none',
+              'focus:outline-none transition-all duration-150',
+              isNaoConforme
+                ? errors.description
+                  ? 'border-red-400 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                  : 'border-red-300 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                : 'border-gray-200 bg-white focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20',
+            )}
+          />
+          {/* Contador de caracteres / erro */}
+          <div className="flex items-center justify-between mt-1.5">
+            {errors.description
+              ? <p className="text-xs text-red-600 font-medium">⚠ {errors.description}</p>
+              : descTooShort
+                ? <p className="text-xs text-orange-600 font-medium">Mínimo 20 caracteres ({20 - descCharCount} restantes)</p>
+                : <span />}
+            <span className={cn(
+              'text-xs tabular-nums ml-auto',
+              isNaoConforme && descCharCount < 20 ? 'text-orange-500' : 'text-gray-400',
+            )}>
+              {descCharCount}/5000
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 4. Fotos ───────────────────────────────────────────────────── */}
+      <section className="bg-white rounded-2xl border border-gray-100 shadow-card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+            <Camera size={15} className="text-brand-primary" />
+            Fotos da Área
+            <span className="text-red-500">*</span>
+          </h2>
+          <span className="text-xs text-gray-400">{photos.length}/10</span>
+        </div>
+
+        {/* Grid de thumbnails */}
+        {photos.length > 0 && (
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {photos.map((ph) => (
+              <PhotoThumb key={ph.id} photo={ph} onRemove={() => removePhoto(ph.id)} />
+            ))}
+          </div>
+        )}
+
+        {/* Input de câmera — oculto, ativado pelo botão */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"   // Abre câmera traseira no mobile
+          multiple
+          className="sr-only"
+          aria-label="Selecionar fotos"
+          onChange={handleFilesChange}
+          id="photo-input"
+        />
+
+        {/* Botão de adicionar fotos */}
+        {photos.length < 10 && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className={cn(
+              'flex flex-col items-center justify-center gap-2 w-full h-24 rounded-2xl border-2 border-dashed',
+              'transition-all duration-150 active:scale-[0.98]',
+              errors.photos
+                ? 'border-red-400 bg-red-50 text-red-600'
+                : 'border-gray-300 bg-gray-50 text-gray-500 hover:border-brand-primary/50 hover:bg-brand-primary/3 hover:text-brand-primary',
+            )}
+          >
+            <ImagePlus size={22} />
+            <span className="text-xs font-semibold">
+              {photos.length === 0 ? 'Adicionar foto / tirar foto' : 'Adicionar mais fotos'}
+            </span>
+          </button>
+        )}
+
+        {errors.photos && <p className="text-xs text-red-500 font-medium">⚠ {errors.photos}</p>}
+        <p className="text-[11px] text-gray-400 flex items-start gap-1.5 leading-relaxed">
+          <Info size={11} className="flex-shrink-0 mt-0.5" />
+          No celular, o botão abre diretamente a câmera traseira. Você pode selecionar até 10 fotos por auditoria.
+        </p>
+      </section>
+
+      {/* ── Botão Submit ──────────────────────────────────────────────── */}
+      <div className="pb-8">
+        <Button
+          size="lg"
+          variant={isNaoConforme ? 'destructive' : 'accent'}
+          className="w-full font-bold text-base py-4 rounded-2xl shadow-lg"
+          onClick={handleSubmit}
+          disabled={pageState === 'SUBMITTING'}
+        >
+          {pageState === 'SUBMITTING' ? (
+            <><Loader2 size={20} className="animate-spin" /> Registrando auditoria...</>
+          ) : (
+            <><Send size={18} /> Registrar Auditoria</>
+          )}
+        </Button>
+        <p className="text-center text-xs text-gray-400 mt-3">
+          O registro será enviado ao Setor de Qualidade para avaliação.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Helper de linha de info ───────────────────────────────────────────────────
+function Row({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <Icon size={13} className="text-gray-400 flex-shrink-0" />
+      <p className="text-xs text-gray-500">{label}:</p>
+      <p className="text-xs font-semibold text-gray-800 truncate">{value}</p>
+    </div>
+  )
+}

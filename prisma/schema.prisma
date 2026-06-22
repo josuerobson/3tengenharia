@@ -1,0 +1,507 @@
+// =============================================================================
+// schema.prisma — Sistema Integrado de Gestão Operacional 3T
+// Gerado em: 2026-06-22
+// Cobre: Módulo 1 (Veículos), Módulo 2 (Ferramentas/Patrimônio), Módulo 3 (Horas)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS GLOBAIS
+// =============================================================================
+
+/// Perfis de acesso para RBAC
+enum UserRole {
+  COLLABORATOR // Colaborador — acesso de leitura limitado
+  MANAGER // Gestor — gerencia obras, valida lançamentos
+  ADMIN // Administrador — acesso total ao sistema
+}
+
+// =============================================================================
+// ENUMS — MÓDULO 1: VEÍCULOS
+// =============================================================================
+
+/// Estado operacional do veículo
+enum VehicleStatus {
+  ACTIVE // Em operação normal
+  MAINTENANCE // Em manutenção preventiva ou corretiva
+  INACTIVE // Fora de operação (baixado, vendido, etc.)
+}
+
+// =============================================================================
+// ENUMS — MÓDULO 2: FERRAMENTAS / PATRIMÔNIO
+// =============================================================================
+
+/// Estado atual do bem patrimonial
+enum AssetStatus {
+  AVAILABLE // Disponível para uso
+  LOANED // Emprestado / em uso por colaborador
+  MAINTENANCE // Aguardando ou em manutenção
+  DAMAGED // Danificado — aguarda avaliação
+}
+
+/// Estado de resolução de um registro de manutenção/avaria
+enum MaintenanceStatus {
+  OPEN // Avaria registrada, aguardando avaliação
+  IN_PROGRESS // Em reparo / manutenção em andamento
+  RESOLVED // Reparo concluído, bem reintegrado
+  WRITTEN_OFF // Bem baixado/descartado após avaria
+}
+
+// =============================================================================
+// ENUMS — MÓDULO 3: HORAS
+// =============================================================================
+
+/// Tipo de jornada/turno do colaborador
+enum ShiftType {
+  REGULAR // Jornada padrão (ex: 8h–17h)
+  OVERTIME // Hora extra aprovada
+  ON_CALL // Sobreaviso / plantão
+  ABSENCE // Falta (justificada ou não)
+  VACATION // Férias
+  HOLIDAY // Feriado
+}
+
+// =============================================================================
+// AUTENTICAÇÃO & USUÁRIOS
+// =============================================================================
+
+/// Usuários do sistema (todos os perfis de acesso)
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(COLLABORATOR)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relação 1-para-1 com Employee (usuário que é também colaborador registrado)
+  employee Employee?
+
+  // Empréstimos de patrimônio registrados por este usuário (Gestor/Admin)
+  loansCreated AssetLoan[] @relation("LoanCreatedBy")
+
+  // Lançamentos de horas registrados por este usuário (Coordenador/Gestor)
+  timeLogsEntered TimeLog[] @relation("TimeLogEnteredBy")
+
+  // Lançamentos de horas validados por este usuário (Gestor)
+  timeLogsValidated TimeLog[] @relation("TimeLogValidatedBy")
+
+  // Auditorias 5S validadas por este usuário (Setor de Qualidade)
+  audits5SValidated Audit5S[] @relation("Audit5SValidator")
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// =============================================================================
+// MÓDULO 3: OBRAS E FUNCIONÁRIOS
+// Declarados antes dos outros módulos pois são referenciados como FK em toda a aplicação
+// =============================================================================
+
+/// Obras / Centros de custo da empresa
+model Worksite {
+  id        String    @id @default(cuid())
+  code      String    @unique // Código interno da obra / centro de custo
+  name      String
+  address   String?
+  city      String?
+  state     String?   @db.Char(2)
+  isActive  Boolean   @default(true) @map("is_active")
+  startDate DateTime? @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  // Funcionários lotados nesta obra
+  employees Employee[]
+
+  // Lançamentos de horas imputados a esta obra
+  timeLogs TimeLog[]
+
+  // Empréstimos de patrimônio com destino a esta obra
+  assetLoans AssetLoan[]
+
+  // Auditorias 5S realizadas nesta obra
+  audits5S Audit5S[]
+
+  @@index([code])
+  @@index([isActive])
+  @@map("worksites")
+}
+
+/// Funcionários / Colaboradores da empresa
+model Employee {
+  id              String    @id @default(cuid())
+  cpf             String    @unique @db.Char(11) // Apenas dígitos, sem formatação
+  registration    String    @unique @map("registration") // Matrícula interna
+  fullName        String    @map("full_name")
+  position        String // Cargo / função
+  phone           String?
+  isActive        Boolean   @default(true) @map("is_active")
+  hireDate        DateTime  @map("hire_date") @db.Date
+  terminationDate DateTime? @map("termination_date") @db.Date
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relação 1-para-1 com User (acesso ao sistema)
+  userId String? @unique @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Obra à qual o funcionário está atualmente lotado
+  // (obrigatório para Coordenadores que lançam horas)
+  worksiteId String?   @map("worksite_id")
+  worksite   Worksite? @relation(fields: [worksiteId], references: [id], onDelete: SetNull)
+
+  // Histórico de viagens onde este funcionário foi o motorista
+  tripsAsDriver VehicleTrip[] @relation("TripEmployeeDriver")
+
+  // Empréstimos de patrimônio retirados por este funcionário
+  assetLoans AssetLoan[] @relation("LoanBorrower")
+
+  // Lançamentos de horas deste funcionário
+  timeLogs TimeLog[]
+
+  // Auditorias 5S registradas por este funcionário como auditor
+  audits5SAuditor Audit5S[] @relation("Audit5SAuditor")
+
+  @@index([cpf])
+  @@index([registration])
+  @@index([worksiteId])
+  @@index([isActive])
+  @@map("employees")
+}
+
+// =============================================================================
+// MÓDULO 1: VEÍCULOS
+// =============================================================================
+
+/// Frota de veículos da empresa
+model Vehicle {
+  id           String        @id @default(cuid())
+  licensePlate String        @unique @map("license_plate") @db.VarChar(8) // Ex: ABC1D23 (Mercosul)
+  brand        String
+  model        String
+  year         Int           @db.SmallInt
+  color        String?
+  fuelType     String?       @map("fuel_type") // Ex: Flex, Diesel, GNV, Elétrico
+  currentKm    Int           @map("current_km") // Odômetro atual em km
+  status       VehicleStatus @default(ACTIVE)
+
+  // Limiares e histórico de manutenção preventiva
+  maintenanceKmThreshold  Int?      @map("maintenance_km_threshold") // Alerta a cada N km rodados
+  maintenanceDayThreshold Int?      @map("maintenance_day_threshold") // Alerta a cada N dias
+  lastMaintenanceKm       Int?      @map("last_maintenance_km") // KM da última manutenção
+  lastMaintenanceDate     DateTime? @map("last_maintenance_date") @db.Date
+
+  notes     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Histórico completo de viagens
+  trips VehicleTrip[]
+
+  @@index([licensePlate])
+  @@index([status])
+  @@map("vehicles")
+}
+
+/// Registro de cada viagem realizada com um veículo
+model VehicleTrip {
+  id String @id @default(cuid())
+
+  // Veículo utilizado na viagem
+  vehicleId String  @map("vehicle_id")
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+
+  // Motorista — mapeado estritamente como colaborador físico
+  driverEmployeeId String?   @map("driver_employee_id")
+  driverEmployee   Employee? @relation("TripEmployeeDriver", fields: [driverEmployeeId], references: [id], onDelete: SetNull)
+
+  // Dados da viagem
+  origin            String
+  destination       String
+  purpose           String?   @db.Text // Finalidade / descrição da viagem
+  departureDateTime DateTime  @map("departure_date_time")
+  arrivalDateTime   DateTime? @map("arrival_date_time")
+  initialKm         Int       @map("initial_km")
+  finalKm           Int?      @map("final_km")
+  distanceTraveled  Int?      @map("distance_traveled") // finalKm - initialKm (calculado pela app)
+
+  // Indica se havia alerta de manutenção ativo no momento da saída
+  maintenanceAlertActive Boolean @default(false) @map("maintenance_alert_active")
+
+  notes     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([vehicleId])
+  @@index([driverEmployeeId])
+  @@index([departureDateTime])
+  @@index([vehicleId, departureDateTime]) // Histórico de um veículo em um período
+  @@index([driverEmployeeId, departureDateTime]) // Histórico de um motorista em um período
+  @@map("vehicle_trips")
+}
+
+// =============================================================================
+// MÓDULO 2: FERRAMENTAS / PATRIMÔNIO FIXO
+// =============================================================================
+
+/// Catálogo de bens patrimoniais da empresa
+model Asset {
+  id               String      @id @default(cuid())
+  assetTag         String      @unique @map("asset_tag") // Número de patrimônio (único)
+  description      String
+  category         String? // Ex: Ferramenta, EPI, Equipamento Elétrico
+  brand            String?
+  model            String?
+  serialNumber     String?     @unique @map("serial_number") // Número de série do fabricante
+  acquisitionDate  DateTime?   @map("acquisition_date") @db.Date
+  acquisitionValue Decimal?    @map("acquisition_value") @db.Decimal(10, 2)
+  currentStatus    AssetStatus @default(AVAILABLE) @map("current_status")
+  location         String? // Localização física atual
+  notes            String?     @db.Text
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  // Histórico de empréstimos deste bem
+  loans AssetLoan[]
+
+  // Histórico de manutenções e avarias deste bem
+  maintenanceLogs AssetMaintenanceLog[]
+
+  @@index([assetTag])
+  @@index([currentStatus])
+  @@index([category])
+  @@map("assets")
+}
+
+/// Movimentações e empréstimos de patrimônio
+model AssetLoan {
+  id String @id @default(cuid())
+
+  // Bem patrimonial emprestado
+  assetId String @map("asset_id")
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  // Colaborador que retirou o bem
+  borrowerEmployeeId String   @map("borrower_employee_id")
+  borrowerEmployee   Employee @relation("LoanBorrower", fields: [borrowerEmployeeId], references: [id], onDelete: Restrict)
+
+  // Obra de destino do bem (opcional)
+  destinationWorksiteId String?   @map("destination_worksite_id")
+  destinationWorksite   Worksite? @relation(fields: [destinationWorksiteId], references: [id], onDelete: SetNull)
+
+  // Usuário que registrou a operação de saída (Gestor/Admin)
+  createdByUserId String? @map("created_by_user_id")
+  createdByUser   User?   @relation("LoanCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  checkoutAt       DateTime  @map("checkout_at") // Data/hora da retirada
+  expectedReturnAt DateTime? @map("expected_return_at") // Previsão de devolução
+  returnedAt       DateTime? @map("returned_at") // Data/hora efetiva da devolução
+  checkoutNotes    String?   @map("checkout_notes") @db.Text
+  returnNotes      String?   @map("return_notes") @db.Text
+  isReturned       Boolean   @default(false) @map("is_returned")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([assetId])
+  @@index([borrowerEmployeeId])
+  @@index([isReturned])
+  @@index([checkoutAt])
+  @@index([assetId, isReturned]) // Busca rápida: "este bem está atualmente emprestado?"
+  @@map("asset_loans")
+}
+
+/// Relatórios de avaria e histórico de manutenção por bem patrimonial
+model AssetMaintenanceLog {
+  id String @id @default(cuid())
+
+  // Bem patrimonial relacionado ao registro
+  assetId String @map("asset_id")
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  // Descrição detalhada do problema ou avaria
+  issueDescription String @map("issue_description") @db.Text
+
+  // Diagnóstico técnico e notas de resolução
+  resolutionNotes String? @map("resolution_notes") @db.Text
+
+  // Estado de resolução desta manutenção
+  maintenanceStatus MaintenanceStatus @default(OPEN) @map("maintenance_status")
+
+  // URL ou caminho relativo da foto do defeito (gerado pelo serviço de upload)
+  defectPhotoUrl String? @map("defect_photo_url")
+
+  // Custo do reparo (preenchido ao resolver)
+  repairCost Decimal? @map("repair_cost") @db.Decimal(10, 2)
+
+  // Usuário que reportou a avaria
+  reportedByUserId String? @map("reported_by_user_id")
+
+  reportedAt DateTime  @default(now()) @map("reported_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([assetId])
+  @@index([maintenanceStatus])
+  @@index([reportedAt])
+  @@index([assetId, maintenanceStatus]) // Avarias abertas de um bem específico
+  @@map("asset_maintenance_logs")
+}
+
+// =============================================================================
+// MÓDULO 3: LANÇAMENTO DE HORAS
+// =============================================================================
+
+/// Lançamento diário de horas trabalhadas por Coordenador / Gestor
+model TimeLog {
+  id String @id @default(cuid())
+
+  // Funcionário cujas horas estão sendo registradas
+  employeeId String   @map("employee_id")
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  // Obra / Centro de custo ao qual o trabalho é imputado
+  worksiteId String   @map("worksite_id")
+  worksite   Worksite @relation(fields: [worksiteId], references: [id], onDelete: Restrict)
+
+  // Coordenador / Gestor que realizou o lançamento
+  enteredByUserId String? @map("entered_by_user_id")
+  enteredByUser   User?   @relation("TimeLogEnteredBy", fields: [enteredByUserId], references: [id], onDelete: SetNull)
+
+  // Data de referência do lançamento (dia de trabalho)
+  workDate DateTime @map("work_date") @db.Date
+
+  // Horários da jornada (DateTime completo para facilitar cálculos e relatórios)
+  clockIn    DateTime? @map("clock_in") // Entrada
+  breakStart DateTime? @map("break_start") // Início do intervalo / almoço
+  breakEnd   DateTime? @map("break_end") // Fim do intervalo / almoço
+  clockOut   DateTime? @map("clock_out") // Saída
+
+  // Tipo da jornada registrada
+  shiftType ShiftType @default(REGULAR) @map("shift_type")
+
+  // Total de minutos trabalhados (calculado pela aplicação: (clockOut - clockIn) - intervalo)
+  totalMinutesWorked Int? @map("total_minutes_worked")
+
+  notes String? @db.Text
+
+  // Fluxo de validação pelo Gestor
+  isValidated       Boolean   @default(false) @map("is_validated")
+  validatedAt       DateTime? @map("validated_at")
+  validatedByUserId String?   @map("validated_by_user_id")
+  validatedByUser   User?     @relation("TimeLogValidatedBy", fields: [validatedByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Um funcionário pode ter apenas um lançamento por obra por dia
+  @@unique([employeeId, worksiteId, workDate], name: "unique_employee_worksite_day")
+  @@index([employeeId])
+  @@index([worksiteId])
+  @@index([workDate])
+  @@index([enteredByUserId])
+  @@index([employeeId, workDate]) // Horas de um funcionário em um intervalo de datas
+  @@index([worksiteId, workDate]) // Todos os lançamentos de uma obra em um dia
+  @@index([isValidated, workDate]) // Lançamentos pendentes de validação por data
+  @@map("time_logs")
+}
+
+// =============================================================================
+// ENUMS — MÓDULO 5S: AUDITORIAS DE ORGANIZAÇÃO
+// =============================================================================
+
+/// Resultado da auditoria 5S registrada pelo auditor
+enum AuditStatus5S {
+  CONFORME // Área em conformidade com os padrões 5S
+  NAO_CONFORME // Irregularidade / não conformidade detectada
+}
+
+/// Estado de validação pela equipe de Qualidade
+enum ValidationStatus5S {
+  AGUARDANDO_AVALIACAO // Registro aguardando análise do Setor de Qualidade
+  APROVADO // Validado e aprovado pela Qualidade
+  REPROVADO // Reprovado — requer nova auditoria ou ação corretiva
+}
+
+// =============================================================================
+// MÓDULO 5S: AUDITORIAS DE ORGANIZAÇÃO
+// =============================================================================
+
+/// Registro de auditoria 5S em uma área ou obra
+model Audit5S {
+  id String @id @default(cuid())
+
+  // Obra / área auditada
+  worksiteId String   @map("worksite_id")
+  worksite   Worksite @relation(fields: [worksiteId], references: [id], onDelete: Restrict)
+
+  // Colaborador ou supervisor que realizou o registro
+  auditorEmployeeId String   @map("auditor_employee_id")
+  auditorEmployee   Employee @relation("Audit5SAuditor", fields: [auditorEmployeeId], references: [id], onDelete: Restrict)
+
+  // Tipo de área auditada — Ex: "Canteiro", "Almoxarifado", "Escritório", "Área Comum"
+  areaType String @map("area_type")
+
+  // Descrição detalhada da irregularidade ou observação identificada
+  description String @db.Text
+
+  // Resultado da auditoria (CONFORME | NAO_CONFORME)
+  status AuditStatus5S @map("status")
+
+  // Estado de validação pelo Setor de Qualidade
+  validation ValidationStatus5S @default(AGUARDANDO_AVALIACAO) @map("validation")
+
+  // Membro do Setor de Qualidade (User) que validou (null enquanto aguardando)
+  validatorUserId String? @map("validator_user_id")
+  validatorUser   User?   @relation("Audit5SValidator", fields: [validatorUserId], references: [id], onDelete: SetNull)
+
+  // Ação corretiva emitida pela Qualidade após validação
+  correctiveAction String? @map("corrective_action") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Fotos associadas a esta auditoria (1-para-N com deleção em cascata)
+  photos AuditPhoto5S[]
+
+  // ── Índices recomendados ──────────────────────────────────────────────
+  @@index([worksiteId]) // Todas as auditorias de uma obra
+  @@index([auditorEmployeeId]) // Auditorias registradas por colaborador
+  @@index([worksiteId, createdAt]) // Histórico temporal de uma obra
+  @@index([validation]) // Fila de itens aguardando avaliação
+  @@index([status, validation]) // NAO_CONFORME + AGUARDANDO = pendências críticas
+  @@index([worksiteId, status]) // Não conformidades por obra
+  @@index([validatorUserId]) // Auditorias revisadas por membro da Qualidade
+  @@map("audits_5s")
+}
+
+/// Foto(s) obrigatória(s) vinculada(s) a uma auditoria 5S
+model AuditPhoto5S {
+  id String @id @default(cuid())
+
+  // Auditoria à qual a foto pertence (cascata: se a auditoria for deletada, as fotos também são)
+  auditId String  @map("audit_id")
+  audit   Audit5S @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  // URL ou caminho relativo da foto (gerado pelo serviço de upload)
+  photoUrl String @map("photo_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([auditId]) // Todas as fotos de uma auditoria
+  @@map("audit_photos_5s")
+}

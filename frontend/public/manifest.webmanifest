@@ -1,0 +1,81 @@
+{
+  "name": "3T Engenharia — Sistema de Gestão",
+  "short_name": "3T Gestão",
+  "description": "Sistema Integrado de Gestão Operacional da 3T Engenharia. Controle de veículos, ferramentas, horas e auditorias 5S.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#00475B",
+  "theme_color": "#00475B",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/icons/screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Dashboard do Sistema 3T no celular"
+    },
+    {
+      "src": "/icons/screenshot-desktop.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard do Sistema 3T no desktop"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Registrar Viagem",
+      "short_name": "Nova Viagem",
+      "description": "Iniciar uma nova viagem de veículo",
+      "url": "/vehicles/trips/new",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Auditoria 5S",
+      "short_name": "5S",
+      "description": "Registrar auditoria 5S no campo",
+      "url": "/5s/audit/new",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Lançar Horas",
+      "short_name": "Horas",
+      "description": "Preencher diário de classe",
+      "url": "/time-logs/daily",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
+}
