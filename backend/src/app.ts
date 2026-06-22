@@ -41,6 +41,16 @@ export async function buildApp() {
 
     // Confia no X-Forwarded-* headers quando atrás de um proxy reverso (Nginx/Caddy)
     trustProxy: true,
+
+    // Configura o AJV para aceitar keywords do OpenAPI/Swagger usadas nos schemas
+    // das rotas (tags, summary, description, security, example) sem lançar erro
+    // de strict mode. Esses campos são apenas documentação e não afetam validação.
+    ajv: {
+      customOptions: {
+        strict: false,
+        allowUnionTypes: true,
+      },
+    },
   })
 
   // ── Plugins de infraestrutura (ordem importa) ─────────────────────────────
