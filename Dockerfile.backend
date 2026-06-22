@@ -1,28 +1,30 @@
 # Dockerfile.backend — 3T Engenharia (Fastify + Prisma + TypeScript)
-# Multi-stage: compila TS no builder, produção mínima no runner.
+# Build: node:20-alpine (leve para compilação)
+# Runner: node:20-alpine com OpenSSL instalado (compatível com Prisma)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage 1 — builder: instala deps e compila TypeScript
+# Stage 1 — builder
 # ─────────────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
-# Contexto de build é a RAIZ do monorepo.
-# Todo WORKDIR e COPY é relativo ao contexto raiz.
+# OpenSSL é necessário para o Prisma engine no Alpine
+RUN apk add --no-cache openssl
+
 WORKDIR /build
 
-# 1. Copia manifesto de dependências do backend
+# 1. Copia manifesto de dependências
 COPY backend/package.json backend/package-lock.json ./
 
-# 2. Instala TODAS as dependências (devDeps necessárias para compilar)
+# 2. Instala TODAS as deps (incluindo devDeps para compilar TS)
 RUN npm ci
 
-# 3. Copia o schema Prisma (necessário antes do generate)
+# 3. Copia schema Prisma
 COPY prisma ./prisma
 
-# 4. Gera o Prisma Client
+# 4. Gera o Prisma Client com binário correto para Alpine
 RUN npx --yes prisma@5.22.0 generate --schema=./prisma/schema.prisma
 
-# 5. Copia todo o código-fonte do backend
+# 5. Copia código-fonte e tsconfig
 COPY backend/src ./src
 COPY backend/tsconfig.json ./
 COPY backend/tsconfig.build.json ./
@@ -31,35 +33,37 @@ COPY backend/tsconfig.build.json ./
 RUN npx tsc --project tsconfig.build.json
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage 2 — runner: imagem mínima de produção
+# Stage 2 — runner (Alpine com OpenSSL)
 # ─────────────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 
-# Usuário não-root para segurança
+# OpenSSL obrigatório para o Prisma query engine
+RUN apk add --no-cache openssl
+
+# Usuário não-root
 RUN addgroup -S app && adduser -S app -G app
 
 WORKDIR /app
 
-# 1. Copia manifesto e instala APENAS deps de produção
+# 1. Deps de produção apenas
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev
 
-# 2. Copia schema Prisma para migrations em runtime
+# 2. Schema Prisma para migrations em runtime
 COPY prisma ./prisma
 
-# 3. Copia o Prisma Client gerado no builder
+# 3. Prisma Client gerado (inclui binário linux-musl)
 COPY --from=builder /build/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /build/node_modules/@prisma ./node_modules/@prisma
 
-# 4. Copia o build compilado (./dist)
+# 4. Build compilado
 COPY --from=builder /build/dist ./dist
 
-# 5. Aplica permissões
 RUN chown -R app:app /app
 USER app
 
 EXPOSE 3333
 
-# Healthcheck (aguarda 30s antes da primeira checagem — migrations podem demorar)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:3333/health || exit 1
 
