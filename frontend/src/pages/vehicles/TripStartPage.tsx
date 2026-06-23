@@ -19,6 +19,7 @@ import {
   ArrowRight,
   RotateCcw,
   AlertCircle,
+  User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -30,7 +31,7 @@ import {
   formatKm,
   formatDuration,
 } from '@/data/mockData'
-import { vehiclesApi, tripsApi, type ApiVehicle } from '@/lib/api'
+import { vehiclesApi, tripsApi, type ApiVehicle, type ApiTrip } from '@/lib/api'
 
 // Usa ApiVehicle como tipo Vehicle para este componente
 type Vehicle = ApiVehicle
@@ -319,37 +320,82 @@ type TripPageState = 'STEP_1' | 'STEP_2' | 'COMPLETED'
 export default function TripStartPage() {
   const navigate = useNavigate()
 
-  // ── Lista de veículos da API ───────────────────────────────────────────────
-  const [vehiclesList, setVehiclesList] = useState<Vehicle[]>([])
+  // ── Estados da API ─────────────────────────────────────────────────────────
+  const [vehiclesList, setVehiclesList]       = useState<Vehicle[]>([])
+  const [ongoingTrips, setOngoingTrips]       = useState<ApiTrip[]>([])
   const [loadingVehicles, setLoadingVehicles] = useState(true)
-
-  useEffect(() => {
-    vehiclesApi.list()
-      .then(res => setVehiclesList(res.vehicles))
-      .catch(() => {})
-      .finally(() => setLoadingVehicles(false))
-  }, [])
+  const [apiError, setApiError]               = useState<string | null>(null)
 
   // ── Trip ID salvo após startTrip (para encerrar no passo 2) ────────────
   const [activeTripId, setActiveTripId] = useState<string | null>(null)
-  const [apiError, setApiError] = useState<string | null>(null)
 
   // ── Estado da máquina ──────────────────────────────────────────────────
   const [pageState, setPageState] = useState<TripPageState>('STEP_1')
 
   // ── Dados do Passo 1 ───────────────────────────────────────────────────
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
-  const [initialKm, setInitialKm] = useState('')
-  const [origin, setOrigin] = useState('')
-  const [destination, setDestination] = useState('')
-  const [purpose, setPurpose] = useState('')
-  const [step1Errors, setStep1Errors] = useState<Partial<Record<string, string>>>({})
+  const [initialKm, setInitialKm]             = useState('')
+  const [origin, setOrigin]                   = useState('')
+  const [destination, setDestination]         = useState('')
+  const [purpose, setPurpose]                 = useState('')
+  const [step1Errors, setStep1Errors]         = useState<Partial<Record<string, string>>>({})
 
   // ── Dados do Passo 2 ───────────────────────────────────────────────────
   const [departureData, setDepartureData] = useState<DepartureData | null>(null)
-  const [finalKm, setFinalKm] = useState('')
-  const [step2Errors, setStep2Errors] = useState<Partial<Record<string, string>>>({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [finalKm, setFinalKm]             = useState('')
+  const [step2Errors, setStep2Errors]     = useState<Partial<Record<string, string>>>({})
+  const [isSubmitting, setIsSubmitting]   = useState(false)
+
+  // ── Carregamento centralizado de dados ──────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    setLoadingVehicles(true)
+    setApiError(null)
+    try {
+      const [vehRes, tripsRes] = await Promise.all([
+        vehiclesApi.list(),
+        tripsApi.list({ limit: 100 }),
+      ])
+      setVehiclesList(vehRes.vehicles)
+      const openTrips = tripsRes.trips.filter(t => t.arrivalDateTime === null || t.finalKm === null)
+      setOngoingTrips(openTrips)
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : 'Erro ao carregar dados do servidor.')
+    } finally {
+      setLoadingVehicles(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
+
+  // Seleciona uma viagem em andamento da lista para encerrar
+  const handleSelectOngoingTrip = useCallback((trip: ApiTrip) => {
+    const fullVehicle = vehiclesList.find(v => v.id === trip.vehicle.id)
+    const vehicleObj = fullVehicle || {
+      ...trip.vehicle,
+      color: null,
+      fuelType: null,
+      maintenanceKmThreshold: null,
+      maintenanceDayThreshold: null,
+      lastMaintenanceKm: null,
+      lastMaintenanceDate: null,
+      notes: null,
+      createdAt: '',
+      updatedAt: '',
+    } as unknown as ApiVehicle
+
+    setActiveTripId(trip.id)
+    setDepartureData({
+      vehicle: vehicleObj,
+      initialKm: trip.initialKm,
+      origin: trip.origin,
+      destination: trip.destination,
+      purpose: trip.purpose ?? '',
+      departureTime: new Date(trip.departureDateTime),
+    })
+    setPageState('STEP_2')
+  }, [vehiclesList])
 
   // ── Cálculos em tempo real (Passo 2) ───────────────────────────────────
   const distanceTraveled = useMemo(() => {
@@ -451,7 +497,6 @@ export default function TripStartPage() {
     }
   }, [validateStep2, activeTripId, finalKm])
 
-
   const handleReset = useCallback(() => {
     setPageState('STEP_1')
     setSelectedVehicle(null)
@@ -465,7 +510,17 @@ export default function TripStartPage() {
     setStep2Errors({})
     setActiveTripId(null)
     setApiError(null)
-  }, [])
+    void fetchData()
+  }, [fetchData])
+
+  const handleBackToStep1 = useCallback(() => {
+    setPageState('STEP_1')
+    setFinalKm('')
+    setStep2Errors({})
+    setActiveTripId(null)
+    setDepartureData(null)
+    void fetchData()
+  }, [fetchData])
 
   // ────────────────────────────────────────────────────────────────────────
   // TELA DE SUCESSO
@@ -517,6 +572,59 @@ export default function TripStartPage() {
         <h1 className="text-2xl font-extrabold text-gray-900">Registro de Viagem</h1>
         <p className="text-gray-500 text-sm mt-0.5">Módulo de Controle de Veículos</p>
       </div>
+
+      {/* Seção: Viagens em Andamento (Lista de Pendências) */}
+      {pageState === 'STEP_1' && ongoingTrips.length > 0 && (
+        <div className="mb-6 space-y-3">
+          <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+            <Clock size={13} className="text-brand-accent" />
+            Viagens em Andamento ({ongoingTrips.length})
+          </h2>
+          <div className="space-y-3">
+            {ongoingTrips.map((trip) => (
+              <div
+                key={trip.id}
+                className="bg-white rounded-2xl border border-amber-200 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all hover:shadow-md"
+              >
+                <div className="min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm text-gray-900">
+                      {trip.vehicle.licensePlate}
+                    </span>
+                    <span className="text-gray-300 text-xs">·</span>
+                    <span className="text-xs text-gray-500 font-medium truncate">
+                      {trip.vehicle.brand} {trip.vehicle.model}
+                    </span>
+                    <Badge variant="accent" dot>Em andamento</Badge>
+                  </div>
+                  <div className="flex flex-col gap-0.5 text-xs text-gray-400 mt-1">
+                    <span className="flex items-center gap-1 text-gray-600 font-medium">
+                      <User size={12} className="text-gray-400" />
+                      {trip.driverEmployee?.fullName ?? 'Motorista não informado'}
+                    </span>
+                    <span className="flex items-center gap-1 mt-0.5">
+                      <MapPin size={12} className="text-gray-300" />
+                      {trip.origin} → {trip.destination}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-1">
+                    <Clock size={10} />
+                    Início: {new Date(trip.departureDateTime).toLocaleDateString('pt-BR')} às {new Date(trip.departureDateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSelectOngoingTrip(trip)}
+                  className="sm:self-center flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-white bg-brand-primary hover:bg-[#003d4f] rounded-xl transition-all shadow-sm flex-shrink-0"
+                >
+                  <CheckCircle2 size={13} />
+                  Encerrar Viagem
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Card principal */}
       <div className="bg-white rounded-3xl shadow-card border border-gray-100 p-5 sm:p-7">
@@ -734,7 +842,7 @@ export default function TripStartPage() {
                 variant="ghost"
                 size="lg"
                 className="flex-shrink-0"
-                onClick={() => setPageState('STEP_1')}
+                onClick={handleBackToStep1}
                 disabled={isSubmitting}
               >
                 <ArrowLeft size={18} />
