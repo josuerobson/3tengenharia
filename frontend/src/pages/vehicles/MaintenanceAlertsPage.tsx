@@ -1,9 +1,8 @@
 // src/pages/vehicles/MaintenanceAlertsPage.tsx
 // Painel de alertas de manutenção preventiva — um alerta por TIPO DE SERVIÇO,
-// independente por veículo. Ex: o mesmo veículo pode ter "óleo vencido" +
-// "correia dentada ok" + "pneus em atenção" — todos separados.
+// independente por veículo. Totalmente integrado ao backend.
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   AlertTriangle,
   Car,
@@ -19,20 +18,31 @@ import {
   Calendar,
   CheckCheck,
   X,
+  RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import {
-  MOCK_VEHICLES,
-  MOCK_TRIPS,
-  MOCK_MAINTENANCE_TYPES,
-  computeMaintenanceAlerts,
-  formatDateTime,
-  formatDate,
-  type MaintenanceAlert,
-  type VehicleMaintenanceType,
-  type Trip,
-} from '@/data/mockData'
+  vehiclesApi,
+  tripsApi,
+  maintenanceApi,
+  type ApiVehicle,
+  type ApiTrip,
+  type ApiMaintenanceAlert,
+} from '@/lib/api'
+
+// ── Helpers locais para formatação ─────────────────────────────────────────────
+
+function formatDateTime(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+         d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso + 'T12:00:00') // evita offset de timezone
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
 
 // ── Configuração de urgência ───────────────────────────────────────────────────
 
@@ -56,7 +66,7 @@ function RegisterServiceModal({
   onConfirm,
   onClose,
 }: {
-  alert: MaintenanceAlert
+  alert: ApiMaintenanceAlert
   currentKm: number
   onConfirm: (serviceKm: number, serviceDate: string) => void
   onClose: () => void
@@ -65,13 +75,13 @@ function RegisterServiceModal({
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in-up">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 space-y-4">
         <div className="flex items-start justify-between">
           <div>
             <h3 className="font-bold text-gray-900 text-base">Registrar Serviço</h3>
             <p className="text-sm text-gray-500 mt-0.5">{alert.name}</p>
-            <p className="text-xs text-gray-400">{alert.licensePlate} — {alert.vehicleBrand}</p>
+            <p className="text-xs text-gray-400">{alert.licensePlate} — {alert.vehicleBrand} {alert.vehicleModel}</p>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
             <X size={18} />
@@ -127,8 +137,8 @@ function AlertCard({
   alert,
   onRegisterService,
 }: {
-  alert: MaintenanceAlert
-  onRegisterService: (alert: MaintenanceAlert) => void
+  alert: ApiMaintenanceAlert
+  onRegisterService: (alert: ApiMaintenanceAlert) => void
 }) {
   const cfg = URGENCY_CONFIG[alert.urgency]
 
@@ -159,7 +169,7 @@ function AlertCard({
           </div>
           <div className="min-w-0">
             <p className="font-bold text-gray-800 text-xs tracking-wider">{alert.licensePlate}</p>
-            <p className="text-[10px] text-gray-400 truncate">{alert.vehicleBrand}</p>
+            <p className="text-[10px] text-gray-400 truncate">{alert.vehicleBrand} {alert.vehicleModel}</p>
           </div>
         </div>
         <span className={cn('text-xs font-bold px-2 py-0.5 rounded-full', cfg.cardBorder, cfg.labelColor, 'border bg-white/70')}>
@@ -219,12 +229,12 @@ function AlertCard({
       </div>
 
       {/* Último serviço */}
-      {(alert.lastServiceKm || alert.lastServiceDate) && (
+      {(alert.lastServiceKm !== null || alert.lastServiceDate !== null) && (
         <p className="text-[10px] text-gray-400 border-t border-gray-100 pt-2 mb-2 flex items-center gap-1">
           <Wrench size={10} />
           Último serviço:
-          {alert.lastServiceKm && <span>{alert.lastServiceKm.toLocaleString('pt-BR')} km</span>}
-          {alert.lastServiceDate && <span>· {formatDate(alert.lastServiceDate)}</span>}
+          {alert.lastServiceKm !== null && <span>{alert.lastServiceKm.toLocaleString('pt-BR')} km</span>}
+          {alert.lastServiceDate !== null && <span>· {formatDate(alert.lastServiceDate)}</span>}
         </p>
       )}
 
@@ -255,9 +265,11 @@ function Metric({ label, value, unit, highlight = false, overdue = false }: {
 
 // ── Item da linha do tempo de viagens ─────────────────────────────────────────
 
-function TimelineItem({ trip, isLast }: { trip: Trip; isLast: boolean }) {
-  const isOngoing = trip.arrivalDateTime === null
-  const initials = trip.driverName.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
+function TimelineItem({ trip, isLast }: { trip: ApiTrip; isLast: boolean }) {
+  const isOngoing = trip.arrivalDateTime === null || trip.finalKm === null
+  const initials = trip.driverEmployee?.fullName
+    ? trip.driverEmployee.fullName.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
+    : 'U'
 
   return (
     <div className="flex gap-4">
@@ -281,7 +293,7 @@ function TimelineItem({ trip, isLast }: { trip: Trip; isLast: boolean }) {
               {trip.maintenanceAlertActive && <Badge variant="high" dot>Alerta KM</Badge>}
             </div>
             <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-              <User size={11} />{trip.driverName} <span className="text-gray-300">·</span> {trip.driverRegistration}
+              <User size={11} />{trip.driverEmployee?.fullName ?? 'Motorista não informado'} <span className="text-gray-300">·</span> {trip.driverEmployee?.registration ?? '—'}
             </p>
           </div>
           <ChevronRight size={16} className="text-gray-300 flex-shrink-0 mt-0.5" />
@@ -321,56 +333,84 @@ export default function MaintenanceAlertsPage() {
   const [filter, setFilter]           = useState<FilterType>('all')
   const [vehicleFilter, setVehicleFilter] = useState<string>('all')
   const [auditVehicleFilter, setAuditVehicleFilter] = useState<string>('all')
-  const [serviceModal, setServiceModal] = useState<MaintenanceAlert | null>(null)
+  const [serviceModal, setServiceModal] = useState<ApiMaintenanceAlert | null>(null)
 
-  // Mock state — em produção viria da API
-  const [maintenanceTypes, setMaintenanceTypes] = useState<VehicleMaintenanceType[]>(MOCK_MAINTENANCE_TYPES)
+  // Estados reais carregados do backend
+  const [vehicles, setVehicles] = useState<ApiVehicle[]>([])
+  const [alerts, setAlerts]     = useState<ApiMaintenanceAlert[]>([])
+  const [trips, setTrips]       = useState<ApiTrip[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
 
-  // Todos os alertas computados para todos os veículos
-  const allAlerts = useMemo(() => {
-    return MOCK_VEHICLES.flatMap(vehicle => {
-      const types = maintenanceTypes.filter(t => t.vehicleId === vehicle.id)
-      return computeMaintenanceAlerts(vehicle, types)
-    })
-  }, [maintenanceTypes])
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [vehiclesRes, alertsRes, tripsRes] = await Promise.all([
+        vehiclesApi.list(),
+        maintenanceApi.listAllAlerts(),
+        tripsApi.list({ limit: 100 }),
+      ])
+      setVehicles(vehiclesRes.vehicles)
+      setAlerts(alertsRes)
+      setTrips(tripsRes.trips)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar dados de manutenção.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-  // Aplicar filtros
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
+
+  // Aplicar filtros nos alertas
   const filteredAlerts = useMemo(() => {
-    return allAlerts
-      .filter(a => {
-        if (vehicleFilter !== 'all' && a.vehicleId !== vehicleFilter) return false
-        if (filter === 'needs-service') return a.urgency !== 'ok'
-        if (filter === 'critical')      return a.urgency === 'critical' || a.urgency === 'high'
-        if (filter === 'ok')            return a.urgency === 'ok'
-        return true
-      })
-  }, [allAlerts, filter, vehicleFilter])
+    return alerts.filter(a => {
+      if (vehicleFilter !== 'all' && a.vehicleId !== vehicleFilter) return false
+      if (filter === 'needs-service') return a.urgency !== 'ok'
+      if (filter === 'critical')      return a.urgency === 'critical' || a.urgency === 'high'
+      if (filter === 'ok')            return a.urgency === 'ok'
+      return true
+    })
+  }, [alerts, filter, vehicleFilter])
 
   // KPIs
-  const criticalCount = useMemo(() => allAlerts.filter(a => a.urgency === 'critical' || a.urgency === 'high').length, [allAlerts])
-  const overdueKmCount = useMemo(() => allAlerts.filter(a => a.kmRemaining !== null && a.kmRemaining < 0).length, [allAlerts])
+  const criticalCount = useMemo(() => alerts.filter(a => a.urgency === 'critical' || a.urgency === 'high').length, [alerts])
+  const overdueKmCount = useMemo(() => alerts.filter(a => a.kmRemaining !== null && a.kmRemaining < 0).length, [alerts])
 
-  // Viagens filtradas
+  // Viagens filtradas para a Linha do Tempo
   const filteredTrips = useMemo(() => {
-    const base = [...MOCK_TRIPS].sort(
+    const sorted = [...trips].sort(
       (a, b) => new Date(b.departureDateTime).getTime() - new Date(a.departureDateTime).getTime(),
     )
-    if (auditVehicleFilter === 'all') return base
-    return base.filter(t => t.vehicleId === auditVehicleFilter)
-  }, [auditVehicleFilter])
+    if (auditVehicleFilter === 'all') return sorted
+    return sorted.filter(t => t.vehicle.id === auditVehicleFilter)
+  }, [trips, auditVehicleFilter])
 
-  function handleRegisterService(serviceKm: number, serviceDate: string) {
+  // Confirmar registro de serviço realizado
+  const handleRegisterService = useCallback(async (serviceKm: number, serviceDate: string) => {
     if (!serviceModal) return
-    setMaintenanceTypes(prev => prev.map(t =>
-      t.id === serviceModal.maintenanceTypeId
-        ? { ...t, lastServiceKm: serviceKm, lastServiceDate: serviceDate }
-        : t,
-    ))
-    setServiceModal(null)
-  }
+    setLoading(true)
+    setError(null)
+    try {
+      await maintenanceApi.completeService(
+        serviceModal.vehicleId,
+        serviceModal.maintenanceTypeId,
+        { serviceKm, serviceDate }
+      )
+      setServiceModal(null)
+      await fetchData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao registrar serviço realizado.')
+    } finally {
+      setLoading(false)
+    }
+  }, [serviceModal, fetchData])
 
   const filterButtons: { id: FilterType; label: string; count?: number }[] = [
-    { id: 'all',           label: 'Todos',          count: allAlerts.length },
+    { id: 'all',           label: 'Todos',          count: alerts.length },
     { id: 'needs-service', label: 'Requer Atenção' },
     { id: 'critical',      label: '🔴 Críticos',    count: criticalCount },
     { id: 'ok',            label: '✅ Em dia' },
@@ -381,20 +421,31 @@ export default function MaintenanceAlertsPage() {
 
       {/* Cabeçalho */}
       <div>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-            <AlertTriangle size={20} className="text-amber-600" />
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+              <AlertTriangle size={20} className="text-amber-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-extrabold text-gray-900">Alertas de Manutenção</h1>
+              <p className="text-gray-500 text-sm">Monitoramento preventivo por tipo de serviço</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Alertas de Manutenção</h1>
-            <p className="text-gray-500 text-sm">Monitoramento preventivo por tipo de serviço</p>
-          </div>
+          <button
+            onClick={() => void fetchData()}
+            disabled={loading}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#00475B] transition-colors disabled:opacity-50"
+            title="Atualizar"
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            {loading ? 'Carregando...' : 'Atualizar'}
+          </button>
         </div>
 
         {/* KPI strip */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div className="rounded-2xl border border-gray-100 bg-white p-4 text-center shadow-sm">
-            <p className="text-2xl font-extrabold text-gray-900">{allAlerts.length}</p>
+            <p className="text-2xl font-extrabold text-gray-900">{alerts.length}</p>
             <p className="text-xs text-gray-400 mt-0.5">Serviços monitorados</p>
           </div>
           <div className={cn('rounded-2xl border p-4 text-center shadow-sm', criticalCount > 0 ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-white')}>
@@ -407,6 +458,20 @@ export default function MaintenanceAlertsPage() {
           </div>
         </div>
       </div>
+
+      {/* Erro */}
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-center gap-3">
+          <AlertTriangle size={18} className="text-red-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-700">Erro na operação</p>
+            <p className="text-xs text-red-500">{error}</p>
+          </div>
+          <button onClick={() => setError(null)} className="text-xs font-semibold text-red-600 hover:underline">
+            Dispensar
+          </button>
+        </div>
+      )}
 
       {/* Filtros de urgência */}
       <div className="flex gap-2 flex-wrap items-center">
@@ -433,16 +498,25 @@ export default function MaintenanceAlertsPage() {
           <select value={vehicleFilter} onChange={e => setVehicleFilter(e.target.value)}
             className="text-sm rounded-xl border border-gray-200 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00475B]/30">
             <option value="all">Todos os veículos</option>
-            {MOCK_VEHICLES.map(v => (
+            {vehicles.map(v => (
               <option key={v.id} value={v.id}>{v.licensePlate} — {v.model}</option>
             ))}
           </select>
         </div>
       </div>
 
+      {/* Loading Skeleton */}
+      {loading && alerts.length === 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2].map(i => (
+            <div key={i} className="rounded-2xl border border-gray-150 bg-white p-4 animate-pulse h-48" />
+          ))}
+        </div>
+      )}
+
       {/* Grid de alertas — 1 card por tipo de manutenção */}
-      {filteredAlerts.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+      {!loading && filteredAlerts.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 shadow-sm">
           <CheckCircle2 size={40} className="text-emerald-400 mx-auto mb-3" />
           <p className="text-gray-600 font-semibold">Nenhum alerta para este filtro</p>
           <p className="text-gray-400 text-sm mt-1">Toda a frota está em dia</p>
@@ -471,7 +545,7 @@ export default function MaintenanceAlertsPage() {
             <select value={auditVehicleFilter} onChange={e => setAuditVehicleFilter(e.target.value)}
               className="h-9 pl-3 pr-8 text-sm rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#00475B]/30 text-gray-700 font-medium">
               <option value="all">Todos os veículos</option>
-              {MOCK_VEHICLES.map(v => (
+              {vehicles.map(v => (
                 <option key={v.id} value={v.id}>{v.licensePlate} — {v.model}</option>
               ))}
             </select>
@@ -479,7 +553,7 @@ export default function MaintenanceAlertsPage() {
         </div>
 
         {filteredTrips.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
+          <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 shadow-sm">
             <p className="text-gray-400 text-sm">Nenhuma viagem registrada para este filtro</p>
           </div>
         ) : (

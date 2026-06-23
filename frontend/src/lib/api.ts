@@ -228,3 +228,110 @@ export const authApi = {
     }
   },
 }
+
+// ── Endpoints de Manutenção ───────────────────────────────────────────────────
+
+export interface ApiMaintenanceAlert {
+  maintenanceTypeId: string
+  name: string
+  description: string | null
+  vehicleId: string
+  licensePlate: string
+  vehicleBrand: string
+  vehicleModel: string
+  currentKm: number
+  lastServiceKm: number | null
+  lastServiceDate: string | null
+  intervalKm: number | null
+  intervalDays: number | null
+  kmRemaining: number | null
+  daysRemaining: number | null
+  urgency: 'critical' | 'high' | 'medium' | 'ok'
+}
+
+export interface ApiMaintenanceType {
+  id: string
+  name: string
+  description: string | null
+  isActive: boolean
+  intervalKm: number | null
+  intervalDays: number | null
+  lastServiceKm: number | null
+  lastServiceDate: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export const maintenanceApi = {
+  getAlerts(vehicleId: string): Promise<{ alerts: ApiMaintenanceAlert[] }> {
+    return request(`/vehicles/${vehicleId}/alerts`)
+  },
+
+  completeService(
+    vehicleId: string,
+    maintenanceTypeId: string,
+    data: { serviceKm: number; serviceDate?: string }
+  ): Promise<unknown> {
+    return request(`/vehicles/${vehicleId}/maintenance-types/${maintenanceTypeId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async listAllAlerts(): Promise<ApiMaintenanceAlert[]> {
+    const { vehicles } = await vehiclesApi.list()
+    const allResults = await Promise.all(
+      vehicles.map(v =>
+        request<{ alerts: ApiMaintenanceAlert[] }>(`/vehicles/${v.id}/alerts`).catch(() => ({ alerts: [] }))
+      )
+    )
+    return allResults.flatMap(r => r.alerts)
+  },
+
+  listTypes(vehicleId: string): Promise<{ types: ApiMaintenanceType[] }> {
+    return request(`/vehicles/${vehicleId}/maintenance-types`)
+  },
+
+  createType(
+    vehicleId: string,
+    data: {
+      name: string
+      description?: string | null
+      intervalKm?: number | null
+      intervalDays?: number | null
+      lastServiceKm?: number | null
+      lastServiceDate?: string | null
+    }
+  ): Promise<ApiMaintenanceType> {
+    return request(`/vehicles/${vehicleId}/maintenance-types`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  updateType(
+    vehicleId: string,
+    id: string,
+    data: Partial<{
+      name: string
+      description: string | null
+      intervalKm: number | null
+      intervalDays: number | null
+      lastServiceKm: number | null
+      lastServiceDate: string | null
+      isActive: boolean
+    }>
+  ): Promise<ApiMaintenanceType> {
+    return request(`/vehicles/${vehicleId}/maintenance-types/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
+  deleteType(vehicleId: string, id: string): Promise<void> {
+    return request(`/vehicles/${vehicleId}/maintenance-types/${id}`, {
+      method: 'DELETE',
+    })
+  },
+}
+

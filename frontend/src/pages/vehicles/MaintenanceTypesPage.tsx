@@ -1,29 +1,23 @@
 // src/pages/vehicles/MaintenanceTypesPage.tsx
 // Cadastro dinâmico de tipos de manutenção por veículo.
-// CRUD completo: listar, criar, editar inline e desativar/remover.
+// CRUD completo integrado ao banco de dados: listar, criar, editar inline e desativar/remover.
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Plus, Pencil, Trash2, X, Check,
   Wrench, Gauge, Calendar, ChevronDown, ChevronUp,
   ToggleLeft, ToggleRight, AlertCircle, History,
-  Search, ChevronDown as CaretDown,
+  Search, ChevronDown as CaretDown, RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { MOCK_VEHICLES, type Vehicle } from '@/data/mockData'
+import {
+  vehiclesApi,
+  maintenanceApi,
+  type ApiVehicle,
+  type ApiMaintenanceType,
+} from '@/lib/api'
 
 // ── Tipos locais ───────────────────────────────────────────────────────────────
-
-interface MaintenanceType {
-  id: string
-  name: string
-  description: string | null
-  isActive: boolean
-  intervalKm: number | null
-  intervalDays: number | null
-  lastServiceKm: number | null
-  lastServiceDate: string | null   // YYYY-MM-DD
-}
 
 interface FormState {
   name: string
@@ -39,41 +33,29 @@ const EMPTY_FORM: FormState = {
   lastServiceKm: '', lastServiceDate: '',
 }
 
-// ── Mock inicial de tipos por veículo ─────────────────────────────────────────
-
-const INITIAL_TYPES: Record<string, MaintenanceType[]> = {
-  'veh-001': [
-    { id: 't1', name: 'Troca de óleo do motor',  description: 'Óleo 5W30 sintético + filtro',            isActive: true,  intervalKm: 10000, intervalDays: 180, lastServiceKm: 46000, lastServiceDate: '2024-12-10' },
-    { id: 't2', name: 'Óleo da caixa de câmbio', description: null,                                        isActive: true,  intervalKm: 40000, intervalDays: null, lastServiceKm: 20000, lastServiceDate: '2023-08-15' },
-    { id: 't3', name: 'Correia dentada',          description: 'Substituir conjunto correia + tensor',     isActive: true,  intervalKm: 60000, intervalDays: null, lastServiceKm: null,  lastServiceDate: null },
-    { id: 't4', name: 'Filtro de combustível',    description: null,                                        isActive: false, intervalKm: 20000, intervalDays: null, lastServiceKm: 30000, lastServiceDate: '2024-01-20' },
-  ],
-  'veh-002': [],
-  'veh-003': [],
-  'veh-004': [],
-  'veh-005': [],
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string | null) {
   if (!iso) return null
-  const [y, m, d] = iso.split('-')
+  const dateOnly = iso.split('T')[0]
+  if (!dateOnly) return null
+  const [y, m, d] = dateOnly.split('-')
+  if (!y || !m || !d) return iso
   return `${d}/${m}/${y}`
 }
 
-function vehicleLabel(v: Vehicle) {
+function vehicleLabel(v: ApiVehicle) {
   return `${v.licensePlate} — ${v.brand} ${v.model} ${v.year}`
 }
 
-function vehicleKmLabel(v: Vehicle) {
+function vehicleKmLabel(v: ApiVehicle) {
   return `KM atual: ${v.currentKm.toLocaleString('pt-BR')}`
 }
 
 // ── Componente: VehicleSearchSelect ───────────────────────────────────────────
 
 interface VehicleSearchSelectProps {
-  vehicles: Vehicle[]
+  vehicles: ApiVehicle[]
   selectedId: string
   onSelect: (id: string) => void
 }
@@ -112,7 +94,7 @@ function VehicleSearchSelect({ vehicles, selectedId, onSelect }: VehicleSearchSe
       })
     : vehicles
 
-  const statusDot = (v: Vehicle) => {
+  const statusDot = (v: ApiVehicle) => {
     if (v.status === 'ACTIVE')       return 'bg-emerald-400'
     if (v.status === 'MAINTENANCE')  return 'bg-amber-400'
     return 'bg-gray-300'
@@ -234,43 +216,98 @@ function VehicleSearchSelect({ vehicles, selectedId, onSelect }: VehicleSearchSe
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export default function MaintenanceTypesPage() {
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string>(MOCK_VEHICLES[0]!.id)
-  const [typesByVehicle, setTypesByVehicle] = useState(INITIAL_TYPES)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [showForm, setShowForm] = useState(false)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
-  const [formError, setFormError] = useState('')
+  const [vehicles, setVehicles]                   = useState<ApiVehicle[]>([])
+  const [types, setTypes]                         = useState<ApiMaintenanceType[]>([])
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('')
+  const [loading, setLoading]                     = useState(true)
+  const [error, setError]                         = useState<string | null>(null)
 
-  const selectedVehicle = MOCK_VEHICLES.find(v => v.id === selectedVehicleId)!
-  const types = typesByVehicle[selectedVehicleId] ?? []
+  const [editingId, setEditingId]   = useState<string | null>(null)
+  const [showForm, setShowForm]     = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [form, setForm]             = useState<FormState>(EMPTY_FORM)
+  const [formError, setFormError]   = useState('')
+
+  const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId)
+
+  // ── Carregar tipos de manutenção ─────────────────────────────────────────────
+  const fetchTypes = useCallback(async (vehicleId: string) => {
+    if (!vehicleId) return
+    try {
+      const res = await maintenanceApi.listTypes(vehicleId)
+      setTypes(res.types)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar tipos de manutenção.')
+    }
+  }, [])
+
+  // ── Inicialização de dados ──────────────────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await vehiclesApi.list()
+      setVehicles(res.vehicles)
+      if (res.vehicles.length > 0) {
+        const firstId = res.vehicles[0].id
+        setSelectedVehicleId(firstId)
+        await fetchTypes(firstId)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar veículos.')
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchTypes])
+
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
+
+  // Atualiza tipos quando muda veículo manualmente
+  const handleSelectVehicle = useCallback(async (id: string) => {
+    setSelectedVehicleId(id)
+    setShowForm(false)
+    setEditingId(null)
+    setLoading(true)
+    setError(null)
+    try {
+      await fetchTypes(id)
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchTypes])
 
   // ── Criar ──────────────────────────────────────────────────────────────────
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!form.name.trim()) { setFormError('O nome é obrigatório.'); return }
-    const newType: MaintenanceType = {
-      id:              `t${Date.now()}`,
-      name:            form.name.trim(),
-      description:     form.description.trim() || null,
-      isActive:        true,
-      intervalKm:      form.intervalKm      ? parseInt(form.intervalKm)      : null,
-      intervalDays:    form.intervalDays    ? parseInt(form.intervalDays)    : null,
-      lastServiceKm:   form.lastServiceKm   ? parseInt(form.lastServiceKm)   : null,
-      lastServiceDate: form.lastServiceDate  || null,
-    }
-    setTypesByVehicle(prev => ({
-      ...prev,
-      [selectedVehicleId]: [...(prev[selectedVehicleId] ?? []), newType],
-    }))
-    setForm(EMPTY_FORM)
+    if (!selectedVehicleId) return
+    setLoading(true)
     setFormError('')
-    setShowForm(false)
+    try {
+      await maintenanceApi.createType(selectedVehicleId, {
+        name:            form.name.trim(),
+        description:     form.description.trim() || null,
+        intervalKm:      form.intervalKm ? parseInt(form.intervalKm) : null,
+        intervalDays:    form.intervalDays ? parseInt(form.intervalDays) : null,
+        lastServiceKm:   form.lastServiceKm ? parseInt(form.lastServiceKm) : null,
+        lastServiceDate: form.lastServiceDate || null,
+      })
+      setForm(EMPTY_FORM)
+      setFormError('')
+      setShowForm(false)
+      await fetchTypes(selectedVehicleId)
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Erro ao cadastrar tipo de manutenção.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // ── Editar inline ──────────────────────────────────────────────────────────
 
-  function startEdit(t: MaintenanceType) {
+  function startEdit(t: ApiMaintenanceType) {
     setEditingId(t.id)
     setForm({
       name:            t.name,
@@ -278,49 +315,68 @@ export default function MaintenanceTypesPage() {
       intervalKm:      t.intervalKm?.toString()      ?? '',
       intervalDays:    t.intervalDays?.toString()    ?? '',
       lastServiceKm:   t.lastServiceKm?.toString()   ?? '',
-      lastServiceDate: t.lastServiceDate             ?? '',
+      lastServiceDate: t.lastServiceDate ? t.lastServiceDate.split('T')[0] : '',
     })
     setFormError('')
   }
 
-  function saveEdit(id: string) {
+  async function saveEdit(id: string) {
     if (!form.name.trim()) { setFormError('Nome obrigatório.'); return }
-    setTypesByVehicle(prev => ({
-      ...prev,
-      [selectedVehicleId]: prev[selectedVehicleId]!.map(t =>
-        t.id === id ? {
-          ...t,
-          name:            form.name.trim(),
-          description:     form.description.trim() || null,
-          intervalKm:      form.intervalKm      ? parseInt(form.intervalKm)      : null,
-          intervalDays:    form.intervalDays    ? parseInt(form.intervalDays)    : null,
-          lastServiceKm:   form.lastServiceKm   ? parseInt(form.lastServiceKm)   : null,
-          lastServiceDate: form.lastServiceDate  || null,
-        } : t
-      ),
-    }))
-    setEditingId(null)
+    if (!selectedVehicleId) return
+    setLoading(true)
     setFormError('')
+    try {
+      await maintenanceApi.updateType(selectedVehicleId, id, {
+        name:            form.name.trim(),
+        description:     form.description.trim() || null,
+        intervalKm:      form.intervalKm ? parseInt(form.intervalKm) : null,
+        intervalDays:    form.intervalDays ? parseInt(form.intervalDays) : null,
+        lastServiceKm:   form.lastServiceKm ? parseInt(form.lastServiceKm) : null,
+        lastServiceDate: form.lastServiceDate || null,
+      })
+      setEditingId(null)
+      setFormError('')
+      await fetchTypes(selectedVehicleId)
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Erro ao atualizar tipo de manutenção.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // ── Toggle ativo ───────────────────────────────────────────────────────────
 
-  function toggleActive(id: string) {
-    setTypesByVehicle(prev => ({
-      ...prev,
-      [selectedVehicleId]: prev[selectedVehicleId]!.map(t =>
-        t.id === id ? { ...t, isActive: !t.isActive } : t
-      ),
-    }))
+  async function toggleActive(t: ApiMaintenanceType) {
+    if (!selectedVehicleId) return
+    setLoading(true)
+    setError(null)
+    try {
+      await maintenanceApi.updateType(selectedVehicleId, t.id, {
+        isActive: !t.isActive,
+      })
+      await fetchTypes(selectedVehicleId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao alterar status do tipo de manutenção.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // ── Remover ────────────────────────────────────────────────────────────────
 
-  function removeType(id: string) {
-    setTypesByVehicle(prev => ({
-      ...prev,
-      [selectedVehicleId]: prev[selectedVehicleId]!.filter(t => t.id !== id),
-    }))
+  async function removeType(id: string) {
+    if (!selectedVehicleId) return
+    if (!window.confirm('Tem certeza que deseja excluir permanentemente este tipo de manutenção?')) return
+    setLoading(true)
+    setError(null)
+    try {
+      await maintenanceApi.deleteType(selectedVehicleId, id)
+      await fetchTypes(selectedVehicleId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao excluir tipo de manutenção.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -329,38 +385,64 @@ export default function MaintenanceTypesPage() {
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
 
       {/* Cabeçalho */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Wrench className="text-[#00475B]" size={26} />
-          Tipos de Manutenção
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Cadastre os serviços preventivos de cada veículo. Informe o último serviço para
-          calcular automaticamente alertas de proximidade.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Wrench className="text-[#00475B]" size={26} />
+            Tipos de Manutenção
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Cadastre os serviços preventivos de cada veículo. Informe o último serviço para
+            calcular automaticamente alertas de proximidade.
+          </p>
+        </div>
+        <button
+          onClick={() => void fetchData()}
+          disabled={loading}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#00475B] transition-colors disabled:opacity-50"
+          title="Atualizar"
+        >
+          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+          {loading ? 'Sincronizando...' : 'Atualizar'}
+        </button>
       </div>
+
+      {/* Erro Geral */}
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-center gap-3">
+          <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-700">Erro na operação</p>
+            <p className="text-xs text-red-500">{error}</p>
+          </div>
+          <button onClick={() => setError(null)} className="text-xs font-semibold text-red-600 hover:underline">
+            Dispensar
+          </button>
+        </div>
+      )}
 
       {/* Seletor de veículo com busca */}
       <div className="space-y-1">
         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Veículo
         </label>
-        <VehicleSearchSelect
-          vehicles={MOCK_VEHICLES}
-          selectedId={selectedVehicleId}
-          onSelect={(id) => {
-            setSelectedVehicleId(id)
-            setShowForm(false)
-            setEditingId(null)
-          }}
-        />
+        {vehicles.length > 0 ? (
+          <VehicleSearchSelect
+            vehicles={vehicles}
+            selectedId={selectedVehicleId}
+            onSelect={handleSelectVehicle}
+          />
+        ) : (
+          <div className="h-12 bg-gray-100 rounded-xl animate-pulse" />
+        )}
       </div>
 
       {/* Botão adicionar */}
-      {!showForm && (
+      {!showForm && vehicles.length > 0 && (
         <button
           onClick={() => { setShowForm(true); setEditingId(null) }}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#00475B] text-white py-3 font-semibold text-sm hover:bg-[#003d4f] active:scale-[.98] transition-all shadow"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#00475B] text-white py-3 font-semibold text-sm hover:bg-[#003d4f] active:scale-[.98] transition-all shadow disabled:opacity-50"
         >
           <Plus size={18} />
           Novo Tipo de Manutenção
@@ -368,7 +450,7 @@ export default function MaintenanceTypesPage() {
       )}
 
       {/* Formulário de criação */}
-      {showForm && (
+      {showForm && selectedVehicle && (
         <div className="rounded-2xl border border-[#00475B]/20 bg-[#00475B]/5 p-4 space-y-3 shadow-sm">
           <p className="text-sm font-semibold text-[#00475B]">
             Novo tipo para: {selectedVehicle.brand} {selectedVehicle.model} ({selectedVehicle.licensePlate})
@@ -450,7 +532,8 @@ export default function MaintenanceTypesPage() {
           <div className="flex gap-2 pt-1">
             <button
               onClick={handleCreate}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#00475B] text-white py-3 text-sm font-semibold hover:bg-[#003d4f] transition-colors"
+              disabled={loading}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#00475B] text-white py-3 text-sm font-semibold hover:bg-[#003d4f] transition-colors disabled:opacity-50"
             >
               <Check size={16} /> Salvar
             </button>
@@ -464,12 +547,21 @@ export default function MaintenanceTypesPage() {
         </div>
       )}
 
+      {/* Loading Skeleton */}
+      {loading && types.length === 0 && (
+        <div className="space-y-2 animate-pulse">
+          {[1, 2].map(i => (
+            <div key={i} className="h-20 bg-gray-100 rounded-2xl" />
+          ))}
+        </div>
+      )}
+
       {/* Lista de tipos */}
-      {types.length === 0 ? (
+      {!loading && types.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-12 text-center">
           <Wrench className="mx-auto text-gray-300 mb-3" size={32} />
           <p className="text-sm text-gray-400 font-medium">Nenhum tipo cadastrado para este veículo.</p>
-          <p className="text-xs text-gray-300 mt-1">Clique em "Novo Tipo" para começar.</p>
+          <p className="text-xs text-gray-300 mt-1">Clique em "Novo Tipo de Manutenção" para começar.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -541,7 +633,8 @@ export default function MaintenanceTypesPage() {
                   {formError && <p className="text-xs text-red-600">{formError}</p>}
                   <div className="flex gap-2">
                     <button onClick={() => saveEdit(t.id)}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#00475B] text-white py-2.5 text-sm font-semibold hover:bg-[#003d4f] transition-colors">
+                      disabled={loading}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#00475B] text-white py-2.5 text-sm font-semibold hover:bg-[#003d4f] transition-colors disabled:opacity-50">
                       <Check size={15}/> Salvar
                     </button>
                     <button onClick={() => { setEditingId(null); setFormError('') }}
@@ -590,20 +683,23 @@ export default function MaintenanceTypesPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => toggleActive(t.id)}
+                      <button onClick={() => toggleActive(t)}
                         title={t.isActive ? 'Desativar' : 'Ativar'}
-                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                        disabled={loading}
+                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50">
                         {t.isActive
                           ? <ToggleRight size={20} className="text-[#00475B]"/>
                           : <ToggleLeft  size={20} className="text-gray-300"/>
                         }
                       </button>
                       <button onClick={() => startEdit(t)}
-                        className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors">
+                        disabled={loading}
+                        className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors disabled:opacity-50">
                         <Pencil size={15}/>
                       </button>
                       <button onClick={() => removeType(t.id)}
-                        className="p-2 rounded-lg hover:bg-red-50 text-red-500 transition-colors">
+                        disabled={loading}
+                        className="p-2 rounded-lg hover:bg-red-50 text-red-500 transition-colors disabled:opacity-50">
                         <Trash2 size={15}/>
                       </button>
                       {t.description && (
@@ -628,7 +724,7 @@ export default function MaintenanceTypesPage() {
         </div>
       )}
 
-      {types.length > 0 && (
+      {!loading && types.length > 0 && (
         <p className="text-xs text-gray-400 text-center">
           {types.filter(t => t.isActive).length} ativo(s) · {types.filter(t => !t.isActive).length} inativo(s)
         </p>
