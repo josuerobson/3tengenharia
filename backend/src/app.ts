@@ -12,6 +12,7 @@ import { maintenanceTypeRoutes }   from './modules/vehicles/maintenanceTypes.rou
 import { assetRoutes }             from './modules/assets/assets.routes.js'
 import { timeLogRoutes }           from './modules/time-logs/time-logs.routes.js'
 import { fiveSRoutes }             from './modules/fiveS/fiveS.routes.js'
+import { userRoutes }              from './modules/users/users.routes.js'
 import { env } from './lib/env.js'
 
 export async function buildApp() {
@@ -77,6 +78,7 @@ export async function buildApp() {
       await v1.register(assetRoutes,            { prefix: '/assets' })     // Módulo 2: Patrimônio
       await v1.register(timeLogRoutes,          { prefix: '/time-logs' })  // Módulo 3: Horas
       await v1.register(fiveSRoutes,            { prefix: '/5s' })         // Módulo 5S: Auditorias
+      await v1.register(userRoutes,             { prefix: '/users' })      // Módulo: Usuários
     },
     { prefix: '/api/v1' },
   )

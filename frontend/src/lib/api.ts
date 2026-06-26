@@ -407,5 +407,63 @@ export interface ApiWorksite {
   name: string
 }
 
+export interface ApiUser {
+  id: string
+  email: string
+  role: 'ADMIN' | 'MANAGER' | 'COLLABORATOR'
+  isActive: boolean
+  createdAt: string
+  employee?: {
+    id: string
+    fullName: string
+    registration: string
+    position: string
+  } | null
+}
+
+// ── Endpoints de Usuários (Users) ─────────────────────────────────────────────
+
+export const usersApi = {
+  list(): Promise<ApiUser[]> {
+    return request('/users')
+  },
+
+  create(data: {
+    email: string
+    password?: string
+    role: 'ADMIN' | 'MANAGER' | 'COLLABORATOR'
+    employeeId?: string | null
+    isActive: boolean
+  }): Promise<ApiUser> {
+    return request('/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  update(
+    id: string,
+    data: Partial<{
+      email: string
+      password?: string
+      role: 'ADMIN' | 'MANAGER' | 'COLLABORATOR'
+      employeeId?: string | null
+      isActive: boolean
+    }>,
+  ): Promise<ApiUser> {
+    return request(`/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
+  delete(id: string): Promise<void> {
+    return request(`/users/${id}`, {
+      method: 'DELETE',
+    })
+  },
+}
+
+
 
 

@@ -24,6 +24,7 @@ import QualityValidationPanel5S from '@/pages/fiveS/QualityValidationPanel5S'
 
 // ── Páginas reais (Admin) ───────────────────────────────────────────────────────────────────────────
 import VehicleRegistrationPage from '@/pages/vehicles/VehicleRegistrationPage'
+import UsersPage                 from '@/pages/admin/UsersPage'
 
 // ── Página placeholder genérica (substituir pelas páginas reais na Etapa 5) ──
 
@@ -92,7 +93,7 @@ export default function App() {
                 <Route path="5s/panel"     element={<QualityValidationPanel5S />} />
 
                 {/* Admin */}
-                <Route path="admin/users"    element={<PlaceholderPage title="Usuários" />} />
+                <Route path="admin/users"    element={<UsersPage />} />
                 <Route path="admin/worksites" element={<PlaceholderPage title="Cadastro de Obras" />} />
 
                 {/* 404 interno */}
