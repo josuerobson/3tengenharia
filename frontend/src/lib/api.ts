@@ -371,6 +371,41 @@ export const assetsApi = {
       body: JSON.stringify(data),
     })
   },
+
+  listEmployees(): Promise<ApiEmployee[]> {
+    return request('/assets/employees')
+  },
+
+  listWorksites(): Promise<ApiWorksite[]> {
+    return request('/assets/worksites')
+  },
+
+  createLoan(data: {
+    assetId: string
+    borrowerEmployeeId: string
+    destinationWorksiteId?: string | null
+    expectedReturnAt?: string | null
+    checkoutNotes?: string | null
+  }): Promise<{ message: string; loan: any }> {
+    return request('/assets/loans', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
 }
+
+export interface ApiEmployee {
+  id: string
+  fullName: string
+  registration: string
+  position: string
+}
+
+export interface ApiWorksite {
+  id: string
+  code: string
+  name: string
+}
+
 
 

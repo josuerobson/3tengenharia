@@ -176,4 +176,59 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     },
     controller.createMaintenanceLog,
   )
+
+  // ── GET /assets/employees ──────────────────────────────────────────────────
+  app.get(
+    '/employees',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Listar todos os colaboradores ativos',
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                fullName: { type: 'string' },
+                registration: { type: 'string' },
+                position: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+    controller.listEmployees,
+  )
+
+  // ── GET /assets/worksites ──────────────────────────────────────────────────
+  app.get(
+    '/worksites',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Listar todas as obras ativas',
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                code: { type: 'string' },
+                name: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
+    controller.listWorksites,
+  )
 }

@@ -247,4 +247,31 @@ export const assetsService = {
       previousStatus: asset.currentStatus,
     }
   },
+
+  // ── GET /assets/employees ──────────────────────────────────────────────────
+  async listEmployees() {
+    return prisma.employee.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        fullName: true,
+        registration: true,
+        position: true,
+      },
+      orderBy: { fullName: 'asc' },
+    })
+  },
+
+  // ── GET /assets/worksites ──────────────────────────────────────────────────
+  async listWorksites() {
+    return prisma.worksite.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+      },
+      orderBy: { name: 'asc' },
+    })
+  },
 }

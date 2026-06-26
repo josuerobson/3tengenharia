@@ -12,6 +12,7 @@ import TripHistoryPage         from '@/pages/vehicles/TripHistoryPage'
 import MaintenanceAlertsPage   from '@/pages/vehicles/MaintenanceAlertsPage'
 import MaintenanceTypesPage    from '@/pages/vehicles/MaintenanceTypesPage'
 import AssetCatalogPage        from '@/pages/assets/AssetCatalogPage'
+import NewLoanPage             from '@/pages/assets/NewLoanPage'
 
 // ── Páginas reais (Etapa 6) ────────────────────────────────────────────────────
 import DailyLogPage from '@/pages/time-logs/DailyLogPage'
@@ -78,7 +79,7 @@ export default function App() {
 
                 {/* Módulo 2 — Ferramentas */}
                 <Route path="assets/catalog" element={<AssetCatalogPage />} />
-                <Route path="assets/loans/new" element={<PlaceholderPage title="Solicitar Empréstimo" />} />
+                <Route path="assets/loans/new" element={<NewLoanPage />} />
                 <Route path="assets/maintenance/new" element={<PlaceholderPage title="Relatar Defeito" />} />
                 <Route path="assets/warehouse" element={<PlaceholderPage title="Almoxarifado" />} />
 

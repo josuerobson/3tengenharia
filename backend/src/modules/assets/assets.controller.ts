@@ -91,5 +91,17 @@ export function assetsController(_app: FastifyInstance) {
         maintenanceLog: result,
       })
     },
+
+    // ── GET /assets/employees ────────────────────────────────────────────────
+    async listEmployees(request: FastifyRequest, reply: FastifyReply) {
+      const employees = await assetsService.listEmployees()
+      return reply.status(200).send(employees)
+    },
+
+    // ── GET /assets/worksites ────────────────────────────────────────────────
+    async listWorksites(request: FastifyRequest, reply: FastifyReply) {
+      const worksites = await assetsService.listWorksites()
+      return reply.status(200).send(worksites)
+    },
   }
 }
