@@ -4,6 +4,7 @@
 // Base URL configurável via variável de ambiente VITE_API_URL.
 
 import type { AuthUser } from '@/types/auth'
+import type { Asset } from '@/data/mockData'
 
 let rawUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
   ?? 'https://3tbackend.j4sistemas.com.br/api/v1'
@@ -334,4 +335,42 @@ export const maintenanceApi = {
     })
   },
 }
+
+// ── Endpoints de Patrimônio (Assets) ──────────────────────────────────────────
+
+export const assetsApi = {
+  list(): Promise<Asset[]> {
+    return request('/assets')
+  },
+
+  create(data: {
+    assetTag: string
+    description: string
+    category: string
+    brand?: string | null
+    model?: string | null
+    serialNumber?: string | null
+    acquisitionDate?: string | null
+    acquisitionValue?: number | null
+    location?: string | null
+    notes?: string | null
+  }): Promise<Asset> {
+    return request('/assets', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  reportDefect(data: {
+    assetId: string
+    issueDescription: string
+    defectPhotoUrl?: string
+  }): Promise<{ message: string; maintenanceLog: any }> {
+    return request('/assets/maintenance', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+}
+
 

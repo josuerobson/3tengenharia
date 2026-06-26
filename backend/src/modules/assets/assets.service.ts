@@ -5,9 +5,26 @@ import { prisma } from '../../lib/prisma.js'
 import type {
   CreateLoanBody,
   CreateMaintenanceLogBody,
+  CreateAssetBody,
 } from './assets.schema.js'
 
 // ── Erros de domínio ──────────────────────────────────────────────────────────
+
+export class DuplicateAssetTagError extends Error {
+  readonly statusCode = 409
+  constructor(tag: string) {
+    super(`Código Patrimonial "${tag}" já cadastrado.`)
+    this.name = 'DuplicateAssetTagError'
+  }
+}
+
+export class DuplicateSerialNumberError extends Error {
+  readonly statusCode = 409
+  constructor(serial: string) {
+    super(`Número de série "${serial}" já cadastrado.`)
+    this.name = 'DuplicateSerialNumberError'
+  }
+}
 
 export class AssetNotFoundError extends Error {
   readonly statusCode = 404
@@ -61,6 +78,77 @@ const assetBaseSelect = {
 // ── Service ───────────────────────────────────────────────────────────────────
 
 export const assetsService = {
+  // ── GET /assets ───────────────────────────────────────────────────────────
+  async list() {
+    const assets = await prisma.asset.findMany({
+      include: {
+        loans: {
+          where: { isReturned: false },
+          include: {
+            borrowerEmployee: {
+              select: { fullName: true }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    return assets.map((asset) => ({
+      id: asset.id,
+      assetTag: asset.assetTag,
+      description: asset.description,
+      category: asset.category,
+      brand: asset.brand,
+      model: asset.model,
+      serialNumber: asset.serialNumber,
+      currentStatus: asset.currentStatus,
+      location: asset.location,
+      acquisitionDate: asset.acquisitionDate ? asset.acquisitionDate.toISOString().split('T')[0] : null,
+      acquisitionValue: asset.acquisitionValue ? Number(asset.acquisitionValue) : null,
+      notes: asset.notes,
+      currentBorrowee: asset.loans[0]?.borrowerEmployee?.fullName ?? null,
+    }))
+  },
+
+  // ── POST /assets ──────────────────────────────────────────────────────────
+  async create(body: CreateAssetBody) {
+    // 1. Validar duplicidade de tag de patrimônio
+    const existingTag = await prisma.asset.findUnique({
+      where: { assetTag: body.assetTag }
+    })
+    if (existingTag) {
+      throw new DuplicateAssetTagError(body.assetTag)
+    }
+
+    // 2. Validar duplicidade de serial (se fornecido)
+    if (body.serialNumber) {
+      const existingSerial = await prisma.asset.findUnique({
+        where: { serialNumber: body.serialNumber }
+      })
+      if (existingSerial) {
+        throw new DuplicateSerialNumberError(body.serialNumber)
+      }
+    }
+
+    // 3. Criar e persistir o bem patrimonial
+    return prisma.asset.create({
+      data: {
+        assetTag: body.assetTag,
+        description: body.description,
+        category: body.category,
+        brand: body.brand || null,
+        model: body.model || null,
+        serialNumber: body.serialNumber || null,
+        acquisitionDate: body.acquisitionDate ? new Date(body.acquisitionDate) : null,
+        acquisitionValue: body.acquisitionValue !== undefined && body.acquisitionValue !== null ? body.acquisitionValue : null,
+        location: body.location || null,
+        notes: body.notes || null,
+        currentStatus: 'AVAILABLE',
+      }
+    })
+  },
+
   // ── POST /assets/loans ────────────────────────────────────────────────────
   async createLoan(body: CreateLoanBody, createdByUserId: string | null) {
     // 1. Busca o bem patrimonial

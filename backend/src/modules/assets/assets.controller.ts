@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import {
   createLoanBodySchema,
   createMaintenanceLogBodySchema,
+  createAssetBodySchema,
 } from './assets.schema.js'
 import {
   assetsService,
@@ -11,6 +12,8 @@ import {
   AssetNotAvailableError,
   AssetWrittenOffError,
   EmployeeNotFoundError,
+  DuplicateAssetTagError,
+  DuplicateSerialNumberError,
 } from './assets.service.js'
 
 const DOMAIN_ERRORS = [
@@ -18,6 +21,8 @@ const DOMAIN_ERRORS = [
   AssetNotAvailableError,
   AssetWrittenOffError,
   EmployeeNotFoundError,
+  DuplicateAssetTagError,
+  DuplicateSerialNumberError,
 ]
 
 function rethrowDomain(err: unknown): never {
@@ -29,6 +34,24 @@ function rethrowDomain(err: unknown): never {
 
 export function assetsController(_app: FastifyInstance) {
   return {
+    // ── GET /assets ──────────────────────────────────────────────────────────
+    async listAssets(request: FastifyRequest, reply: FastifyReply) {
+      const assets = await assetsService.list()
+      return reply.status(200).send(assets)
+    },
+
+    // ── POST /assets ─────────────────────────────────────────────────────────
+    async createAsset(request: FastifyRequest, reply: FastifyReply) {
+      const body = createAssetBodySchema.parse(request.body)
+      let asset: Awaited<ReturnType<typeof assetsService.create>>
+      try {
+        asset = await assetsService.create(body)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+      return reply.status(201).send(asset)
+    },
+
     // ── POST /assets/loans ───────────────────────────────────────────────────
     async createLoan(request: FastifyRequest, reply: FastifyReply) {
       const body = createLoanBodySchema.parse(request.body)

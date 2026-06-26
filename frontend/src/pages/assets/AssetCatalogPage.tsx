@@ -28,8 +28,10 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { useAuth } from '@/contexts/AuthContext'
+import { assetsApi } from '@/lib/api'
 import {
-  MOCK_ASSETS,
   ASSET_CATEGORY_LABELS,
   type Asset,
   type AssetCategory,
@@ -306,6 +308,271 @@ function DefectReportModal({ asset, onClose, onSubmit }: DefectReportModalProps)
   )
 }
 
+// ── Modal de Novo Item Patrimonial ─────────────────────────────────────────────
+
+interface NewAssetModalProps {
+  open: boolean
+  onClose: () => void
+  onSubmit: (data: {
+    assetTag: string
+    description: string
+    category: string
+    brand?: string | null
+    model?: string | null
+    serialNumber?: string | null
+    acquisitionDate?: string | null
+    acquisitionValue?: number | null
+    location?: string | null
+    notes?: string | null
+  }) => Promise<void>
+}
+
+function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
+  const [assetTag, setAssetTag] = useState('')
+  const [description, setDescription] = useState('')
+  const [category, setCategory] = useState<AssetCategory>('POWER_TOOLS')
+  const [brand, setBrand] = useState('')
+  const [model, setModel] = useState('')
+  const [serialNumber, setSerialNumber] = useState('')
+  const [acquisitionDate, setAcquisitionDate] = useState('')
+  const [acquisitionValue, setAcquisitionValue] = useState('')
+  const [location, setLocation] = useState('')
+  const [notes, setNotes] = useState('')
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  // Limpa state ao abrir/fechar
+  useEffect(() => {
+    if (open) {
+      setAssetTag('')
+      setDescription('')
+      setCategory('POWER_TOOLS')
+      setBrand('')
+      setModel('')
+      setSerialNumber('')
+      setAcquisitionDate('')
+      setAcquisitionValue('')
+      setLocation('')
+      setNotes('')
+      setError('')
+      setIsSubmitting(false)
+    }
+  }, [open])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!assetTag.trim()) {
+      setError('Código Patrimonial é obrigatório.')
+      return
+    }
+    if (!description.trim()) {
+      setError('Descrição é obrigatória.')
+      return
+    }
+    if (!category) {
+      setError('Categoria é obrigatória.')
+      return
+    }
+
+    setError('')
+    setIsSubmitting(true)
+    try {
+      await onSubmit({
+        assetTag: assetTag.trim(),
+        description: description.trim(),
+        category,
+        brand: brand.trim() || null,
+        model: model.trim() || null,
+        serialNumber: serialNumber.trim() || null,
+        acquisitionDate: acquisitionDate ? new Date(acquisitionDate).toISOString() : null,
+        acquisitionValue: acquisitionValue ? parseFloat(acquisitionValue) : null,
+        location: location.trim() || null,
+        notes: notes.trim() || null,
+      })
+      onClose()
+    } catch (err: any) {
+      setError(err?.message ?? 'Erro ao cadastrar o item. Tente novamente.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Novo Item Patrimonial"
+      description="Cadastre uma ferramenta, equipamento ou EPI no sistema."
+    >
+      <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2.5 text-xs text-red-600">
+            <span className="font-bold mt-0.5">⚠</span>
+            <p>{error}</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="assetTag" required>
+              Código Patrimonial
+            </Label>
+            <Input
+              id="assetTag"
+              placeholder="Ex: PAT-0001"
+              value={assetTag}
+              onChange={(e) => setAssetTag(e.target.value)}
+              className="mt-1.5 h-11"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="category" required>
+              Categoria
+            </Label>
+            <select
+              id="category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as AssetCategory)}
+              className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+              required
+            >
+              {Object.entries(ASSET_CATEGORY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="description" required>
+            Descrição
+          </Label>
+          <Input
+            id="description"
+            placeholder="Ex: Furadeira de Impacto 13mm"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="mt-1.5 h-11"
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="brand">Marca</Label>
+            <Input
+              id="brand"
+              placeholder="Ex: Bosch"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              className="mt-1.5 h-11"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="model">Modelo</Label>
+            <Input
+              id="model"
+              placeholder="Ex: GSB 13 RE"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="mt-1.5 h-11"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="serialNumber">Número de Série</Label>
+            <Input
+              id="serialNumber"
+              placeholder="Ex: BSH-2024-0001"
+              value={serialNumber}
+              onChange={(e) => setSerialNumber(e.target.value)}
+              className="mt-1.5 h-11"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="location">Localização Inicial</Label>
+            <Input
+              id="location"
+              placeholder="Ex: Almoxarifado Central"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="mt-1.5 h-11"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="acquisitionDate">Data de Aquisição</Label>
+            <Input
+              id="acquisitionDate"
+              type="date"
+              value={acquisitionDate}
+              onChange={(e) => setAcquisitionDate(e.target.value)}
+              className="mt-1.5 h-11"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="acquisitionValue">Valor de Aquisição</Label>
+            <Input
+              id="acquisitionValue"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Ex: 485.90"
+              value={acquisitionValue}
+              onChange={(e) => setAcquisitionValue(e.target.value)}
+              className="mt-1.5 h-11"
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="notes">Observações</Label>
+          <Textarea
+            id="notes"
+            placeholder="Informações adicionais sobre o estado do item, acessórios inclusos, etc..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="mt-1.5 resize-none"
+          />
+        </div>
+
+        <Button
+          type="submit"
+          variant="accent"
+          size="lg"
+          className="w-full font-bold shadow-lg shadow-brand-primary/20"
+          disabled={isSubmitting || !assetTag.trim() || !description.trim()}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              Salvando item...
+            </>
+          ) : (
+            <>
+              <Plus size={18} />
+              Cadastrar Item
+            </>
+          )}
+        </Button>
+      </form>
+    </Dialog>
+  )
+}
+
 // ── Card de bem patrimonial ───────────────────────────────────────────────────
 
 interface AssetCardProps {
@@ -437,14 +704,41 @@ function StatsStrip({ assets }: { assets: Asset[] }) {
 type StatusFilter = 'ALL' | AssetStatus
 
 export default function AssetCatalogPage() {
+  const { user } = useAuth()
+  const canCreate = user?.role === 'ADMIN' || user?.role === 'MANAGER'
+
+  const [assets, setAssets] = useState<Asset[]>([])
+  const [loading, setLoading] = useState(true)
+  const [apiError, setApiError] = useState('')
+
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
   const [reportingAsset, setReportingAsset] = useState<Asset | null>(null)
+  const [newAssetModalOpen, setNewAssetModalOpen] = useState(false)
+
+  // Buscar itens do backend
+  const fetchAssets = useCallback(async () => {
+    try {
+      setLoading(true)
+      setApiError('')
+      const data = await assetsApi.list()
+      setAssets(data)
+    } catch (err: any) {
+      console.error('Erro ao carregar bens:', err)
+      setApiError(err?.message ?? 'Falha ao carregar catálogo de bens.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchAssets()
+  }, [fetchAssets])
 
   // Filtragem combinada
   const filteredAssets = useMemo(() => {
     const q = search.toLowerCase().trim()
-    return MOCK_ASSETS.filter((a) => {
+    return assets.filter((a) => {
       const matchesSearch =
         !q ||
         a.assetTag.toLowerCase().includes(q) ||
@@ -457,14 +751,26 @@ export default function AssetCatalogPage() {
 
       return matchesSearch && matchesStatus
     })
-  }, [search, statusFilter])
+  }, [assets, search, statusFilter])
 
   const handleDefectSubmit = useCallback(
-    async (_assetId: string, _description: string, _photo: File | null) => {
-      // Simulação de chamada à API (substituir na Etapa 6)
-      await new Promise((resolve) => setTimeout(resolve, 1_500))
+    async (assetId: string, description: string, _photo: File | null) => {
+      // Registrar a avaria real no banco
+      await assetsApi.reportDefect({
+        assetId,
+        issueDescription: description,
+      })
+      await fetchAssets()
     },
-    [],
+    [fetchAssets],
+  )
+
+  const handleNewAssetSubmit = useCallback(
+    async (data: any) => {
+      await assetsApi.create(data)
+      await fetchAssets()
+    },
+    [fetchAssets],
   )
 
   const statusTabs: { id: StatusFilter; label: string }[] = [
@@ -484,95 +790,115 @@ export default function AssetCatalogPage() {
             Ferramentas & Equipamentos
           </h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            Catálogo de {MOCK_ASSETS.length} itens patrimoniais
+            {loading ? 'Carregando bens patrimoniais...' : `Catálogo de ${assets.length} itens patrimoniais`}
           </p>
         </div>
-        <Button size="md" className="flex-shrink-0">
-          <Plus size={16} />
-          Novo Item
-        </Button>
-      </div>
-
-      {/* ── Strip de estatísticas ──────────────────────────────────────── */}
-      <StatsStrip assets={MOCK_ASSETS} />
-
-      {/* ── Barra de busca ────────────────────────────────────────────── */}
-      <div className="relative">
-        <Search
-          size={18}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-        />
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por código patrimonial, descrição ou marca..."
-          className="w-full h-12 pl-11 pr-4 text-sm rounded-xl border border-gray-200 bg-white
-                     focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20
-                     transition-all duration-150 placeholder:text-gray-400"
-        />
-        {search && (
-          <button
-            onClick={() => setSearch('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400
-                       hover:text-gray-600 transition-colors"
-            aria-label="Limpar busca"
-          >
-            <X size={16} />
-          </button>
+        {canCreate && (
+          <Button size="md" className="flex-shrink-0" onClick={() => setNewAssetModalOpen(true)}>
+            <Plus size={16} />
+            Novo Item
+          </Button>
         )}
       </div>
 
-      {/* ── Filtros de status (scroll horizontal no mobile) ─────────────── */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
-        {statusTabs.map((tab) => {
-          const count =
-            tab.id === 'ALL'
-              ? MOCK_ASSETS.length
-              : MOCK_ASSETS.filter((a) => a.currentStatus === tab.id).length
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
-              className={cn(
-                'flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold',
-                'whitespace-nowrap transition-all duration-150 border flex-shrink-0',
-                statusFilter === tab.id
-                  ? 'bg-brand-primary text-white border-brand-primary shadow-sm'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-brand-primary/40',
-              )}
-            >
-              {tab.label}
-              <span
-                className={cn(
-                  'text-[10px] font-bold px-1.5 py-0.5 rounded-full',
-                  statusFilter === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500',
-                )}
-              >
-                {count}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ── Grid de cards ─────────────────────────────────────────────── */}
-      {filteredAssets.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-          <Package size={36} className="text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-600 font-semibold">Nenhum item encontrado</p>
-          <p className="text-gray-400 text-sm mt-1">Tente ajustar os filtros de busca</p>
+      {loading ? (
+        <div className="py-20 flex flex-col items-center justify-center bg-white rounded-2xl border border-gray-100 shadow-card animate-pulse">
+          <Loader2 size={36} className="text-brand-primary animate-spin mb-3" />
+          <p className="text-gray-500 text-sm font-medium">Buscando itens patrimoniais do servidor...</p>
+        </div>
+      ) : apiError ? (
+        <div className="py-16 text-center bg-white rounded-2xl border border-gray-100 shadow-card">
+          <AlertCircle size={36} className="text-red-500 mx-auto mb-3" />
+          <p className="text-gray-600 font-semibold">Erro ao carregar catálogo</p>
+          <p className="text-gray-400 text-sm mt-1 mb-4">{apiError}</p>
+          <Button size="sm" variant="outline" onClick={fetchAssets}>
+            Tentar Novamente
+          </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-          {filteredAssets.map((asset) => (
-            <AssetCard
-              key={asset.id}
-              asset={asset}
-              onReportDefect={setReportingAsset}
+        <>
+          {/* ── Strip de estatísticas ──────────────────────────────────────── */}
+          <StatsStrip assets={assets} />
+
+          {/* ── Barra de busca ────────────────────────────────────────────── */}
+          <div className="relative">
+            <Search
+              size={18}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
             />
-          ))}
-        </div>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por código patrimonial, descrição ou marca..."
+              className="w-full h-12 pl-11 pr-4 text-sm rounded-xl border border-gray-200 bg-white
+                         focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20
+                         transition-all duration-150 placeholder:text-gray-400"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400
+                           hover:text-gray-600 transition-colors"
+                aria-label="Limpar busca"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* ── Filtros de status (scroll horizontal no mobile) ─────────────── */}
+          <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+            {statusTabs.map((tab) => {
+              const count =
+                tab.id === 'ALL'
+                  ? assets.length
+                  : assets.filter((a) => a.currentStatus === tab.id).length
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold',
+                    'whitespace-nowrap transition-all duration-150 border flex-shrink-0',
+                    statusFilter === tab.id
+                      ? 'bg-brand-primary text-white border-brand-primary shadow-sm'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-brand-primary/40',
+                  )}
+                >
+                  {tab.label}
+                  <span
+                    className={cn(
+                      'text-[10px] font-bold px-1.5 py-0.5 rounded-full',
+                      statusFilter === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500',
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* ── Grid de cards ─────────────────────────────────────────────── */}
+          {filteredAssets.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+              <Package size={36} className="text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-600 font-semibold">Nenhum item encontrado</p>
+              <p className="text-gray-400 text-sm mt-1">Tente ajustar os filtros de busca</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {filteredAssets.map((asset) => (
+                <AssetCard
+                  key={asset.id}
+                  asset={asset}
+                  onReportDefect={setReportingAsset}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* ── Modal de Relato de Defeito ─────────────────────────────────── */}
@@ -580,6 +906,13 @@ export default function AssetCatalogPage() {
         asset={reportingAsset}
         onClose={() => setReportingAsset(null)}
         onSubmit={handleDefectSubmit}
+      />
+
+      {/* ── Modal de Novo Item ─────────────────────────────────────────── */}
+      <NewAssetModal
+        open={newAssetModalOpen}
+        onClose={() => setNewAssetModalOpen(false)}
+        onSubmit={handleNewAssetSubmit}
       />
     </div>
   )

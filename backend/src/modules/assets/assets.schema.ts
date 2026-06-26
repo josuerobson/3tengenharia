@@ -53,3 +53,33 @@ export const createMaintenanceLogBodySchema = z.object({
 export type CreateMaintenanceLogBody = z.infer<
   typeof createMaintenanceLogBodySchema
 >
+
+// ── Asset (criação de bem patrimonial) ──────────────────────────────────────────
+
+export const createAssetBodySchema = z.object({
+  assetTag: z
+    .string({ required_error: 'Código Patrimonial é obrigatório.' })
+    .trim()
+    .min(1, 'Código Patrimonial não pode ser vazio.'),
+
+  description: z
+    .string({ required_error: 'Descrição é obrigatória.' })
+    .trim()
+    .min(1, 'Descrição não pode ser vazia.'),
+
+  category: z
+    .string({ required_error: 'Categoria é obrigatória.' })
+    .trim()
+    .min(1, 'Categoria não pode ser vazia.'),
+
+  brand: z.string().trim().nullable().optional(),
+  model: z.string().trim().nullable().optional(),
+  serialNumber: z.string().trim().nullable().optional(),
+  acquisitionDate: z.coerce.date().nullable().optional(),
+  acquisitionValue: z.coerce.number().nullable().optional(),
+  location: z.string().trim().nullable().optional(),
+  notes: z.string().trim().nullable().optional(),
+})
+
+export type CreateAssetBody = z.infer<typeof createAssetBodySchema>
+

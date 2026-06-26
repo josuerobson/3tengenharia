@@ -7,6 +7,95 @@ import { assetsController } from './assets.controller.js'
 export async function assetRoutes(app: FastifyInstance): Promise<void> {
   const controller = assetsController(app)
 
+  // ── GET /assets ────────────────────────────────────────────────────────────
+  app.get(
+    '/',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Listar todos os bens patrimoniais',
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                assetTag: { type: 'string' },
+                description: { type: 'string' },
+                category: { type: 'string' },
+                brand: { type: 'string', nullable: true },
+                model: { type: 'string', nullable: true },
+                serialNumber: { type: 'string', nullable: true },
+                acquisitionDate: { type: 'string', nullable: true },
+                acquisitionValue: { type: 'number', nullable: true },
+                currentStatus: { type: 'string' },
+                location: { type: 'string', nullable: true },
+                notes: { type: 'string', nullable: true },
+                currentBorrowee: { type: 'string', nullable: true },
+              },
+            },
+          },
+        },
+      },
+    },
+    controller.listAssets,
+  )
+
+  // ── POST /assets ───────────────────────────────────────────────────────────
+  app.post(
+    '/',
+    {
+      onRequest: [
+        app.authenticate,
+        app.requireRole([UserRole.MANAGER, UserRole.ADMIN]),
+      ],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Criar um novo bem patrimonial',
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['assetTag', 'description', 'category'],
+          properties: {
+            assetTag: { type: 'string' },
+            description: { type: 'string' },
+            category: { type: 'string' },
+            brand: { type: 'string', nullable: true },
+            model: { type: 'string', nullable: true },
+            serialNumber: { type: 'string', nullable: true },
+            acquisitionDate: { type: 'string', nullable: true },
+            acquisitionValue: { type: 'number', nullable: true },
+            location: { type: 'string', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              assetTag: { type: 'string' },
+              description: { type: 'string' },
+              category: { type: 'string' },
+              brand: { type: 'string', nullable: true },
+              model: { type: 'string', nullable: true },
+              serialNumber: { type: 'string', nullable: true },
+              acquisitionDate: { type: 'string', nullable: true },
+              acquisitionValue: { type: 'number', nullable: true },
+              currentStatus: { type: 'string' },
+              location: { type: 'string', nullable: true },
+              notes: { type: 'string', nullable: true },
+            },
+          },
+        },
+      },
+    },
+    controller.createAsset,
+  )
+
   // ── POST /assets/loans ─────────────────────────────────────────────────────
   // Requer: MANAGER ou ADMIN (apenas gestores autorizam saídas de patrimônio)
   app.post(
