@@ -11,7 +11,7 @@
 
 import { prisma } from '../../lib/prisma.js'
 import { UserRole } from '@prisma/client'
-import type { BulkTimeLogBody, DuplicateEmployeeDetail } from './time-logs.schema.js'
+import type { BulkTimeLogBody, DuplicateEmployeeDetail, ListTimeLogsQuery } from './time-logs.schema.js'
 import type { JwtPayload } from '../../types/fastify.js'
 
 // ── Erros de domínio ──────────────────────────────────────────────────────────
@@ -232,5 +232,64 @@ export const timeLogsService = {
       totalMinutesWorked,
       totalHoursWorked: Number((totalMinutesWorked / 60).toFixed(2)),
     }
+  },
+
+  async list(filters: ListTimeLogsQuery, currentUser: JwtPayload) {
+    const isPrivileged =
+      currentUser.role === UserRole.MANAGER ||
+      currentUser.role === UserRole.ADMIN
+
+    let allowedWorksiteId = filters.worksiteId
+
+    if (!isPrivileged) {
+      if (!currentUser.employeeId) {
+        return []
+      }
+      const coordinator = await prisma.employee.findUnique({
+        where: { id: currentUser.employeeId },
+        select: { worksiteId: true },
+      })
+      if (!coordinator || coordinator.worksiteId === null) {
+        return []
+      }
+      allowedWorksiteId = coordinator.worksiteId
+    }
+
+    const where: any = {}
+    if (allowedWorksiteId) {
+      where.worksiteId = allowedWorksiteId
+    }
+    
+    if (filters.startDate || filters.endDate) {
+      where.workDate = {}
+      if (filters.startDate) {
+        where.workDate.gte = new Date(filters.startDate)
+      }
+      if (filters.endDate) {
+        where.workDate.lte = new Date(filters.endDate)
+      }
+    }
+
+    return prisma.timeLog.findMany({
+      where,
+      include: {
+        employee: {
+          select: {
+            id: true,
+            fullName: true,
+            registration: true,
+            position: true,
+          },
+        },
+        worksite: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: { workDate: 'desc' },
+    })
   },
 }

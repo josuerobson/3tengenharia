@@ -2,7 +2,7 @@
 // Painel analítico de relatórios de horas — visão Admin/Gestor.
 // KPIs em cards, tabela filtrada por período/obra/funcionário e exportação CSV pura em JS.
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   Clock,
   Building2,
@@ -15,16 +15,63 @@ import {
   AlertCircle,
   CheckCircle2,
   BarChart2,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import {
-  MOCK_TIME_LOGS,
-  MOCK_WORKSITES,
-  MOCK_EMPLOYEES,
   SHIFT_TYPE_LABELS,
-  type TimeLogEntry,
+  type ShiftType,
 } from '@/data/mockData'
+import {
+  assetsApi,
+  timeLogsApi,
+  type ApiTimeLog,
+  type ApiWorksite,
+  type ApiEmployee,
+} from '@/lib/api'
+
+// ── Tipos ─────────────────────────────────────────────────────────────────────
+
+interface TimeLogEntry {
+  id: string
+  employeeId: string
+  employeeName: string
+  registration: string
+  worksiteId: string
+  worksiteName: string
+  costCenter: string
+  logDate: string // YYYY-MM-DD
+  entryTime: string // HH:mm
+  exitTime: string // HH:mm
+  breakStartTime?: string | null
+  breakEndTime?: string | null
+  shiftType: ShiftType
+  totalHours: number
+  overtimeHours: number
+  hasInconsistency: boolean
+  inconsistencyNote?: string
+}
+
+type PeriodFilter = 'TODAY' | 'WEEK' | 'MONTH'
+type SortKey = 'logDate' | 'employeeName' | 'worksiteName' | 'totalHours'
+type SortDir = 'asc' | 'desc'
+
+const PERIOD_LABELS: Record<PeriodFilter, string> = {
+  TODAY: 'Hoje',
+  WEEK:  'Esta Semana',
+  MONTH: 'Este Mês',
+}
+
+function formatTimeToHM(isoStr: string): string {
+  const d = new Date(isoStr)
+  if (isNaN(d.getTime())) return ''
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${hh}:${mm}`
+}
 
 // ── CSV Export (puro JavaScript) ──────────────────────────────────────────────
 
@@ -51,7 +98,6 @@ function exportToCSV(logs: TimeLogEntry[], periodLabel: string): void {
     l.registration,
     l.worksiteName,
     l.costCenter,
-    // Parse date safely with noon time to avoid timezone shift
     new Date(l.logDate + 'T12:00:00').toLocaleDateString('pt-BR'),
     l.entryTime,
     l.breakStartTime ?? '-',
@@ -86,18 +132,6 @@ function exportToCSV(logs: TimeLogEntry[], periodLabel: string): void {
   URL.revokeObjectURL(url)
 }
 
-// ── Tipos ─────────────────────────────────────────────────────────────────────
-
-type PeriodFilter = 'TODAY' | 'WEEK' | 'MONTH'
-type SortKey = 'logDate' | 'employeeName' | 'worksiteName' | 'totalHours'
-type SortDir = 'asc' | 'desc'
-
-const PERIOD_LABELS: Record<PeriodFilter, string> = {
-  TODAY: 'Hoje',
-  WEEK:  'Esta Semana',
-  MONTH: 'Este Mês',
-}
-
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 
 interface KPICardProps {
@@ -112,10 +146,9 @@ interface KPICardProps {
 
 function KPICard({ icon: Icon, iconBg, iconColor, label, value, sub, alert }: KPICardProps) {
   return (
-    <div className={cn(
-      'bg-white rounded-2xl border shadow-card p-4 sm:p-5 flex flex-col gap-3',
-      'transition-all duration-150 hover:shadow-card-hover',
-      alert ? 'border-red-200' : 'border-gray-100',
+    <Card className={cn(
+      'p-4 sm:p-5 flex flex-col gap-3 transition-all duration-150 bg-white border border-gray-100 shadow-card hover:shadow-card-hover',
+      alert && 'border-red-200 bg-red-50/10',
     )}>
       <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', iconBg)}>
         <Icon size={20} className={iconColor} />
@@ -129,7 +162,7 @@ function KPICard({ icon: Icon, iconBg, iconColor, label, value, sub, alert }: KP
         </p>
         {sub && <p className="text-xs text-gray-500 mt-1 leading-snug">{sub}</p>}
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -269,7 +302,13 @@ function SortableTh({ label, sortKey, currentKey, currentDir, onSort }: Sortable
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default function ReportPage() {
-  // ── Filtros ────────────────────────────────────────────────────────────
+  // ── Estados de Dados e Filtro ───────────────────────────────────────────
+  const [logs, setLogs] = useState<ApiTimeLog[]>([])
+  const [worksites, setWorksites] = useState<ApiWorksite[]>([])
+  const [employees, setEmployees] = useState<ApiEmployee[]>([])
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+
   const [period, setPeriod] = useState<PeriodFilter>('MONTH')
   const [worksiteFilter, setWorksiteFilter] = useState('all')
   const [employeeFilter, setEmployeeFilter] = useState('all')
@@ -289,40 +328,100 @@ export default function ReportPage() {
     })
   }, [])
 
-  // ── Data de referência (2026-06-22 = hoje no projeto) ─────────────────
-  const REF_TODAY = new Date('2026-06-22T12:00:00')
+  // ── Carregar Lançamentos do Banco ──────────────────────────────────────
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setFetchError(null)
 
-  // ── Filtragem por período ──────────────────────────────────────────────
+      const todayObj = new Date()
+      const todayStr = todayObj.toISOString().split('T')[0]
+
+      let startDate = ''
+      if (period === 'TODAY') {
+        startDate = todayStr
+      } else if (period === 'WEEK') {
+        const weekStart = new Date(todayObj)
+        const day = weekStart.getDay()
+        const diff = day === 0 ? -6 : 1 - day
+        weekStart.setDate(todayObj.getDate() + diff)
+        startDate = weekStart.toISOString().split('T')[0]
+      } else if (period === 'MONTH') {
+        // Início do mês atual
+        startDate = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-01`
+      }
+
+      const [logList, wList, eList] = await Promise.all([
+        timeLogsApi.list({ startDate, endDate: todayStr }),
+        assetsApi.listWorksites(),
+        assetsApi.listEmployees(),
+      ])
+
+      setLogs(logList)
+      setWorksites(wList)
+      setEmployees(eList)
+    } catch (err: any) {
+      console.error(err)
+      setFetchError(err?.message ?? 'Falha ao buscar lançamentos de horas.')
+    } finally {
+      setLoading(false)
+    }
+  }, [period])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // ── Conversão de Tipo para Exibição ────────────────────────────────────
+  const mappedLogs = useMemo(() => {
+    return logs.map((log): TimeLogEntry => {
+      const entryTime = formatTimeToHM(log.clockIn)
+      const exitTime = formatTimeToHM(log.clockOut)
+      const breakStartTime = log.breakStart ? formatTimeToHM(log.breakStart) : null
+      const breakEndTime = log.breakEnd ? formatTimeToHM(log.breakEnd) : null
+      const totalHours = log.totalMinutesWorked / 60
+      const overtimeHours = Math.max(0, totalHours - 8)
+      
+      // Inconsistência se a jornada for superior a 10h ou se não validada
+      const hasInconsistency = totalHours > 10 || !log.isValidated
+      const inconsistencyNote = totalHours > 10 
+        ? 'Alerta: Jornada superior a 10h líquidas.' 
+        : !log.isValidated 
+          ? 'Aguardando validação do encarregado.' 
+          : ''
+
+      return {
+        id: log.id,
+        employeeId: log.employeeId,
+        employeeName: log.employee.fullName,
+        registration: log.employee.registration,
+        worksiteId: log.worksiteId,
+        worksiteName: log.worksite.name,
+        costCenter: log.worksite.code,
+        logDate: log.workDate.split('T')[0],
+        entryTime,
+        exitTime,
+        breakStartTime,
+        breakEndTime,
+        shiftType: log.shiftType,
+        totalHours,
+        overtimeHours,
+        hasInconsistency,
+        inconsistencyNote,
+      }
+    })
+  }, [logs])
+
+  // ── Filtragem adicional local ──────────────────────────────────────────
   const filteredLogs = useMemo(() => {
-    const today = REF_TODAY
-    const todayStr = today.toISOString().split('T')[0]
-
-    // Início da semana (Segunda-feira)
-    const weekStart = new Date(today)
-    const day = weekStart.getDay()
-    const diff = day === 0 ? -6 : 1 - day
-    weekStart.setDate(today.getDate() + diff)
-    const weekStartStr = weekStart.toISOString().split('T')[0]
-
-    // Início do mês
-    const monthStartStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
-
-    return MOCK_TIME_LOGS.filter((log) => {
-      // Período
-      if (period === 'TODAY' && log.logDate !== todayStr) return false
-      if (period === 'WEEK'  && log.logDate < weekStartStr) return false
-      if (period === 'MONTH' && log.logDate < monthStartStr) return false
-
+    return mappedLogs.filter((log) => {
       // Obra
       if (worksiteFilter !== 'all' && log.worksiteId !== worksiteFilter) return false
-
       // Funcionário
       if (employeeFilter !== 'all' && log.employeeId !== employeeFilter) return false
-
       return true
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, worksiteFilter, employeeFilter])
+  }, [mappedLogs, worksiteFilter, employeeFilter])
 
   // ── Ordenação ──────────────────────────────────────────────────────────
   const sortedLogs = useMemo(() => {
@@ -367,7 +466,16 @@ export default function ReportPage() {
     exportToCSV(sortedLogs, PERIOD_LABELS[period].toLowerCase().replace(' ', '_'))
   }, [sortedLogs, period])
 
-  // ── Render ─────────────────────────────────────────────────────────────
+  // ── TELA DE CARREGAMENTO ─────────────────────────────────────────────
+  if (loading && logs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 gap-3 bg-white border border-gray-100 rounded-3xl max-w-md mx-auto">
+        <Loader2 className="w-10 h-10 animate-spin text-brand-primary" />
+        <p className="text-sm text-gray-500 font-medium">Buscando relatório de horas...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
 
@@ -397,6 +505,18 @@ export default function ReportPage() {
           )}
         </button>
       </div>
+
+      {fetchError && (
+        <div className="p-4 bg-red-50 text-red-800 rounded-2xl border border-red-100 flex items-start gap-3 text-sm">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-semibold">Erro ao atualizar dados:</span> {fetchError}
+          </div>
+          <Button size="sm" variant="ghost" onClick={loadData} className="text-red-800 hover:bg-red-100 shrink-0">
+            Recarregar
+          </Button>
+        </div>
+      )}
 
       {/* ── Filtros de período ─────────────────────────────────────────── */}
       <div className="flex gap-2">
@@ -454,7 +574,7 @@ export default function ReportPage() {
       </div>
 
       {/* ── Filtros de obra e funcionário ─────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-4">
+      <Card className="bg-white border border-gray-100 shadow-card p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter size={14} className="text-gray-400" />
           <p className="text-sm font-semibold text-gray-700">Filtros adicionais</p>
@@ -470,8 +590,8 @@ export default function ReportPage() {
                          text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/20"
             >
               <option value="all">Todas as obras</option>
-              {MOCK_WORKSITES.map((w) => (
-                <option key={w.id} value={w.id}>{w.name} ({w.costCenter})</option>
+              {worksites.map((w) => (
+                <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
               ))}
             </select>
           </div>
@@ -485,16 +605,16 @@ export default function ReportPage() {
                          text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/20"
             >
               <option value="all">Todos os funcionários</option>
-              {MOCK_EMPLOYEES.map((e) => (
+              {employees.map((e) => (
                 <option key={e.id} value={e.id}>{e.fullName} ({e.registration})</option>
               ))}
             </select>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* ── Tabela ────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-card overflow-hidden">
+      <Card className="bg-white border border-gray-100 shadow-card overflow-hidden p-0">
         {/* Cabeçalho da tabela */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
           <div className="flex items-center gap-2">
@@ -569,7 +689,7 @@ export default function ReportPage() {
             </table>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* ── Legenda de inconsistências ─────────────────────────────────── */}
       {kpis.inconsistencies > 0 && (

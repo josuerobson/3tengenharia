@@ -114,4 +114,63 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
     },
     controller.createBulk,
   )
+
+  // ── GET /time-logs ──────────────────────────────────────────────────────────
+  app.get(
+    '/',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['TimeLogs'],
+        summary: 'Listar lançamentos de horas',
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: 'object',
+          properties: {
+            worksiteId: { type: 'string' },
+            startDate: { type: 'string', format: 'date' },
+            endDate: { type: 'string', format: 'date' },
+          },
+        },
+        response: {
+          200: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                employeeId: { type: 'string' },
+                worksiteId: { type: 'string' },
+                workDate: { type: 'string' },
+                clockIn: { type: 'string' },
+                clockOut: { type: 'string' },
+                breakStart: { type: 'string', nullable: true },
+                breakEnd: { type: 'string', nullable: true },
+                shiftType: { type: 'string' },
+                totalMinutesWorked: { type: 'integer' },
+                notes: { type: 'string', nullable: true },
+                isValidated: { type: 'boolean' },
+                employee: {
+                  type: 'object',
+                  properties: {
+                    fullName: { type: 'string' },
+                    registration: { type: 'string' },
+                    position: { type: 'string' },
+                  },
+                },
+                worksite: {
+                  type: 'object',
+                  properties: {
+                    code: { type: 'string' },
+                    name: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    controller.listTimeLogs,
+  )
 }

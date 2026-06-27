@@ -115,3 +115,14 @@ export interface DuplicateEmployeeDetail {
   conflictingWorksiteId: string
   conflictingWorksiteName: string
 }
+
+// ── Query List Time Logs ──────────────────────────────────────────────────────
+
+export const listTimeLogsQuerySchema = z.object({
+  worksiteId: z.string().cuid().optional(),
+  startDate: z.string().date().optional(),
+  endDate: z.string().date().optional(),
+})
+
+export type ListTimeLogsQuery = z.infer<typeof listTimeLogsQuerySchema>
+

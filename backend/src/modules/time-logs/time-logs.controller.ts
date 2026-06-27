@@ -1,7 +1,7 @@
 // src/modules/time-logs/time-logs.controller.ts
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import { bulkTimeLogBodySchema } from './time-logs.schema.js'
+import { bulkTimeLogBodySchema, listTimeLogsQuerySchema } from './time-logs.schema.js'
 import {
   timeLogsService,
   WorksiteNotFoundError,
@@ -54,6 +54,21 @@ export function timeLogsController(_app: FastifyInstance) {
           `para a obra "${result.worksiteName}" em ${result.workDate}.`,
         summary: result,
       })
+    },
+
+    // ── GET /time-logs ───────────────────────────────────────────────────────
+    async listTimeLogs(request: FastifyRequest, reply: FastifyReply) {
+      const query = listTimeLogsQuerySchema.parse(request.query)
+      const currentUser = request.currentUser
+
+      let result: Awaited<ReturnType<typeof timeLogsService.list>>
+      try {
+        result = await timeLogsService.list(query, currentUser)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+
+      return reply.status(200).send(result)
     },
   }
 }

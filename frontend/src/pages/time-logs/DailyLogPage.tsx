@@ -25,26 +25,31 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
 import {
-  MOCK_WORKSITES,
-  MOCK_EMPLOYEES,
   SHIFT_TYPE_LABELS,
   calculateNetHours,
   validateTimes,
-  type Worksite,
-  type Employee,
   type ShiftType,
 } from '@/data/mockData'
+import {
+  assetsApi,
+  timeLogsApi,
+  type ApiWorksite,
+  type ApiEmployee,
+  type ApiBulkTimeLogParams,
+} from '@/lib/api'
 
 // ── Combobox de Obras ─────────────────────────────────────────────────────────
 
 interface WorksiteComboboxProps {
-  value: Worksite | null
-  onChange: (w: Worksite | null) => void
+  worksites: ApiWorksite[]
+  value: ApiWorksite | null
+  onChange: (w: ApiWorksite | null) => void
   error?: string
 }
 
-function WorksiteCombobox({ value, onChange, error }: WorksiteComboboxProps) {
+function WorksiteCombobox({ worksites, value, onChange, error }: WorksiteComboboxProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -64,14 +69,12 @@ function WorksiteCombobox({ value, onChange, error }: WorksiteComboboxProps) {
 
   const filtered = useMemo(
     () =>
-      MOCK_WORKSITES.filter(
+      worksites.filter(
         (w) =>
-          w.status === 'ACTIVE' &&
-          (w.name.toLowerCase().includes(search.toLowerCase()) ||
-            w.costCenter.toLowerCase().includes(search.toLowerCase()) ||
-            w.city.toLowerCase().includes(search.toLowerCase())),
+          w.name.toLowerCase().includes(search.toLowerCase()) ||
+          w.code.toLowerCase().includes(search.toLowerCase()),
       ),
-    [search],
+    [worksites, search],
   )
 
   return (
@@ -95,7 +98,7 @@ function WorksiteCombobox({ value, onChange, error }: WorksiteComboboxProps) {
             <Building2 size={16} className="text-brand-primary flex-shrink-0" />
             <div className="text-left min-w-0">
               <p className="font-bold text-gray-900 text-sm truncate">{value.name}</p>
-              <p className="text-xs text-gray-400 truncate">{value.costCenter} · {value.city}</p>
+              <p className="text-xs text-gray-400 truncate">Código: {value.code}</p>
             </div>
           </div>
         ) : (
@@ -137,20 +140,20 @@ function WorksiteCombobox({ value, onChange, error }: WorksiteComboboxProps) {
             ) : (
               filtered.map((w) => (
                 <button
-                  key={w.id}
-                  type="button"
-                  onClick={() => { onChange(w); setIsOpen(false); setSearch('') }}
-                  className={cn(
-                    'flex items-center gap-3 w-full px-3 py-3 text-left transition-colors',
-                    value?.id === w.id ? 'bg-brand-primary/8 text-brand-primary' : 'hover:bg-gray-50',
-                  )}
+                   key={w.id}
+                   type="button"
+                   onClick={() => { onChange(w); setIsOpen(false); setSearch('') }}
+                   className={cn(
+                     'flex items-center gap-3 w-full px-3 py-3 text-left transition-colors',
+                     value?.id === w.id ? 'bg-brand-primary/8 text-brand-primary' : 'hover:bg-gray-50',
+                   )}
                 >
                   <div className="w-8 h-8 bg-brand-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Building2 size={15} className="text-brand-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-gray-900 truncate">{w.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{w.costCenter} · {w.city}</p>
+                    <p className="text-xs text-gray-500 truncate">CC: {w.code}</p>
                   </div>
                   {value?.id === w.id && <CheckCircle2 size={15} className="text-brand-primary flex-shrink-0" />}
                 </button>
@@ -166,7 +169,7 @@ function WorksiteCombobox({ value, onChange, error }: WorksiteComboboxProps) {
 // ── Linha de Funcionário com Checkbox ─────────────────────────────────────────
 
 interface EmployeeRowProps {
-  employee: Employee
+  employee: ApiEmployee
   checked: boolean
   onToggle: (id: string) => void
 }
@@ -210,7 +213,7 @@ function EmployeeRow({ employee, checked, onToggle }: EmployeeRowProps) {
           {employee.fullName}
         </p>
         <p className="text-xs text-gray-400 mt-0.5">
-          {employee.registration} · {employee.role}
+          {employee.registration} · {employee.position}
         </p>
       </div>
 
@@ -292,8 +295,14 @@ type PageState = 'FORM' | 'SUBMITTING' | 'SUCCESS'
 // ── Página principal ─────────────────────────────────────────────────────────
 
 export default function DailyLogPage() {
-  // ── Dados principais ───────────────────────────────────────────────────
-  const [selectedWorksite, setSelectedWorksite] = useState<Worksite | null>(null)
+  // ── Obras e Funcionários do Servidor ──────────────────────────────────
+  const [worksites, setWorksites] = useState<ApiWorksite[]>([])
+  const [employees, setEmployees] = useState<ApiEmployee[]>([])
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+
+  // ── Selecionados ───────────────────────────────────────────────────────
+  const [selectedWorksite, setSelectedWorksite] = useState<ApiWorksite | null>(null)
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set())
   const [employeeSearch, setEmployeeSearch] = useState('')
 
@@ -311,18 +320,40 @@ export default function DailyLogPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submittedPayload, setSubmittedPayload] = useState<BulkPayload | null>(null)
 
+  // ── Carregar Obras e Funcionários ──────────────────────────────────────
+  const loadInitialData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setFetchError(null)
+      const [wList, eList] = await Promise.all([
+        assetsApi.listWorksites(),
+        assetsApi.listEmployees(),
+      ])
+      setWorksites(wList)
+      setEmployees(eList)
+    } catch (err: any) {
+      console.error(err)
+      setFetchError(err?.message ?? 'Falha ao sincronizar com o banco de dados.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadInitialData()
+  }, [loadInitialData])
+
   // ── Funcionários filtrados ─────────────────────────────────────────────
   const filteredEmployees = useMemo(() => {
     const q = employeeSearch.toLowerCase().trim()
-    return MOCK_EMPLOYEES.filter(
+    return employees.filter(
       (e) =>
-        e.active &&
-        (!q ||
-          e.fullName.toLowerCase().includes(q) ||
-          e.registration.toLowerCase().includes(q) ||
-          e.role.toLowerCase().includes(q)),
+        !q ||
+        e.fullName.toLowerCase().includes(q) ||
+        e.registration.toLowerCase().includes(q) ||
+        e.position.toLowerCase().includes(q),
     )
-  }, [employeeSearch])
+  }, [employees, employeeSearch])
 
   // ── Cálculos em tempo real ─────────────────────────────────────────────
   const netHours = useMemo(
@@ -378,34 +409,52 @@ export default function DailyLogPage() {
 
     setPageState('SUBMITTING')
 
-    const payload: BulkPayload = {
+    const payload: ApiBulkTimeLogParams = {
+      employeeIds: Array.from(selectedEmployees),
       worksiteId: selectedWorksite!.id,
-      worksiteName: selectedWorksite!.name,
-      costCenter: selectedWorksite!.costCenter,
-      logDate,
+      workDate: logDate,
+      clockIn: entryTime,
+      clockOut: exitTime,
+      breakStart: breakStart || null,
+      breakEnd: breakEnd || null,
       shiftType,
-      entries: Array.from(selectedEmployees).map((empId) => {
-        const emp = MOCK_EMPLOYEES.find((e) => e.id === empId)!
-        return {
-          employeeId: empId,
-          employeeName: emp.fullName,
-          registration: emp.registration,
-          entryTime,
-          breakStartTime: breakStart || null,
-          breakEndTime: breakEnd || null,
-          exitTime,
-          totalHours: netHours,
-          overtimeHours,
-        }
-      }),
+      notes: '',
     }
 
-    // Simula chamada ao endpoint bulk da API (substituir na Etapa real)
-    await new Promise((resolve) => setTimeout(resolve, 1_600))
-
-    setSubmittedPayload(payload)
-    setPageState('SUCCESS')
-  }, [selectedWorksite, selectedEmployees, logDate, shiftType, entryTime, breakStart, breakEnd, exitTime, netHours, overtimeHours])
+    try {
+      await timeLogsApi.createBulk(payload)
+      
+      setSubmittedPayload({
+        worksiteId: selectedWorksite!.id,
+        worksiteName: selectedWorksite!.name,
+        costCenter: selectedWorksite!.code,
+        logDate,
+        shiftType,
+        entries: Array.from(selectedEmployees).map((empId) => {
+          const emp = employees.find((e) => e.id === empId)!
+          return {
+            employeeId: empId,
+            employeeName: emp.fullName,
+            registration: emp.registration,
+            entryTime,
+            breakStartTime: breakStart || null,
+            breakEndTime: breakEnd || null,
+            exitTime,
+            totalHours: netHours,
+            overtimeHours,
+          }
+        }),
+      })
+      setPageState('SUCCESS')
+    } catch (err: any) {
+      console.error('Erro ao enviar lote:', err)
+      setErrors((prev) => ({
+        ...prev,
+        submit: err?.message ?? 'Falha ao salvar lançamento de horas no servidor.',
+      }))
+      setPageState('FORM')
+    }
+  }, [selectedWorksite, selectedEmployees, logDate, shiftType, entryTime, breakStart, breakEnd, exitTime, netHours, overtimeHours, employees])
 
   const handleReset = useCallback(() => {
     setPageState('FORM')
@@ -413,6 +462,29 @@ export default function DailyLogPage() {
     setSubmittedPayload(null)
     setErrors({})
   }, [])
+
+  // ── TELA DE CARREGAMENTO ─────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 gap-3 bg-white border border-gray-100 rounded-3xl max-w-md mx-auto">
+        <Loader2 className="w-10 h-10 animate-spin text-brand-primary" />
+        <p className="text-sm text-gray-500 font-medium">Carregando diário de classe...</p>
+      </div>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <div className="max-w-md mx-auto p-6 bg-white rounded-3xl border border-gray-100 shadow-sm text-center">
+        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+        <h3 className="text-lg font-bold text-gray-900 mb-1">Erro ao Carregar</h3>
+        <p className="text-sm text-gray-500 mb-6">{fetchError}</p>
+        <Button onClick={loadInitialData} className="w-full">
+          Tentar Novamente
+        </Button>
+      </div>
+    )
+  }
 
   // ── TELA DE SUCESSO ──────────────────────────────────────────────────
   if (pageState === 'SUCCESS' && submittedPayload) {
@@ -442,7 +514,7 @@ export default function DailyLogPage() {
           {/* Preview de funcionários gravados */}
           <div className="text-left mb-6">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Registrado para:</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto scrollbar-thin">
               {entries.map((e) => (
                 <span key={e.employeeId} className="text-xs bg-brand-primary/10 text-brand-primary font-medium px-2.5 py-1 rounded-full">
                   {e.employeeName.split(' ')[0]} {e.employeeName.split(' ').slice(-1)[0]}
@@ -482,9 +554,10 @@ export default function DailyLogPage() {
         <div className="flex-1 min-w-0 pb-80 lg:pb-0 space-y-5">
 
           {/* Seletor de Obra */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-4">
+          <Card className="p-4 bg-white border border-gray-100 shadow-card">
             <Label required>Obra / Centro de Custo</Label>
             <WorksiteCombobox
+              worksites={worksites}
               value={selectedWorksite}
               onChange={setSelectedWorksite}
               error={errors.worksite}
@@ -492,13 +565,13 @@ export default function DailyLogPage() {
             {selectedWorksite && (
               <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
                 <MapPin size={12} />
-                {selectedWorksite.address}, {selectedWorksite.city} · Coord: {selectedWorksite.coordinatorName}
+                Centro de Custo: {selectedWorksite.code} · {selectedWorksite.name}
               </div>
             )}
-          </div>
+          </Card>
 
           {/* Lista de Funcionários */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-card overflow-hidden">
+          <Card className="bg-white border border-gray-100 shadow-card overflow-hidden p-0">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-3">
@@ -562,7 +635,7 @@ export default function DailyLogPage() {
                 ))
               )}
             </div>
-          </div>
+          </Card>
         </div>
 
         {/* ══════ Painel de Horários ══════ */}
@@ -579,7 +652,7 @@ export default function DailyLogPage() {
           <div className="lg:sticky lg:top-20">
             <div className={cn(
               'bg-white p-4 sm:p-5',
-              'lg:rounded-2xl lg:border lg:border-gray-100 lg:shadow-card',
+              'lg:rounded-2xl lg:border lg:border-gray-100 lg:shadow-card lg:p-5',
             )}>
               {/* Título do painel */}
               <div className="hidden lg:flex items-center gap-2 mb-4">
@@ -627,11 +700,11 @@ export default function DailyLogPage() {
                 <TimeInput id="break-end"   label="Fim do Intervalo"    value={breakEnd}   onChange={setBreakEnd} />
               </div>
 
-              {/* Erro de horário */}
-              {errors.time && (
+              {/* Erro de horário ou de envio */}
+              {(errors.time || errors.submit) && (
                 <div className="flex items-start gap-2 p-3 bg-red-50 rounded-xl border border-red-200 mb-3">
                   <AlertCircle size={14} className="text-red-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-red-600 font-medium">{errors.time}</p>
+                  <p className="text-xs text-red-600 font-medium">{errors.time || errors.submit}</p>
                 </div>
               )}
 
@@ -690,7 +763,7 @@ export default function DailyLogPage() {
                 )}
               </Button>
 
-              {/* Nota informativa */}
+              {/* Informação */}
               <p className="flex items-start gap-1.5 mt-3 text-[11px] text-gray-400 leading-relaxed">
                 <Info size={11} className="flex-shrink-0 mt-0.5" />
                 Os horários são aplicados igualmente a todos os funcionários selecionados.

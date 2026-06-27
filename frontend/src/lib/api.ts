@@ -536,6 +536,81 @@ export const worksitesApi = {
   },
 }
 
+// ── Endpoints de Lançamentos de Horas (Time Logs) ────────────────────────────
+
+export interface ApiTimeLog {
+  id: string
+  employeeId: string
+  worksiteId: string
+  workDate: string
+  clockIn: string
+  clockOut: string
+  breakStart?: string | null
+  breakEnd?: string | null
+  shiftType: 'REGULAR' | 'OVERTIME' | 'ON_CALL' | 'ABSENCE' | 'VACATION' | 'HOLIDAY'
+  totalMinutesWorked: number
+  notes?: string | null
+  isValidated: boolean
+  employee: {
+    fullName: string
+    registration: string
+    position: string
+  }
+  worksite: {
+    code: string
+    name: string
+  }
+}
+
+export interface ApiBulkTimeLogParams {
+  employeeIds: string[]
+  worksiteId: string
+  workDate: string // YYYY-MM-DD
+  clockIn: string // HH:mm
+  clockOut: string // HH:mm
+  breakStart?: string | null
+  breakEnd?: string | null
+  shiftType?: 'REGULAR' | 'OVERTIME' | 'ON_CALL' | 'ABSENCE' | 'VACATION' | 'HOLIDAY'
+  notes?: string | null
+}
+
+export interface ApiBulkTimeLogResponse {
+  message: string
+  summary: {
+    worksiteId: string
+    worksiteName: string
+    workDate: string
+    employeeCount: number
+    shiftType: string
+    clockIn: string
+    clockOut: string
+    totalMinutesWorked: number
+    totalHoursWorked: number
+  }
+}
+
+export const timeLogsApi = {
+  list(filters: {
+    worksiteId?: string
+    startDate?: string
+    endDate?: string
+  } = {}): Promise<ApiTimeLog[]> {
+    const params = new URLSearchParams()
+    if (filters.worksiteId) params.append('worksiteId', filters.worksiteId)
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
+    const queryStr = params.toString()
+    return request(`/time-logs${queryStr ? `?${queryStr}` : ''}`)
+  },
+
+  createBulk(data: ApiBulkTimeLogParams): Promise<ApiBulkTimeLogResponse> {
+    return request('/time-logs/bulk', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+}
+
 
 
 
