@@ -416,6 +416,13 @@ export interface ApiWorksite {
   id: string
   code: string
   name: string
+  address?: string | null
+  city?: string | null
+  state?: string | null
+  isActive: boolean
+  startDate?: string | null
+  endDate?: string | null
+  createdAt?: string
 }
 
 export interface ApiUser {
@@ -475,6 +482,55 @@ export const usersApi = {
 
   delete(id: string): Promise<void> {
     return request(`/users/${id}`, {
+      method: 'DELETE',
+    })
+  },
+}
+
+// ── Endpoints de Obras (Worksites) ───────────────────────────────────────────
+
+export const worksitesApi = {
+  list(): Promise<ApiWorksite[]> {
+    return request('/worksites')
+  },
+
+  create(data: {
+    code: string
+    name: string
+    address?: string | null
+    city?: string | null
+    state?: string | null
+    isActive: boolean
+    startDate?: string | null
+    endDate?: string | null
+  }): Promise<ApiWorksite> {
+    return request('/worksites', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  update(
+    id: string,
+    data: Partial<{
+      code: string
+      name: string
+      address?: string | null
+      city?: string | null
+      state?: string | null
+      isActive: boolean
+      startDate?: string | null
+      endDate?: string | null
+    }>,
+  ): Promise<ApiWorksite> {
+    return request(`/worksites/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
+  delete(id: string): Promise<void> {
+    return request(`/worksites/${id}`, {
       method: 'DELETE',
     })
   },
