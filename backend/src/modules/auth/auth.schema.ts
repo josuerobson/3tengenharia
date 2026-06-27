@@ -37,7 +37,15 @@ export const userPublicSchema = z.object({
       fullName: z.string(),
       registration: z.string(),
       position: z.string(),
+      cpf: z.string().optional(),
       worksiteId: z.string().nullable(),
+      worksite: z
+        .object({
+          code: z.string(),
+          name: z.string(),
+        })
+        .nullable()
+        .optional(),
     })
     .nullable(),
 })
@@ -52,3 +60,17 @@ export const loginResponseSchema = z.object({
 })
 
 export type LoginResponse = z.infer<typeof loginResponseSchema>
+
+// ── Change Password Request ───────────────────────────────────────────────────
+
+export const changePasswordBodySchema = z.object({
+  currentPassword: z
+    .string({ required_error: 'Senha atual é obrigatória.' })
+    .min(1, 'Senha atual é obrigatória.'),
+  newPassword: z
+    .string({ required_error: 'Nova senha é obrigatória.' })
+    .min(8, 'A nova senha deve ter pelo menos 8 caracteres.'),
+})
+
+export type ChangePasswordBody = z.infer<typeof changePasswordBodySchema>
+

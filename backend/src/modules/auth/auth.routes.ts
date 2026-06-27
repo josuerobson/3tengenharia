@@ -52,7 +52,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
                       fullName: { type: 'string' },
                       registration: { type: 'string' },
                       position: { type: 'string' },
+                      cpf: { type: 'string' },
                       worksiteId: { type: ['string', 'null'] },
+                      worksite: {
+                        type: ['object', 'null'],
+                        properties: {
+                          code: { type: 'string' },
+                          name: { type: 'string' },
+                        },
+                      },
                     },
                   },
                 },
@@ -109,7 +117,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
                       fullName: { type: 'string' },
                       registration: { type: 'string' },
                       position: { type: 'string' },
+                      cpf: { type: 'string' },
                       worksiteId: { type: ['string', 'null'] },
+                      worksite: {
+                        type: ['object', 'null'],
+                        properties: {
+                          code: { type: 'string' },
+                          name: { type: 'string' },
+                        },
+                      },
                     },
                   },
                 },
@@ -129,5 +145,44 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     controller.me,
+  )
+
+  // ── PATCH /auth/change-password ──────────────────────────────────────────────
+  app.patch(
+    '/change-password',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Auth'],
+        summary: 'Alterar senha do usuário logado',
+        description:
+          'Permite que qualquer usuário logado altere sua própria senha de acesso.',
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['currentPassword', 'newPassword'],
+          properties: {
+            currentPassword: { type: 'string' },
+            newPassword: { type: 'string', minLength: 8 },
+          },
+        },
+        response: {
+          204: {
+            description: 'Senha alterada com sucesso.',
+            type: 'null',
+          },
+          400: {
+            description: 'Dados inválidos ou senha atual incorreta.',
+            type: 'object',
+            properties: {
+              statusCode: { type: 'number' },
+              error: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+    controller.changePassword,
   )
 }

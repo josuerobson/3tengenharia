@@ -5,7 +5,7 @@
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma.js'
 import { env } from '../../lib/env.js'
-import type { LoginBody, UserPublic } from './auth.schema.js'
+import type { LoginBody, UserPublic, ChangePasswordBody } from './auth.schema.js'
 
 // ── Erros tipados do domínio ──────────────────────────────────────────────────
 
@@ -27,6 +27,14 @@ export class InactiveUserError extends Error {
   }
 }
 
+export class InvalidCurrentPasswordError extends Error {
+  readonly statusCode = 400
+  constructor() {
+    super('A senha atual está incorreta.')
+    this.name = 'InvalidCurrentPasswordError'
+  }
+}
+
 // ── Seletor reutilizável (evita buscar passwordHash desnecessariamente) ────────
 
 const userPublicSelect = {
@@ -41,7 +49,14 @@ const userPublicSelect = {
       fullName: true,
       registration: true,
       position: true,
+      cpf: true,
       worksiteId: true,
+      worksite: {
+        select: {
+          code: true,
+          name: true,
+        },
+      },
     },
   },
 } as const
@@ -108,5 +123,32 @@ export const authService = {
    */
   async hashPassword(plainText: string): Promise<string> {
     return bcrypt.hash(plainText, env.BCRYPT_SALT_ROUNDS)
+  },
+
+  /**
+   * Altera a senha do usuário autenticado após validação da senha atual.
+   */
+  async changePassword(userId: string, body: ChangePasswordBody): Promise<void> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId, isActive: true },
+      select: { passwordHash: true },
+    })
+
+    if (!user) {
+      throw new Error('Usuário não encontrado ou inativo.')
+    }
+
+    const passwordMatch = await bcrypt.compare(body.currentPassword, user.passwordHash)
+
+    if (!passwordMatch) {
+      throw new InvalidCurrentPasswordError()
+    }
+
+    const newPasswordHash = await bcrypt.hash(body.newPassword, env.BCRYPT_SALT_ROUNDS)
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newPasswordHash },
+    })
   },
 }

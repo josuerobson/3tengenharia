@@ -3,6 +3,7 @@
 // central de notificações e menu do usuário com indicador de perfil RBAC.
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Menu,
   Bell,
@@ -203,11 +204,17 @@ function NotificationPanel({
 /** Menu dropdown do usuário */
 function UserDropdownMenu({ onClose }: { onClose: () => void }) {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
 
   const handleLogout = useCallback(() => {
     logout()
     onClose()
   }, [logout, onClose])
+
+  const handleProfileClick = useCallback(() => {
+    navigate('/profile')
+    onClose()
+  }, [navigate, onClose])
 
   return (
     <div className="animate-slide-down absolute right-0 top-full mt-2.5 w-56
@@ -220,8 +227,11 @@ function UserDropdownMenu({ onClose }: { onClose: () => void }) {
 
       {/* Actions */}
       <div className="p-1.5 space-y-0.5">
-        <button className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-gray-600
-                           rounded-xl hover:bg-gray-50 hover:text-brand-primary transition-colors text-left">
+        <button
+          onClick={handleProfileClick}
+          className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-gray-600
+                           rounded-xl hover:bg-gray-50 hover:text-brand-primary transition-colors text-left"
+        >
           <User size={15} className="flex-shrink-0" />
           Meu Perfil
         </button>

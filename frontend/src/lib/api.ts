@@ -228,6 +228,17 @@ export const authApi = {
       user: mappedUser,
     }
   },
+
+  me(): Promise<{ user: ApiUser }> {
+    return request('/auth/me')
+  },
+
+  changePassword(data: { currentPassword: string; newPassword: string }): Promise<void> {
+    return request('/auth/change-password', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
 }
 
 // ── Endpoints de Manutenção ───────────────────────────────────────────────────
@@ -418,6 +429,11 @@ export interface ApiUser {
     fullName: string
     registration: string
     position: string
+    cpf?: string
+    worksite?: {
+      code: string
+      name: string
+    } | null
   } | null
 }
 

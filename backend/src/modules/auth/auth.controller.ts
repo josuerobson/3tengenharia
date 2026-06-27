@@ -6,11 +6,12 @@
 //   4. Serializar e retornar a resposta
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import { loginBodySchema } from './auth.schema.js'
+import { loginBodySchema, changePasswordBodySchema } from './auth.schema.js'
 import {
   authService,
   InvalidCredentialsError,
   InactiveUserError,
+  InvalidCurrentPasswordError,
 } from './auth.service.js'
 import { env } from '../../lib/env.js'
 
@@ -71,6 +72,23 @@ export function authController(app: FastifyInstance) {
       }
 
       return reply.status(200).send({ user })
+    },
+
+    // ── PATCH /auth/change-password ───────────────────────────────────────────
+    async changePassword(request: FastifyRequest, reply: FastifyReply) {
+      const { sub: userId } = request.currentUser
+      const body = changePasswordBodySchema.parse(request.body)
+
+      try {
+        await authService.changePassword(userId, body)
+      } catch (err) {
+        if (err instanceof InvalidCurrentPasswordError) {
+          throw err
+        }
+        throw err
+      }
+
+      return reply.status(204).send()
     },
   }
 }
