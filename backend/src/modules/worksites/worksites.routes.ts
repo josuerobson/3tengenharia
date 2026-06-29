@@ -65,8 +65,8 @@ export async function worksiteRoutes(app: FastifyInstance): Promise<void> {
             city: { type: 'string', nullable: true },
             state: { type: 'string', maxLength: 2, nullable: true },
             isActive: { type: 'boolean' },
-            startDate: { type: 'string', format: 'date-time', nullable: true },
-            endDate: { type: 'string', format: 'date-time', nullable: true },
+            startDate: { type: 'string', format: 'date', nullable: true },
+            endDate: { type: 'string', format: 'date', nullable: true },
           },
         },
         response: {
@@ -111,8 +111,8 @@ export async function worksiteRoutes(app: FastifyInstance): Promise<void> {
             city: { type: 'string', nullable: true },
             state: { type: 'string', maxLength: 2, nullable: true },
             isActive: { type: 'boolean' },
-            startDate: { type: 'string', format: 'date-time', nullable: true },
-            endDate: { type: 'string', format: 'date-time', nullable: true },
+            startDate: { type: 'string', format: 'date', nullable: true },
+            endDate: { type: 'string', format: 'date', nullable: true },
           },
         },
         response: {
