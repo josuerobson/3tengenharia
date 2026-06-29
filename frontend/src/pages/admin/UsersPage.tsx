@@ -42,7 +42,7 @@ const ROLE_BADGE_VARIANTS: Record<string, 'default' | 'brand' | 'critical' | nul
 export default function UsersPage() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
-  const isAuthorized = currentUser?.role === 'ADMIN'
+  const isAuthorized = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
 
   // ── Estados de Dados ───────────────────────────────────────────────────────
   const [users, setUsers] = useState<ApiUser[]>([])
@@ -229,7 +229,7 @@ export default function UsersPage() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Acesso Restrito</h2>
           <p className="text-sm text-gray-500 mb-6">
-            Desculpe, a área de administração de usuários é reservada para administradores do sistema.
+            Desculpe, a área de administração de usuários é reservada para administradores e gestores do sistema.
           </p>
           <Button onClick={() => navigate('/')} className="w-full font-semibold">
             Voltar para o Início

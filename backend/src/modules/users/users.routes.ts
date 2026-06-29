@@ -12,7 +12,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     {
       onRequest: [
         app.authenticate,
-        app.requireRole([UserRole.ADMIN]),
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER]),
       ],
       schema: {
         tags: ['Users'],
@@ -53,7 +53,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     {
       onRequest: [
         app.authenticate,
-        app.requireRole([UserRole.ADMIN]),
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER]),
       ],
       schema: {
         tags: ['Users'],
@@ -92,7 +92,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     {
       onRequest: [
         app.authenticate,
-        app.requireRole([UserRole.ADMIN]),
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER]),
       ],
       schema: {
         tags: ['Users'],
@@ -137,7 +137,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     {
       onRequest: [
         app.authenticate,
-        app.requireRole([UserRole.ADMIN]),
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER]),
       ],
       schema: {
         tags: ['Users'],
