@@ -436,6 +436,7 @@ export interface ApiUser {
     fullName: string
     registration: string
     position: string
+    phone?: string | null
     cpf?: string
     worksite?: {
       code: string
@@ -455,7 +456,9 @@ export const usersApi = {
     email: string
     password?: string
     role: 'ADMIN' | 'MANAGER' | 'COLLABORATOR'
-    employeeId?: string | null
+    fullName: string
+    phone: string
+    position: string
     isActive: boolean
   }): Promise<ApiUser> {
     return request('/users', {
@@ -470,7 +473,9 @@ export const usersApi = {
       email: string
       password?: string
       role: 'ADMIN' | 'MANAGER' | 'COLLABORATOR'
-      employeeId?: string | null
+      fullName: string
+      phone: string
+      position: string
       isActive: boolean
     }>,
   ): Promise<ApiUser> {

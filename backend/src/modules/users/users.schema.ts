@@ -17,7 +17,20 @@ export const createUserBodySchema = z.object({
     required_error: 'Perfil é obrigatório.',
   }),
 
-  employeeId: z.string().cuid('ID do colaborador inválido.').nullable().optional(),
+  fullName: z
+    .string({ required_error: 'Nome completo é obrigatório.' })
+    .trim()
+    .min(1, 'Nome completo não pode ser vazio.'),
+
+  phone: z
+    .string({ required_error: 'WhatsApp é obrigatório.' })
+    .trim()
+    .min(1, 'WhatsApp não pode ser vazio.'),
+
+  position: z
+    .string({ required_error: 'Função é obrigatória.' })
+    .trim()
+    .min(1, 'Função não pode ser vazia.'),
 
   isActive: z.boolean().optional().default(true),
 })
@@ -39,7 +52,9 @@ export const updateUserBodySchema = z.object({
 
   role: z.nativeEnum(UserRole).optional(),
 
-  employeeId: z.string().cuid('ID do colaborador inválido.').nullable().optional(),
+  fullName: z.string().trim().min(1).optional(),
+  phone: z.string().trim().min(1).optional(),
+  position: z.string().trim().min(1).optional(),
 
   isActive: z.boolean().optional(),
 })

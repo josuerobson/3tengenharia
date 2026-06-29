@@ -47,6 +47,7 @@ export const usersService = {
             fullName: true,
             registration: true,
             position: true,
+            phone: true,
           },
         },
       },
@@ -63,23 +64,10 @@ export const usersService = {
       throw new EmailAlreadyExistsError(body.email)
     }
 
-    // 2. Validar funcionário (se fornecido)
-    if (body.employeeId) {
-      const employee = await prisma.employee.findUnique({
-        where: { id: body.employeeId },
-      })
-      if (!employee) {
-        throw new EmployeeNotFoundError(body.employeeId)
-      }
-      if (employee.userId) {
-        throw new EmployeeAlreadyLinkedError(employee.fullName)
-      }
-    }
-
-    // 3. Hash password
+    // 2. Hash password
     const passwordHash = await bcrypt.hash(body.password, SALT_ROUNDS)
 
-    // 4. Inserir usuário
+    // 3. Inserir usuário
     const user = await prisma.user.create({
       data: {
         email: body.email,
@@ -89,13 +77,32 @@ export const usersService = {
       },
     })
 
-    // 5. Vincular funcionário
-    if (body.employeeId) {
-      await prisma.employee.update({
-        where: { id: body.employeeId },
-        data: { userId: user.id },
-      })
+    // 4. Inserir Employee sob o capô
+    let cpf = ''
+    let registration = ''
+    while (true) {
+      cpf = Math.floor(10000000000 + Math.random() * 90000000000).toString()
+      const existing = await prisma.employee.findUnique({ where: { cpf } })
+      if (!existing) break
     }
+    while (true) {
+      registration = 'MAT-' + Math.floor(100000 + Math.random() * 900000).toString()
+      const existing = await prisma.employee.findUnique({ where: { registration } })
+      if (!existing) break
+    }
+
+    await prisma.employee.create({
+      data: {
+        userId: user.id,
+        fullName: body.fullName,
+        phone: body.phone,
+        position: body.position,
+        cpf,
+        registration,
+        hireDate: new Date(),
+        isActive: true,
+      },
+    })
 
     // Retorna com relacionamento atualizado
     return prisma.user.findUnique({
@@ -107,6 +114,7 @@ export const usersService = {
             fullName: true,
             registration: true,
             position: true,
+            phone: true,
           },
         },
       },
@@ -133,22 +141,7 @@ export const usersService = {
       }
     }
 
-    // 3. Validar funcionário se alterado
-    if (body.employeeId !== undefined && body.employeeId !== user.employee?.id) {
-      if (body.employeeId) {
-        const employee = await prisma.employee.findUnique({
-          where: { id: body.employeeId },
-        })
-        if (!employee) {
-          throw new EmployeeNotFoundError(body.employeeId)
-        }
-        if (employee.userId && employee.userId !== id) {
-          throw new EmployeeAlreadyLinkedError(employee.fullName)
-        }
-      }
-    }
-
-    // 4. Preparar data
+    // 3. Preparar data
     const updateData: any = {}
     if (body.email) updateData.email = body.email
     if (body.password) {
@@ -157,26 +150,49 @@ export const usersService = {
     if (body.role) updateData.role = body.role
     if (body.isActive !== undefined) updateData.isActive = body.isActive
 
-    // 5. Salvar atualizações do User
+    // 4. Salvar atualizações do User
     await prisma.user.update({
       where: { id },
       data: updateData,
     })
 
-    // 6. Gerenciar vínculos de Employee
-    if (body.employeeId !== undefined && body.employeeId !== user.employee?.id) {
-      // Desvincular anterior
+    // 5. Atualizar Employee
+    const empData: any = {}
+    if (body.fullName !== undefined) empData.fullName = body.fullName
+    if (body.phone !== undefined) empData.phone = body.phone
+    if (body.position !== undefined) empData.position = body.position
+    
+    if (Object.keys(empData).length > 0) {
       if (user.employee?.id) {
         await prisma.employee.update({
           where: { id: user.employee.id },
-          data: { userId: null },
+          data: empData,
         })
-      }
-      // Vincular novo
-      if (body.employeeId) {
-        await prisma.employee.update({
-          where: { id: body.employeeId },
-          data: { userId: id },
+      } else {
+        // Se por algum motivo o seed ou banco antigo não tiver employee para o user, cria
+        let cpf = ''
+        let registration = ''
+        while (true) {
+          cpf = Math.floor(10000000000 + Math.random() * 90000000000).toString()
+          const existing = await prisma.employee.findUnique({ where: { cpf } })
+          if (!existing) break
+        }
+        while (true) {
+          registration = 'MAT-' + Math.floor(100000 + Math.random() * 900000).toString()
+          const existing = await prisma.employee.findUnique({ where: { registration } })
+          if (!existing) break
+        }
+        await prisma.employee.create({
+          data: {
+            userId: id,
+            fullName: body.fullName || 'Usuário Sem Nome',
+            phone: body.phone || null,
+            position: body.position || 'Função Não Definida',
+            cpf,
+            registration,
+            hireDate: new Date(),
+            isActive: true,
+          },
         })
       }
     }
@@ -190,6 +206,7 @@ export const usersService = {
             fullName: true,
             registration: true,
             position: true,
+            phone: true,
           },
         },
       },

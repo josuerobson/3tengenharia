@@ -63,7 +63,11 @@ export default function UsersPage() {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<'ADMIN' | 'MANAGER' | 'COLLABORATOR'>('COLLABORATOR')
   const [isActive, setIsActive] = useState(true)
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [position, setPosition] = useState('')
+  const [isCustomPosition, setIsCustomPosition] = useState(false)
+  const [customPosition, setCustomPosition] = useState('')
 
   const [formError, setFormError] = useState<string | null>(null)
   const [formSubmitting, setFormSubmitting] = useState(false)
@@ -73,6 +77,19 @@ export default function UsersPage() {
   const [deletingUser, setDeletingUser] = useState<ApiUser | null>(null)
   const [deleteSubmitting, setDeleteSubmitting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // ── Funções de exemplo (para o select) ─────────────────────────────────────
+  const existingPositions = useMemo(() => {
+    const set = new Set<string>()
+    employees.forEach((e) => {
+      if (e.position) set.add(e.position.trim())
+    })
+    set.add('Administrador')
+    set.add('Gestor de Obras')
+    set.add('Coordenador')
+    set.add('Almoxarife')
+    return Array.from(set).sort()
+  }, [employees])
 
   // ── Carregar Dados ─────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -127,7 +144,11 @@ export default function UsersPage() {
     setPassword('')
     setRole('COLLABORATOR')
     setIsActive(true)
-    setSelectedEmployeeId('')
+    setFullName('')
+    setPhone('')
+    setPosition('')
+    setIsCustomPosition(false)
+    setCustomPosition('')
     setFormError(null)
     setFormOpen(true)
   }
@@ -138,7 +159,12 @@ export default function UsersPage() {
     setPassword('') // Senha vazia significa que não será alterada
     setRole(user.role)
     setIsActive(user.isActive)
-    setSelectedEmployeeId(user.employee?.id ?? '')
+    setFullName(user.employee?.fullName ?? '')
+    setPhone(user.employee?.phone ?? '')
+    const currentPos = user.employee?.position ?? ''
+    setPosition(currentPos)
+    setIsCustomPosition(false)
+    setCustomPosition('')
     setFormError(null)
     setFormOpen(true)
   }
@@ -157,6 +183,19 @@ export default function UsersPage() {
       setFormError('A senha deve ter pelo menos 8 caracteres.')
       return
     }
+    if (!fullName.trim()) {
+      setFormError('Nome completo é obrigatório.')
+      return
+    }
+    if (!phone.trim()) {
+      setFormError('WhatsApp é obrigatório.')
+      return
+    }
+    const finalPosition = isCustomPosition ? customPosition.trim() : position.trim()
+    if (!finalPosition) {
+      setFormError('Função é obrigatória.')
+      return
+    }
 
     setFormError(null)
     setFormSubmitting(true)
@@ -168,7 +207,9 @@ export default function UsersPage() {
           email: email.trim(),
           role,
           isActive,
-          employeeId: selectedEmployeeId || null,
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          position: finalPosition,
           ...(password ? { password } : {}),
         })
       } else {
@@ -178,7 +219,9 @@ export default function UsersPage() {
           password,
           role,
           isActive,
-          employeeId: selectedEmployeeId || null,
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          position: finalPosition,
         })
       }
       setFormOpen(false)
@@ -352,7 +395,7 @@ export default function UsersPage() {
 
                         {/* Detalhes do colaborador */}
                         <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-                          <p className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Colaborador Vinculado</p>
+                          <p className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Dados do Colaborador</p>
                           {u.employee ? (
                             <>
                               <p className="text-xs font-bold text-gray-800 truncate">{u.employee.fullName}</p>
@@ -361,7 +404,7 @@ export default function UsersPage() {
                               </p>
                             </>
                           ) : (
-                            <p className="text-xs text-gray-400 italic">Sem colaborador vinculado</p>
+                            <p className="text-xs text-gray-400 italic">Sem dados de colaborador</p>
                           )}
                         </div>
                       </div>
@@ -464,6 +507,36 @@ export default function UsersPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
+              <Label htmlFor="fullName" required>
+                Nome Completo
+              </Label>
+              <Input
+                id="fullName"
+                placeholder="Ex: João da Silva"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="mt-1.5 h-11"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="phone" required>
+                WhatsApp
+              </Label>
+              <Input
+                id="phone"
+                placeholder="Ex: (11) 99999-9999"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="mt-1.5 h-11"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <Label htmlFor="role" required>
                 Perfil de Acesso
               </Label>
@@ -481,22 +554,50 @@ export default function UsersPage() {
             </div>
 
             <div>
-              <Label htmlFor="employee">Colaborador Vinculado</Label>
+              <Label htmlFor="position" required>
+                Função
+              </Label>
               <select
-                id="employee"
-                value={selectedEmployeeId}
-                onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                id="position"
+                value={isCustomPosition ? 'CUSTOM' : position}
+                onChange={(e) => {
+                  const val = e.target.value
+                  if (val === 'CUSTOM') {
+                    setIsCustomPosition(true)
+                  } else {
+                    setIsCustomPosition(false)
+                    setPosition(val)
+                  }
+                }}
                 className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+                required
               >
-                <option value="">Nenhum colaborador vinculado</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.fullName} ({emp.registration})
+                <option value="">Selecione uma função...</option>
+                {existingPositions.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
                   </option>
                 ))}
+                <option value="CUSTOM">+ Adicionar nova função...</option>
               </select>
             </div>
           </div>
+
+          {isCustomPosition && (
+            <div className="animate-slide-down">
+              <Label htmlFor="customPosition" required>
+                Nome da Nova Função
+              </Label>
+              <Input
+                id="customPosition"
+                placeholder="Ex: Encarregado de Obras"
+                value={customPosition}
+                onChange={(e) => setCustomPosition(e.target.value)}
+                className="mt-1.5 h-11"
+                required
+              />
+            </div>
+          )}
 
           <div className="flex items-center gap-2.5 pt-2">
             <input
@@ -551,7 +652,7 @@ export default function UsersPage() {
               <p className="text-gray-500 font-medium">Você tem certeza que deseja excluir o usuário?</p>
               <p className="font-bold text-gray-900 mt-1">{deletingUser.email}</p>
               {deletingUser.employee && (
-                <p className="text-xs text-gray-400">Vinculado a: {deletingUser.employee.fullName}</p>
+                <p className="text-xs text-gray-400">Nome: {deletingUser.employee.fullName}</p>
               )}
             </div>
           )}
