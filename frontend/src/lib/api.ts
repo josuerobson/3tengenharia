@@ -108,6 +108,7 @@ export interface ApiVehicle {
   notes: string | null
   createdAt: string
   updatedAt: string
+  trips?: { id: string }[]
 }
 
 export interface ApiTrip {

@@ -14,6 +14,7 @@ import {
   TripNotFoundError,
   TripAlreadyEndedError,
   FinalKmBelowInitialError,
+  VehicleAlreadyInTripError,
 } from './vehicles.service.js'
 
 /** Erros de domínio deste módulo — re-lançados para o error-handler global */
@@ -24,6 +25,7 @@ const DOMAIN_ERRORS = [
   TripNotFoundError,
   TripAlreadyEndedError,
   FinalKmBelowInitialError,
+  VehicleAlreadyInTripError,
 ]
 
 function rethrowDomain(err: unknown): never {

@@ -147,7 +147,8 @@ function VehicleCombobox({ value, onChange, error, vehicles, loadingVehicles }: 
 
   const handleSelect = useCallback(
     (vehicle: Vehicle) => {
-      if (vehicle.status !== 'ACTIVE') return
+      const hasActiveTrip = !!(vehicle.trips && vehicle.trips.length > 0)
+      if (vehicle.status !== 'ACTIVE' || hasActiveTrip) return
       onChange(vehicle)
       setIsOpen(false)
       setSearch('')
@@ -250,8 +251,9 @@ function VehicleCombobox({ value, onChange, error, vehicles, loadingVehicles }: 
               </div>
             ) : (
               filtered.map((vehicle) => {
+                const hasActiveTrip = !!(vehicle.trips && vehicle.trips.length > 0)
                 const badge = VEHICLE_STATUS_BADGE[vehicle.status]
-                const isDisabled = vehicle.status !== 'ACTIVE'
+                const isDisabled = vehicle.status !== 'ACTIVE' || hasActiveTrip
                 const isSelected = value?.id === vehicle.id
 
                 return (
@@ -280,9 +282,15 @@ function VehicleCombobox({ value, onChange, error, vehicles, loadingVehicles }: 
                         <span className="font-bold text-sm text-gray-900">
                           {vehicle.licensePlate}
                         </span>
-                        <Badge variant={badge.variant} dot>
-                          {badge.label}
-                        </Badge>
+                        {hasActiveTrip ? (
+                          <Badge variant="brand" dot={false}>
+                            Em Viagem
+                          </Badge>
+                        ) : (
+                          <Badge variant={badge.variant} dot>
+                            {badge.label}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500 truncate">
                         {vehicle.brand} {vehicle.model} · {formatKm(vehicle.currentKm)} · {vehicle.year}

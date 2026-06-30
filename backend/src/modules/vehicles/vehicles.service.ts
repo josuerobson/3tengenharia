@@ -41,6 +41,14 @@ export class InitialKmBelowCurrentError extends Error {
   }
 }
 
+export class VehicleAlreadyInTripError extends Error {
+  readonly statusCode = 409
+  constructor(licensePlate: string) {
+    super(`O veículo com placa ${licensePlate} já possui uma viagem em andamento.`)
+    this.name = 'VehicleAlreadyInTripError'
+  }
+}
+
 export class TripNotFoundError extends Error {
   readonly statusCode = 404
   constructor(id: string) {
@@ -168,6 +176,17 @@ export const vehiclesService = {
     // 2. Valida que o veículo está ACTIVE
     if (vehicle.status !== 'ACTIVE') {
       throw new VehicleNotActiveError(vehicle.status)
+    }
+
+    // ⚙️ REGRA DE NEGÓCIO: Veículo não pode ter viagem em andamento
+    const activeTrip = await prisma.vehicleTrip.findFirst({
+      where: {
+        vehicleId: body.vehicleId,
+        arrivalDateTime: null,
+      },
+    })
+    if (activeTrip) {
+      throw new VehicleAlreadyInTripError(vehicle.licensePlate)
     }
 
     // 3. ⚙️ REGRA DE NEGÓCIO: initialKm não pode ser menor que currentKm
@@ -336,6 +355,10 @@ export const vehiclesService = {
         status: true, maintenanceKmThreshold: true, maintenanceDayThreshold: true,
         lastMaintenanceKm: true, lastMaintenanceDate: true, notes: true,
         createdAt: true, updatedAt: true,
+        trips: {
+          where: { arrivalDateTime: null },
+          select: { id: true },
+        },
       },
     })
   },
