@@ -243,8 +243,7 @@ export default function DailyAuditForm5S() {
     async function fetchWorksites() {
       try {
         const list = await assetsApi.listWorksites()
-        // Filtrar ativas
-        setWorksitesList(list.filter((w: any) => w.status === 'ACTIVE'))
+        setWorksitesList(list)
       } catch (err) {
         console.error('Erro ao carregar obras:', err)
       }
