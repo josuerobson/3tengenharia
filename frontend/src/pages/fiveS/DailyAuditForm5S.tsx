@@ -28,6 +28,53 @@ import { assetsApi, fiveSApi, type ApiWorksite } from '@/lib/api'
 
 type Worksite = ApiWorksite
 
+// ── Funções Auxiliares ─────────────────────────────────────────────────────────
+
+function compressImage(file: File, maxWidth = 1024, maxHeight = 1024, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = (event) => {
+      const img = new Image()
+      img.src = event.target?.result as string
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+
+        // Redimensionar mantendo proporção
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width)
+            width = maxWidth
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height)
+            height = maxHeight
+          }
+        }
+
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve(event.target?.result as string) // Fallback para base64 original se canvas falhar
+          return
+        }
+
+        ctx.drawImage(img, 0, 0, width, height)
+        // Converte para jpeg comprimido
+        const dataUrl = canvas.toDataURL('image/jpeg', quality)
+        resolve(dataUrl)
+      }
+      img.onerror = (err) => reject(err)
+    }
+    reader.onerror = (err) => reject(err)
+  })
+}
+
 // ── Tipos locais ──────────────────────────────────────────────────────────────
 
 interface PhotoPreview {
@@ -35,6 +82,7 @@ interface PhotoPreview {
   objectUrl: string
   fileName: string
   sizeKb: number
+  file?: File
 }
 
 type PageState = 'FORM' | 'SUBMITTING' | 'SUCCESS'
@@ -277,6 +325,7 @@ export default function DailyAuditForm5S() {
       objectUrl: URL.createObjectURL(f),
       fileName:  f.name,
       sizeKb:    Math.round(f.size / 1024),
+      file:      f,
     }))
     setPhotos((prev) => [...prev, ...newPreviews].slice(0, 10)) // máx 10 fotos
     // Reset input para permitir selecionar os mesmos arquivos novamente
@@ -312,9 +361,23 @@ export default function DailyAuditForm5S() {
     try {
       setPageState('SUBMITTING')
       
-      // Mapear fotos locais para URLs válidas e únicas (já que não temos serviço de upload de arquivos no backend)
-      const mockPhotoUrls = photos.map((_, idx) => 
-        `https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&w=800&q=80&sig=${idx}-${Date.now()}`
+      // Comprimir fotos locais para Base64 leve e rápido
+      const realPhotoUrls = await Promise.all(
+        photos.map(async (p) => {
+          if (p.file) {
+            try {
+              return await compressImage(p.file)
+            } catch (err) {
+              console.error('Erro ao comprimir imagem, usando base64 bruto:', err)
+              return new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onloadend = () => resolve(reader.result as string)
+                reader.readAsDataURL(p.file!)
+              })
+            }
+          }
+          return p.objectUrl
+        })
       )
 
       await fiveSApi.create({
@@ -322,7 +385,7 @@ export default function DailyAuditForm5S() {
         areaType,
         status,
         description: description.trim() || undefined,
-        photoUrls: mockPhotoUrls,
+        photoUrls: realPhotoUrls,
       })
 
       setPageState('SUCCESS')

@@ -62,7 +62,10 @@ export const createAuditBodySchema = z
      */
     photoUrls: z
       .array(
-        z.string({ required_error: 'URL da foto é obrigatória.' }).url('URL de foto inválida.').min(1),
+        z.string({ required_error: 'URL da foto é obrigatória.' }).refine(
+          (val) => val.startsWith('http://') || val.startsWith('https://') || val.startsWith('data:image/'),
+          { message: 'URL da foto ou Base64 inválido.' }
+        ),
         { required_error: 'Pelo menos uma foto é obrigatória.' },
       )
       .min(1, 'Você deve incluir pelo menos 1 foto na auditoria.'),
