@@ -35,6 +35,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
                 location: { type: 'string', nullable: true },
                 notes: { type: 'string', nullable: true },
                 currentBorrowee: { type: 'string', nullable: true },
+                activeLoanId: { type: 'string', nullable: true },
               },
             },
           },
