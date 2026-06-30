@@ -551,7 +551,7 @@ export default function DailyLogPage() {
       <div className="flex flex-col lg:flex-row gap-6">
 
         {/* ══════ Coluna Esquerda — Obra + Funcionários ══════ */}
-        <div className="flex-1 min-w-0 pb-80 lg:pb-0 space-y-5">
+        <div className="flex-1 min-w-0 space-y-5">
 
           {/* Seletor de Obra */}
           <Card className="p-4 bg-white border border-gray-100 shadow-card">
@@ -639,21 +639,10 @@ export default function DailyLogPage() {
         </div>
 
         {/* ══════ Painel de Horários ══════ */}
-        {/* Mobile: fixed bottom | Desktop: sticky sidebar */}
-        <div className={cn(
-          // Mobile: painel fixo no fundo
-          'fixed bottom-0 inset-x-0 z-30 lg:hidden',
-          'bg-white border-t-2 border-gray-100 shadow-2xl',
-          // Desktop: coluna direita fixa
-          'lg:relative lg:bottom-auto lg:inset-x-auto lg:z-auto',
-          'lg:w-80 xl:w-96 lg:flex-shrink-0 lg:shadow-none lg:border-0',
-        )}>
+        <div className="w-full lg:w-80 xl:w-96 lg:flex-shrink-0">
           {/* Wrapper sticky no desktop */}
           <div className="lg:sticky lg:top-20">
-            <div className={cn(
-              'bg-white p-4 sm:p-5',
-              'lg:rounded-2xl lg:border lg:border-gray-100 lg:shadow-card lg:p-5',
-            )}>
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-card">
               {/* Título do painel */}
               <div className="hidden lg:flex items-center gap-2 mb-4">
                 <Clock size={16} className="text-brand-primary" />
