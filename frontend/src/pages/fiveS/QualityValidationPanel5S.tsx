@@ -47,7 +47,8 @@ function ValidationBadge({ status }: { status: ValidationStatus }) {
     APROVADO:             { cls: 'bg-emerald-100 text-emerald-800 border-emerald-300', label: '✓ Aprovado' },
     REPROVADO:            { cls: 'bg-red-100 text-red-800 border-red-300',             label: '✗ Reprovado' },
   }
-  const { cls, label } = cfg[status]
+  const item = cfg[status] || { cls: 'bg-gray-100 text-gray-800 border-gray-300', label: String(status || 'Pendente') }
+  const { cls, label } = item
   return (
     <span className={cn('inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border', cls)}>
       {label}
