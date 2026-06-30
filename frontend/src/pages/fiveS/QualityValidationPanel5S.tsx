@@ -2,7 +2,7 @@
 // Painel de Validação 5S — Setor de Qualidade.
 // Desktop/tablet-first com suporte a mobile via cards responsivos.
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   ClipboardCheck,
   Clock,
@@ -26,13 +26,13 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import {
-  MOCK_AUDITS_5S,
   compute5SKPIs,
   VALIDATION_LABELS,
   STATUS_5S_LABELS,
   type Audit5SEntry,
   type ValidationStatus,
 } from '@/data/mockData'
+import { fiveSApi, type ApiAudit5S } from '@/lib/api'
 
 // ── Tipos locais ──────────────────────────────────────────────────────────────
 
@@ -405,12 +405,51 @@ function AuditRow({ audit, onOpen }: { audit: Audit5SEntry; onOpen: () => void }
 // ── Página Principal ──────────────────────────────────────────────────────────
 
 export default function QualityValidationPanel5S() {
-  const [audits, setAudits]           = useState<Audit5SEntry[]>(MOCK_AUDITS_5S)
+  const [audits, setAudits]           = useState<Audit5SEntry[]>([])
   const [selectedAudit, setSelectedAudit] = useState<Audit5SEntry | null>(null)
   const [filterValidation, setFilterValidation] = useState<FilterValidation>('ALL')
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'CONFORME' | 'NAO_CONFORME'>('ALL')
   const [search, setSearch]           = useState('')
   const [refreshing, setRefreshing]   = useState(false)
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState<string | null>(null)
+
+  const loadAudits = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const res = await fiveSApi.list({ limit: 100 })
+      const mapped = res.audits.map((a: ApiAudit5S) => ({
+        id: a.id,
+        worksiteId: a.worksiteId,
+        worksiteName: a.worksite?.name ?? 'Obra',
+        worksiteCity: a.worksite?.city ?? 'Cidade',
+        areaType: a.areaType as any,
+        status: a.status,
+        description: a.description ?? '',
+        photos: a.photos ?? [],
+        auditorEmployeeId: a.auditorEmployeeId,
+        auditorName: a.auditorEmployee?.fullName ?? 'Auditor',
+        auditorRegistration: a.auditorEmployee?.registration ?? '-',
+        validation: a.validation,
+        correctiveAction: a.correctiveAction ?? null,
+        validatorId: a.validatorUser?.id ?? null,
+        validatorEmail: a.validatorUser?.email ?? null,
+        createdAt: a.createdAt,
+        updatedAt: a.updatedAt,
+      }))
+      setAudits(mapped)
+    } catch (err: any) {
+      console.error('Erro ao carregar auditorias 5S:', err)
+      setError(err?.message ?? 'Falha ao carregar auditorias. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadAudits()
+  }, [loadAudits])
 
   const kpis = useMemo(() => compute5SKPIs(audits), [audits])
 
@@ -431,29 +470,23 @@ export default function QualityValidationPanel5S() {
   }, [audits, filterValidation, filterStatus, search])
 
   const handleValidate = useCallback(async (id: string, action: ValidateAction, correctiveAction?: string) => {
-    // Simula PATCH /api/v1/5s/audits/:id/validate
-    await new Promise((r) => setTimeout(r, 1_200))
-    setAudits((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? {
-              ...a,
-              validation:       action,
-              correctiveAction: correctiveAction ?? null,
-              validatorEmail:   'qualidade@3tengenharia.com',
-              validatorId:      'usr-current',
-              updatedAt:        new Date().toISOString(),
-            }
-          : a,
-      ),
-    )
-  }, [])
+    try {
+      await fiveSApi.validate(id, {
+        validation: action,
+        correctiveAction,
+      })
+      await loadAudits()
+    } catch (err: any) {
+      console.error('Erro ao validar auditoria:', err)
+      alert(err?.message ?? 'Falha ao salvar decisão.')
+    }
+  }, [loadAudits])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
-    await new Promise((r) => setTimeout(r, 800))
+    await loadAudits()
     setRefreshing(false)
-  }, [])
+  }, [loadAudits])
 
   return (
     <div className="space-y-6">
@@ -562,8 +595,19 @@ export default function QualityValidationPanel5S() {
           <p className="text-xs text-gray-400">Pendentes aparecem primeiro</p>
         </div>
 
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3 bg-white rounded-2xl border border-gray-100 shadow-card">
+            <Loader2 size={40} className="animate-spin text-brand-primary/50" />
+            <p className="text-sm font-medium">Carregando auditorias...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-16 text-red-500 gap-3 bg-white rounded-2xl border border-gray-100 shadow-card">
+            <AlertTriangle size={40} className="opacity-50" />
+            <p className="text-sm font-medium">{error}</p>
+            <Button size="sm" variant="outline" onClick={loadAudits}>Tentar Novamente</Button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3 bg-white rounded-2xl border border-gray-100 shadow-card">
             <ClipboardCheck size={40} className="opacity-30" />
             <p className="text-sm font-medium">Nenhuma auditoria encontrada</p>
             <p className="text-xs">Ajuste os filtros ou limpe a busca</p>

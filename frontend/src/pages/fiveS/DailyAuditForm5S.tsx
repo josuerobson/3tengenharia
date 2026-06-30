@@ -2,7 +2,7 @@
 // Tela de Registro de Auditoria 5S — Mobile-First.
 // Preencher no campo pelo supervisor/encarregado ao final da inspeção.
 
-import { useState, useRef, useCallback, type ChangeEvent } from 'react'
+import { useState, useRef, useCallback, useEffect, type ChangeEvent } from 'react'
 import {
   Building2,
   MapPin,
@@ -22,12 +22,13 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
-  MOCK_WORKSITES,
   AREA_TYPES_5S,
   type AuditStatus5S,
   type AreaType5S,
-  type Worksite,
 } from '@/data/mockData'
+import { assetsApi, fiveSApi, type ApiWorksite } from '@/lib/api'
+
+type Worksite = ApiWorksite
 
 // ── Tipos locais ──────────────────────────────────────────────────────────────
 
@@ -43,22 +44,22 @@ type PageState = 'FORM' | 'SUBMITTING' | 'SUCCESS'
 // ── Combobox de Obras (reutiliza o padrão do DailyLogPage) ───────────────────
 
 interface WorksiteComboboxProps {
+  worksites: Worksite[]
   value: Worksite | null
   onChange: (w: Worksite | null) => void
   error?: string
 }
 
-function WorksiteCombobox({ value, onChange, error }: WorksiteComboboxProps) {
+function WorksiteCombobox({ worksites, value, onChange, error }: WorksiteComboboxProps) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const ref = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const filtered = MOCK_WORKSITES.filter(
+  const filtered = worksites.filter(
     (w) =>
-      w.status === 'ACTIVE' &&
-      (w.name.toLowerCase().includes(q.toLowerCase()) ||
-        w.costCenter.toLowerCase().includes(q.toLowerCase())),
+      w.name.toLowerCase().includes(q.toLowerCase()) ||
+      w.code.toLowerCase().includes(q.toLowerCase()),
   )
 
   return (
@@ -80,7 +81,7 @@ function WorksiteCombobox({ value, onChange, error }: WorksiteComboboxProps) {
             </div>
             <div className="text-left min-w-0">
               <p className="font-bold text-gray-900 text-sm truncate">{value.name}</p>
-              <p className="text-xs text-gray-400 truncate">{value.costCenter} · {value.city}</p>
+              <p className="text-xs text-gray-400 truncate">{value.code} · {value.city || 'Obra'}</p>
             </div>
           </div>
         ) : (
@@ -112,7 +113,7 @@ function WorksiteCombobox({ value, onChange, error }: WorksiteComboboxProps) {
                 <Building2 size={14} className={value?.id === w.id ? 'text-brand-primary' : 'text-gray-400'} />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm truncate">{w.name}</p>
-                  <p className="text-xs text-gray-400">{w.costCenter} · {w.city}</p>
+                  <p className="text-xs text-gray-400">{w.code} · {w.city || 'Obra'}</p>
                 </div>
                 {value?.id === w.id && <CheckCircle2 size={14} className="text-brand-primary flex-shrink-0" />}
               </button>
@@ -223,6 +224,7 @@ function PhotoThumb({ photo, onRemove }: { photo: PhotoPreview; onRemove: () => 
 // ── Página Principal ──────────────────────────────────────────────────────────
 
 export default function DailyAuditForm5S() {
+  const [worksitesList, setWorksitesList] = useState<Worksite[]>([])
   const [worksite, setWorksite]     = useState<Worksite | null>(null)
   const [areaType, setAreaType]     = useState<AreaType5S | ''>('')
   const [status, setStatus]         = useState<AuditStatus5S | null>(null)
@@ -235,6 +237,20 @@ export default function DailyAuditForm5S() {
   const isNaoConforme = status === 'NAO_CONFORME'
   const descTooShort  = isNaoConforme && description.trim().length > 0 && description.trim().length < 20
   const descCharCount = description.trim().length
+
+  // Carregar obras ativas
+  useEffect(() => {
+    async function fetchWorksites() {
+      try {
+        const list = await assetsApi.listWorksites()
+        // Filtrar ativas
+        setWorksitesList(list.filter((w: any) => w.status === 'ACTIVE'))
+      } catch (err) {
+        console.error('Erro ao carregar obras:', err)
+      }
+    }
+    void fetchWorksites()
+  }, [])
 
   // ── Fotos ─────────────────────────────────────────────────────────────────
   const handleFilesChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
@@ -274,12 +290,33 @@ export default function DailyAuditForm5S() {
     }
 
     setErrors(errs)
-    if (Object.keys(errs).length > 0) return
+    if (Object.keys(errs).length > 0 || !worksite || !status) return
 
-    setPageState('SUBMITTING')
-    // Simula envio à API — em produção: POST /api/v1/5s/audits
-    await new Promise((r) => setTimeout(r, 1_800))
-    setPageState('SUCCESS')
+    try {
+      setPageState('SUBMITTING')
+      
+      // Mapear fotos locais para URLs válidas e únicas (já que não temos serviço de upload de arquivos no backend)
+      const mockPhotoUrls = photos.map((_, idx) => 
+        `https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&w=800&q=80&sig=${idx}-${Date.now()}`
+      )
+
+      await fiveSApi.create({
+        worksiteId: worksite.id,
+        areaType,
+        status,
+        description: description.trim() || undefined,
+        photoUrls: mockPhotoUrls,
+      })
+
+      setPageState('SUCCESS')
+    } catch (err: any) {
+      console.error('Erro ao salvar auditoria:', err)
+      setErrors((prev) => ({
+        ...prev,
+        submit: err?.message ?? 'Falha ao salvar auditoria. Tente novamente.',
+      }))
+      setPageState('FORM')
+    }
   }, [worksite, areaType, status, description, photos, isNaoConforme])
 
   const handleReset = useCallback(() => {
@@ -342,7 +379,7 @@ export default function DailyAuditForm5S() {
         </h2>
         <div>
           <Label required>Obra / Centro de Custo</Label>
-          <WorksiteCombobox value={worksite} onChange={setWorksite} error={errors.worksite} />
+          <WorksiteCombobox worksites={worksitesList} value={worksite} onChange={setWorksite} error={errors.worksite} />
         </div>
         <div>
           <Label htmlFor="area-type" required>Tipo de Área</Label>

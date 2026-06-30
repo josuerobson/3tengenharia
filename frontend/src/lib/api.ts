@@ -627,6 +627,91 @@ export const timeLogsApi = {
   },
 }
 
+export interface ApiAudit5S {
+  id: string
+  worksiteId: string
+  worksite: {
+    id: string
+    code: string
+    name: string
+    city: string
+  }
+  areaType: string
+  status: 'CONFORME' | 'NAO_CONFORME'
+  description?: string | null
+  photos: {
+    id: string
+    photoUrl: string
+    createdAt: string
+  }[]
+  auditorEmployeeId: string
+  auditorEmployee: {
+    id: string
+    fullName: string
+    registration: string
+  }
+  validation: 'AGUARDANDO_AVALIACAO' | 'APROVADO' | 'REPROVADO'
+  correctiveAction?: string | null
+  validatedByUserId?: string | null
+  validatorUser?: {
+    id: string
+    email: string
+  } | null
+  validatedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export const fiveSApi = {
+  list(params?: {
+    worksiteId?: string
+    status?: string
+    validation?: string
+    dateFrom?: string
+    dateTo?: string
+    page?: number
+    limit?: number
+  }): Promise<{ audits: ApiAudit5S[]; total: number; pages: number }> {
+    const query = new URLSearchParams()
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') {
+          query.set(k, String(v))
+        }
+      })
+    }
+    const qStr = query.toString()
+    return request(`/5s/audits${qStr ? `?${qStr}` : ''}`)
+  },
+
+  create(data: {
+    worksiteId: string
+    areaType: string
+    status: 'CONFORME' | 'NAO_CONFORME'
+    description?: string
+    photoUrls: string[]
+  }): Promise<{ message: string; audit: ApiAudit5S }> {
+    return request('/5s/audits', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  validate(
+    auditId: string,
+    data: {
+      validation: 'APROVADO' | 'REPROVADO'
+      correctiveAction?: string
+    },
+  ): Promise<{ message: string; audit: ApiAudit5S }> {
+    return request(`/5s/audits/${auditId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+}
+
+
 
 
 

@@ -306,8 +306,10 @@ export const fiveSService = {
           validatorUser: {
             select: { id: true, email: true, role: true },
           },
-          // Apenas contagem de fotos no listagem (URLs completas no endpoint de detalhe)
-          _count: { select: { photos: true } },
+          photos: {
+            select: { id: true, photoUrl: true, createdAt: true },
+            orderBy: { createdAt: 'asc' },
+          },
         },
       }),
     ])
