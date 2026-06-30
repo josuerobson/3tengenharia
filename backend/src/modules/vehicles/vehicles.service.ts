@@ -75,6 +75,14 @@ export class FinalKmBelowInitialError extends Error {
   }
 }
 
+export class OnlySelfTripCreationAllowedError extends Error {
+  readonly statusCode = 403
+  constructor() {
+    super('Usuários com perfil Colaborador só podem registrar viagens para si mesmos.')
+    this.name = 'OnlySelfTripCreationAllowedError'
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
@@ -155,7 +163,18 @@ export const vehiclesService = {
     body: StartTripBody,
     /** employeeId extraído do JWT (pode ser null se o usuário não tem employee) */
     jwtEmployeeId: string | null,
+    userRole: string,
   ) {
+    // ⚙️ REGRA DE NEGÓCIO: Colaboradores só podem criar viagem para si mesmos
+    if (userRole === 'COLLABORATOR') {
+      if (!jwtEmployeeId) {
+        throw new OnlySelfTripCreationAllowedError()
+      }
+      if (body.driverEmployeeId && body.driverEmployeeId !== jwtEmployeeId) {
+        throw new OnlySelfTripCreationAllowedError()
+      }
+    }
+
     // 1. Busca o veículo e valida existência
     const vehicle = await prisma.vehicle.findUnique({
       where: { id: body.vehicleId },

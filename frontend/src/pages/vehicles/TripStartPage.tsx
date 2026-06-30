@@ -22,6 +22,7 @@ import {
   User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,7 +32,7 @@ import {
   formatKm,
   formatDuration,
 } from '@/data/mockData'
-import { vehiclesApi, tripsApi, type ApiVehicle, type ApiTrip } from '@/lib/api'
+import { vehiclesApi, tripsApi, assetsApi, type ApiVehicle, type ApiTrip, type ApiEmployee } from '@/lib/api'
 
 // Usa ApiVehicle como tipo Vehicle para este componente
 type Vehicle = ApiVehicle
@@ -327,10 +328,12 @@ type TripPageState = 'STEP_1' | 'STEP_2' | 'COMPLETED'
 
 export default function TripStartPage() {
   const navigate = useNavigate()
+  const { user: currentUser } = useAuth()
 
   // ── Estados da API ─────────────────────────────────────────────────────────
   const [vehiclesList, setVehiclesList]       = useState<Vehicle[]>([])
   const [ongoingTrips, setOngoingTrips]       = useState<ApiTrip[]>([])
+  const [employeesList, setEmployeesList]     = useState<ApiEmployee[]>([])
   const [loadingVehicles, setLoadingVehicles] = useState(true)
   const [apiError, setApiError]               = useState<string | null>(null)
 
@@ -342,6 +345,7 @@ export default function TripStartPage() {
 
   // ── Dados do Passo 1 ───────────────────────────────────────────────────
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
+  const [selectedDriverId, setSelectedDriverId] = useState('')
   const [initialKm, setInitialKm]             = useState('')
   const [origin, setOrigin]                   = useState('')
   const [destination, setDestination]         = useState('')
@@ -359,19 +363,24 @@ export default function TripStartPage() {
     setLoadingVehicles(true)
     setApiError(null)
     try {
-      const [vehRes, tripsRes] = await Promise.all([
+      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+      const [vehRes, tripsRes, empRes] = await Promise.all([
         vehiclesApi.list(),
         tripsApi.list({ limit: 100 }),
+        isManagerOrAdmin ? assetsApi.listEmployees() : Promise.resolve([]),
       ])
       setVehiclesList(vehRes.vehicles)
       const openTrips = tripsRes.trips.filter(t => t.arrivalDateTime === null || t.finalKm === null)
       setOngoingTrips(openTrips)
+      if (isManagerOrAdmin && Array.isArray(empRes)) {
+        setEmployeesList(empRes)
+      }
     } catch (err) {
       setApiError(err instanceof Error ? err.message : 'Erro ao carregar dados do servidor.')
     } finally {
       setLoadingVehicles(false)
     }
-  }, [])
+  }, [currentUser])
 
   useEffect(() => {
     void fetchData()
@@ -437,9 +446,14 @@ export default function TripStartPage() {
     if (!origin.trim()) errors.origin = 'Informe a origem.'
     if (!destination.trim()) errors.destination = 'Informe o destino.'
 
+    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+    if (isManagerOrAdmin && !selectedDriverId) {
+      errors.driver = 'Selecione o motorista responsável pela viagem.'
+    }
+
     setStep1Errors(errors)
     return Object.keys(errors).length === 0
-  }, [selectedVehicle, initialKm, origin, destination])
+  }, [selectedVehicle, initialKm, origin, destination, currentUser, selectedDriverId])
 
   // ── Validação Passo 2 ─────────────────────────────────────────────────
   const validateStep2 = useCallback((): boolean => {
@@ -466,12 +480,14 @@ export default function TripStartPage() {
     setIsSubmitting(true)
     setApiError(null)
     try {
+      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
       const res = await tripsApi.start({
         vehicleId:   selectedVehicle.id,
         initialKm:   initialKmValue,
         origin:      origin.trim(),
         destination: destination.trim(),
         purpose:     purpose.trim() || undefined,
+        ...(isManagerOrAdmin && selectedDriverId ? { driverEmployeeId: selectedDriverId } : {}),
       })
       setActiveTripId(res.trip.id)
       setDepartureData({
@@ -488,7 +504,7 @@ export default function TripStartPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }, [validateStep1, selectedVehicle, initialKm, origin, destination, purpose])
+  }, [validateStep1, selectedVehicle, initialKm, origin, destination, purpose, currentUser, selectedDriverId])
 
   const handleStep2Submit = useCallback(async () => {
     if (!validateStep2() || !activeTripId) return
@@ -518,6 +534,7 @@ export default function TripStartPage() {
     setStep2Errors({})
     setActiveTripId(null)
     setApiError(null)
+    setSelectedDriverId('')
     void fetchData()
   }, [fetchData])
 
@@ -662,6 +679,42 @@ export default function TripStartPage() {
                 loadingVehicles={loadingVehicles}
               />
             </div>
+
+            {/* Motorista */}
+            {currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER' ? (
+              <div>
+                <Label htmlFor="driver" required>
+                  Motorista
+                </Label>
+                <select
+                  id="driver"
+                  value={selectedDriverId}
+                  onChange={(e) => setSelectedDriverId(e.target.value)}
+                  className="mt-1.5 w-full h-12 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+                  required
+                >
+                  <option value="">Selecionar motorista...</option>
+                  {employeesList.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.fullName} ({emp.registration} — {emp.position})
+                    </option>
+                  ))}
+                </select>
+                {step1Errors.driver && (
+                  <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                    <span className="font-semibold">⚠</span> {step1Errors.driver}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <Label>Motorista</Label>
+                <div className="mt-1.5 flex items-center gap-3 w-full h-12 px-4 rounded-xl border border-gray-100 bg-gray-50 text-sm text-gray-500 font-medium">
+                  <User size={16} className="text-gray-400" />
+                  <span>{currentUser?.name || 'Carregando...'}</span>
+                </div>
+              </div>
+            )}
 
             {/* KM Inicial */}
             <div>

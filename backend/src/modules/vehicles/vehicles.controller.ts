@@ -15,6 +15,7 @@ import {
   TripAlreadyEndedError,
   FinalKmBelowInitialError,
   VehicleAlreadyInTripError,
+  OnlySelfTripCreationAllowedError,
 } from './vehicles.service.js'
 
 /** Erros de domínio deste módulo — re-lançados para o error-handler global */
@@ -26,6 +27,7 @@ const DOMAIN_ERRORS = [
   TripAlreadyEndedError,
   FinalKmBelowInitialError,
   VehicleAlreadyInTripError,
+  OnlySelfTripCreationAllowedError,
 ]
 
 function rethrowDomain(err: unknown): never {
@@ -43,10 +45,11 @@ export function vehiclesController(_app: FastifyInstance) {
 
       // O employeeId do JWT é usado como fallback para o motorista
       const jwtEmployeeId = request.currentUser.employeeId
+      const userRole = request.currentUser.role
 
       let result: Awaited<ReturnType<typeof vehiclesService.startTrip>>
       try {
-        result = await vehiclesService.startTrip(body, jwtEmployeeId)
+        result = await vehiclesService.startTrip(body, jwtEmployeeId, userRole)
       } catch (err) {
         rethrowDomain(err)
       }
