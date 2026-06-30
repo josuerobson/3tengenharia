@@ -6,6 +6,7 @@ import type {
   CreateLoanBody,
   CreateMaintenanceLogBody,
   CreateAssetBody,
+  ReturnLoanBody,
 } from './assets.schema.js'
 
 // ── Erros de domínio ──────────────────────────────────────────────────────────
@@ -64,6 +65,22 @@ export class EmployeeNotFoundError extends Error {
   }
 }
 
+export class LoanNotFoundError extends Error {
+  readonly statusCode = 404
+  constructor(id: string) {
+    super(`Empréstimo não encontrado: ${id}`)
+    this.name = 'LoanNotFoundError'
+  }
+}
+
+export class LoanAlreadyReturnedError extends Error {
+  readonly statusCode = 409
+  constructor(id: string) {
+    super(`Este empréstimo (${id}) já foi devolvido.`)
+    this.name = 'LoanAlreadyReturnedError'
+  }
+}
+
 // ── Seletor de bem patrimonial ────────────────────────────────────────────────
 
 const assetBaseSelect = {
@@ -108,6 +125,7 @@ export const assetsService = {
       acquisitionValue: asset.acquisitionValue ? Number(asset.acquisitionValue) : null,
       notes: asset.notes,
       currentBorrowee: asset.loans[0]?.borrowerEmployee?.fullName ?? null,
+      activeLoanId: asset.loans[0]?.id ?? null,
     }))
   },
 
@@ -246,6 +264,44 @@ export const assetsService = {
       // Status anterior para referência no response
       previousStatus: asset.currentStatus,
     }
+  },
+
+  // ── POST /assets/loans/:id/return ──────────────────────────────────────────
+  async returnLoan(loanId: string, body: ReturnLoanBody) {
+    // 1. Busca o empréstimo ativo
+    const loan = await prisma.assetLoan.findUnique({
+      where: { id: loanId },
+      include: { asset: { select: assetBaseSelect } },
+    })
+
+    if (!loan) throw new LoanNotFoundError(loanId)
+
+    // 2. Valida que o empréstimo não foi retornado ainda
+    if (loan.isReturned) {
+      throw new LoanAlreadyReturnedError(loanId)
+    }
+
+    // 3. Atualiza o empréstimo
+    const updatedLoan = await prisma.assetLoan.update({
+      where: { id: loanId },
+      data: {
+        isReturned: true,
+        returnedAt: body.returnedAt ?? new Date(),
+        returnNotes: body.returnNotes ?? null,
+      },
+      include: {
+        asset: { select: assetBaseSelect },
+        borrowerEmployee: { select: { id: true, fullName: true, registration: true } },
+      },
+    })
+
+    // 4. Atualiza o status do bem para AVAILABLE
+    await prisma.asset.update({
+      where: { id: loan.assetId },
+      data: { currentStatus: 'AVAILABLE' },
+    })
+
+    return updatedLoan
   },
 
   // ── GET /assets/employees ──────────────────────────────────────────────────

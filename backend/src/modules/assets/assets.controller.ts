@@ -5,6 +5,7 @@ import {
   createLoanBodySchema,
   createMaintenanceLogBodySchema,
   createAssetBodySchema,
+  returnLoanBodySchema,
 } from './assets.schema.js'
 import {
   assetsService,
@@ -14,6 +15,8 @@ import {
   EmployeeNotFoundError,
   DuplicateAssetTagError,
   DuplicateSerialNumberError,
+  LoanNotFoundError,
+  LoanAlreadyReturnedError,
 } from './assets.service.js'
 
 const DOMAIN_ERRORS = [
@@ -23,6 +26,8 @@ const DOMAIN_ERRORS = [
   EmployeeNotFoundError,
   DuplicateAssetTagError,
   DuplicateSerialNumberError,
+  LoanNotFoundError,
+  LoanAlreadyReturnedError,
 ]
 
 function rethrowDomain(err: unknown): never {
@@ -66,6 +71,24 @@ export function assetsController(_app: FastifyInstance) {
 
       return reply.status(201).send({
         message: `Saída do bem "${loan.asset.assetTag}" registrada com sucesso. Status atualizado para LOANED.`,
+        loan,
+      })
+    },
+
+    // ── POST /assets/loans/:id/return ────────────────────────────────────────
+    async returnLoan(request: FastifyRequest, reply: FastifyReply) {
+      const params = request.params as { id: string }
+      const body = returnLoanBodySchema.parse(request.body)
+
+      let loan: Awaited<ReturnType<typeof assetsService.returnLoan>>
+      try {
+        loan = await assetsService.returnLoan(params.id, body)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+
+      return reply.status(200).send({
+        message: `Devolução do bem "${loan.asset.assetTag}" registrada com sucesso. Status atualizado para AVAILABLE.`,
         loan,
       })
     },

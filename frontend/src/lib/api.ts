@@ -404,6 +404,16 @@ export const assetsApi = {
       body: JSON.stringify(data),
     })
   },
+
+  returnLoan(loanId: string, data: {
+    returnedAt?: string | null
+    returnNotes?: string | null
+  }): Promise<{ message: string; loan: any }> {
+    return request(`/assets/loans/${loanId}/return`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
 }
 
 export interface ApiEmployee {

@@ -139,6 +139,50 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     controller.createLoan,
   )
 
+  // ── POST /assets/loans/:id/return ──────────────────────────────────────────
+  // Requer: MANAGER ou ADMIN
+  app.post(
+    '/loans/:id/return',
+    {
+      onRequest: [
+        app.authenticate,
+        app.requireRole([UserRole.MANAGER, UserRole.ADMIN]),
+      ],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Registrar devolução de bem patrimonial emprestado',
+        description: 'Encerra o registro de empréstimo e altera o status do bem de volta para AVAILABLE.',
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          properties: {
+            returnedAt: { type: 'string', format: 'date-time' },
+            returnNotes: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              message: { type: 'string' },
+              loan: { type: 'object' },
+            },
+          },
+          404: { type: 'object', properties: { statusCode: { type: 'number' }, error: { type: 'string' }, message: { type: 'string' } } },
+          409: { type: 'object', properties: { statusCode: { type: 'number' }, error: { type: 'string' }, message: { type: 'string' } } },
+        },
+      },
+    },
+    controller.returnLoan,
+  )
+
   // ── POST /assets/maintenance ───────────────────────────────────────────────
   // Requer: qualquer usuário autenticado pode abrir um chamado de avaria
   app.post(

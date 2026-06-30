@@ -83,3 +83,13 @@ export const createAssetBodySchema = z.object({
 
 export type CreateAssetBody = z.infer<typeof createAssetBodySchema>
 
+// ── Return Loan ──────────────────────────────────────────────────────────────
+
+export const returnLoanBodySchema = z.object({
+  returnedAt: z.coerce.date().optional(),
+  returnNotes: z.string().trim().max(1000).optional(),
+})
+
+export type ReturnLoanBody = z.infer<typeof returnLoanBodySchema>
+
+

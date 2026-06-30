@@ -63,6 +63,13 @@ export default function WarehousePage() {
   const [modalSubmitting, setModalSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
 
+  // Modal Devolução
+  const [returnModalOpen, setReturnModalOpen] = useState(false)
+  const [selectedAssetForReturn, setSelectedAssetForReturn] = useState<Asset | null>(null)
+  const [returnNotes, setReturnNotes] = useState('')
+  const [returnSubmitting, setReturnSubmitting] = useState(false)
+  const [returnError, setReturnError] = useState<string | null>(null)
+
   // ── Carregar Dados ─────────────────────────────────────────────────────────
   const loadAssets = useCallback(async () => {
     try {
@@ -81,6 +88,32 @@ export default function WarehousePage() {
   useEffect(() => {
     loadAssets()
   }, [loadAssets])
+
+  const handleOpenReturnModal = useCallback((asset: Asset) => {
+    setSelectedAssetForReturn(asset)
+    setReturnNotes('')
+    setReturnError(null)
+    setReturnModalOpen(true)
+  }, [])
+
+  const handleReturnSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedAssetForReturn?.activeLoanId) return
+    try {
+      setReturnSubmitting(true)
+      setReturnError(null)
+      await assetsApi.returnLoan(selectedAssetForReturn.activeLoanId, {
+        returnNotes: returnNotes.trim() || undefined,
+      })
+      setReturnModalOpen(false)
+      loadAssets()
+    } catch (err: any) {
+      console.error('Erro ao devolver item:', err)
+      setReturnError(err?.message ?? 'Falha ao devolver item. Tente novamente.')
+    } finally {
+      setReturnSubmitting(false)
+    }
+  }, [selectedAssetForReturn, returnNotes, loadAssets])
 
   // ── Métricas (KPIs) ────────────────────────────────────────────────────────
   const metrics = useMemo(() => {
@@ -504,6 +537,19 @@ export default function WarehousePage() {
                           </div>
                         </div>
                       </div>
+                      {isManagerOrAdmin && (
+                        <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenReturnModal(asset)}
+                            className="text-xs font-semibold flex items-center gap-1.5 border-brand-primary text-brand-primary hover:bg-brand-primary/5 h-9 rounded-lg"
+                          >
+                            <ArrowLeftRight size={13} />
+                            Devolver Ferramenta
+                          </Button>
+                        </div>
+                      )}
                     </Card>
                   ))}
                 </div>
@@ -735,6 +781,78 @@ export default function WarehousePage() {
                 </>
               ) : (
                 'Cadastrar Item'
+              )}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* ── Modal de Devolução (Dialog) ────────────────────────────────────────── */}
+      <Dialog
+        open={returnModalOpen}
+        onClose={() => setReturnModalOpen(false)}
+        title="Registrar Devolução"
+        description={`Registrar devolução do bem patrimonial ${selectedAssetForReturn?.assetTag}`}
+      >
+        <form onSubmit={handleReturnSubmit} className="space-y-4 pt-2">
+          {returnError && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2.5 text-xs text-red-600">
+              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+              <p className="font-semibold">{returnError}</p>
+            </div>
+          )}
+
+          <div>
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2 mb-2">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                Resumo do Empréstimo
+              </p>
+              <div className="flex justify-between text-xs text-gray-700">
+                <span className="font-medium text-gray-500">Ferramenta:</span>
+                <span className="font-semibold text-gray-900">{selectedAssetForReturn?.description}</span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-700">
+                <span className="font-medium text-gray-500">Responsável:</span>
+                <span className="font-semibold text-gray-900">{selectedAssetForReturn?.currentBorrowee}</span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-700">
+                <span className="font-medium text-gray-500">Localização atual:</span>
+                <span className="font-semibold text-gray-900">{selectedAssetForReturn?.location ?? 'Obra externa'}</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="returnNotes">Observações da Devolução (opcional)</Label>
+            <Textarea
+              id="returnNotes"
+              placeholder="Ex: Devolvido limpo e funcionando perfeitamente."
+              value={returnNotes}
+              onChange={(e) => setReturnNotes(e.target.value)}
+              className="min-h-[80px] mt-1.5"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setReturnModalOpen(false)}
+              disabled={returnSubmitting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={returnSubmitting}
+            >
+              {returnSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Devolvendo...
+                </>
+              ) : (
+                'Confirmar Devolução'
               )}
             </Button>
           </div>
