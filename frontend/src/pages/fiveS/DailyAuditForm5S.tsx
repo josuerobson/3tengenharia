@@ -22,9 +22,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
-  AREA_TYPES_5S,
   type AuditStatus5S,
-  type AreaType5S,
 } from '@/data/mockData'
 import { assetsApi, fiveSApi, type ApiWorksite } from '@/lib/api'
 
@@ -225,8 +223,12 @@ function PhotoThumb({ photo, onRemove }: { photo: PhotoPreview; onRemove: () => 
 
 export default function DailyAuditForm5S() {
   const [worksitesList, setWorksitesList] = useState<Worksite[]>([])
+  const [areaTypesList, setAreaTypesList] = useState<string[]>(['Canteiro', 'Almoxarifado', 'Escritório', 'Área Comum'])
+  const [isAddingNewArea, setIsAddingNewArea] = useState(false)
+  const [newAreaInput, setNewAreaInput] = useState('')
+
   const [worksite, setWorksite]     = useState<Worksite | null>(null)
-  const [areaType, setAreaType]     = useState<AreaType5S | ''>('')
+  const [areaType, setAreaType]     = useState<string>('')
   const [status, setStatus]         = useState<AuditStatus5S | null>(null)
   const [description, setDescription] = useState('')
   const [photos, setPhotos]         = useState<PhotoPreview[]>([])
@@ -238,17 +240,29 @@ export default function DailyAuditForm5S() {
   const descTooShort  = isNaoConforme && description.trim().length > 0 && description.trim().length < 20
   const descCharCount = description.trim().length
 
-  // Carregar obras ativas
+  // Carregar obras e tipos de áreas existentes
   useEffect(() => {
-    async function fetchWorksites() {
+    async function fetchData() {
       try {
-        const list = await assetsApi.listWorksites()
+        const [list, resAudits] = await Promise.all([
+          assetsApi.listWorksites(),
+          fiveSApi.list({ limit: 100 })
+        ])
         setWorksitesList(list)
+
+        const uniqueTypes = Array.from(new Set([
+          'Canteiro',
+          'Almoxarifado',
+          'Escritório',
+          'Área Comum',
+          ...resAudits.audits.map((a: any) => a.areaType).filter(Boolean)
+        ]))
+        setAreaTypesList(uniqueTypes)
       } catch (err) {
-        console.error('Erro ao carregar obras:', err)
+        console.error('Erro ao carregar dados iniciais:', err)
       }
     }
-    void fetchWorksites()
+    void fetchData()
   }, [])
 
   // ── Fotos ─────────────────────────────────────────────────────────────────
@@ -322,6 +336,7 @@ export default function DailyAuditForm5S() {
     photos.forEach((p) => URL.revokeObjectURL(p.objectUrl))
     setWorksite(null); setAreaType(''); setStatus(null)
     setDescription(''); setPhotos([]); setErrors({})
+    setIsAddingNewArea(false); setNewAreaInput('')
     setPageState('FORM')
   }, [photos])
 
@@ -382,24 +397,68 @@ export default function DailyAuditForm5S() {
         </div>
         <div>
           <Label htmlFor="area-type" required>Tipo de Área</Label>
-          <div className="relative">
-            <select
-              id="area-type"
-              value={areaType}
-              onChange={(e) => setAreaType(e.target.value as AreaType5S)}
-              className={cn(
-                'flex h-14 w-full rounded-2xl border bg-white px-4 text-sm font-semibold',
-                'text-gray-900 focus:outline-none transition-all appearance-none',
-                errors.areaType
-                  ? 'border-red-400 focus:border-red-400'
-                  : 'border-gray-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20',
-              )}
-            >
-              <option value="">Selecione o tipo de área...</option>
-              {AREA_TYPES_5S.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
+          {isAddingNewArea ? (
+            <div className="space-y-2">
+              <div className="relative">
+                <input
+                  id="area-type-new"
+                  type="text"
+                  placeholder="Digite o nome da nova área..."
+                  value={newAreaInput}
+                  onChange={(e) => {
+                    setNewAreaInput(e.target.value)
+                    setAreaType(e.target.value)
+                  }}
+                  className={cn(
+                    'flex h-14 w-full rounded-2xl border bg-white px-4 text-sm font-semibold',
+                    'text-gray-900 focus:outline-none transition-all',
+                    errors.areaType
+                      ? 'border-red-400 focus:border-red-400'
+                      : 'border-gray-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20',
+                  )}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingNewArea(false)
+                  setAreaType('')
+                }}
+                className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1 mt-1.5"
+              >
+                ← Escolher área existente
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <select
+                id="area-type"
+                value={areaType}
+                onChange={(e) => {
+                  const val = e.target.value
+                  if (val === '__NEW__') {
+                    setIsAddingNewArea(true)
+                    setNewAreaInput('')
+                    setAreaType('')
+                  } else {
+                    setAreaType(val)
+                  }
+                }}
+                className={cn(
+                  'flex h-14 w-full rounded-2xl border bg-white px-4 text-sm font-semibold',
+                  'text-gray-900 focus:outline-none transition-all appearance-none',
+                  errors.areaType
+                    ? 'border-red-400 focus:border-red-400'
+                    : 'border-gray-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20',
+                )}
+              >
+                <option value="">Selecione o tipo de área...</option>
+                {areaTypesList.map((t) => <option key={t} value={t}>{t}</option>)}
+                <option value="__NEW__" className="text-brand-primary font-bold">+ Adicionar novo tipo de área...</option>
+              </select>
+              <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          )}
           {errors.areaType && <p className="mt-1.5 text-xs text-red-500 font-medium">⚠ {errors.areaType}</p>}
         </div>
       </section>
