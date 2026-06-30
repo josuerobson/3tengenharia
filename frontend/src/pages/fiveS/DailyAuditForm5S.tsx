@@ -243,13 +243,17 @@ export default function DailyAuditForm5S() {
   // Carregar obras e tipos de áreas existentes
   useEffect(() => {
     async function fetchData() {
+      // 1. Carrega as obras (obrigatório)
       try {
-        const [list, resAudits] = await Promise.all([
-          assetsApi.listWorksites(),
-          fiveSApi.list({ limit: 100 })
-        ])
+        const list = await assetsApi.listWorksites()
         setWorksitesList(list)
+      } catch (err) {
+        console.error('Erro ao carregar obras:', err)
+      }
 
+      // 2. Carrega as auditorias (opcional - falha silenciosamente se for colaborador sem permissão)
+      try {
+        const resAudits = await fiveSApi.list({ limit: 100 })
         const uniqueTypes = Array.from(new Set([
           'Canteiro',
           'Almoxarifado',
@@ -259,7 +263,7 @@ export default function DailyAuditForm5S() {
         ]))
         setAreaTypesList(uniqueTypes)
       } catch (err) {
-        console.error('Erro ao carregar dados iniciais:', err)
+        console.log('Não foi possível carregar tipos de áreas extras:', err)
       }
     }
     void fetchData()
