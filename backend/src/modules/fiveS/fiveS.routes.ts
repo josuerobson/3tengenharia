@@ -18,6 +18,59 @@ const errorResponseSchema = {
   },
 }
 
+const auditSchema = {
+  type: 'object',
+  properties: {
+    id:              { type: 'string' },
+    worksiteId:      { type: 'string' },
+    areaType:        { type: 'string' },
+    status:          { type: 'string' },
+    validation:      { type: 'string' },
+    description:     { type: 'string', nullable: true },
+    correctiveAction: { type: 'string', nullable: true },
+    validatorUserId: { type: 'string', nullable: true },
+    auditorEmployeeId: { type: 'string' },
+    createdAt:       { type: 'string' },
+    updatedAt:       { type: 'string' },
+    worksite: {
+      type: 'object',
+      properties: {
+        id:   { type: 'string' },
+        name: { type: 'string' },
+        code: { type: 'string' },
+        city: { type: 'string' },
+      },
+    },
+    auditorEmployee: {
+      type: 'object',
+      properties: {
+        id:           { type: 'string' },
+        fullName:     { type: 'string' },
+        registration: { type: 'string' },
+      },
+    },
+    validatorUser: {
+      type: ['object', 'null'],
+      properties: {
+        id:    { type: 'string' },
+        email: { type: 'string' },
+        role:  { type: 'string' },
+      },
+    },
+    photos: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id:       { type: 'string' },
+          photoUrl: { type: 'string' },
+          createdAt:{ type: 'string' },
+        },
+      },
+    },
+  },
+}
+
 export async function fiveSRoutes(app: FastifyInstance): Promise<void> {
   const controller = fiveSController(app)
 
@@ -76,7 +129,7 @@ export async function fiveSRoutes(app: FastifyInstance): Promise<void> {
             properties: {
               message:     { type: 'string' },
               photosCount: { type: 'number' },
-              audit:       { type: 'object' },
+              audit:       auditSchema,
             },
           },
           404: { ...errorResponseSchema, description: 'Obra ou colaborador não encontrado.' },
@@ -133,7 +186,7 @@ export async function fiveSRoutes(app: FastifyInstance): Promise<void> {
             description: 'Auditoria validada com sucesso.',
             properties: {
               message: { type: 'string' },
-              audit:   { type: 'object' },
+              audit:   auditSchema,
             },
           },
           403: { ...errorResponseSchema, description: 'Acesso negado — perfil insuficiente.' },
@@ -208,7 +261,7 @@ export async function fiveSRoutes(app: FastifyInstance): Promise<void> {
             type:        'object',
             description: 'Listagem de auditorias com paginação e KPIs.',
             properties: {
-              data:       { type: 'array', items: { type: 'object' } },
+              data:       { type: 'array', items: auditSchema },
               pagination: {
                 type: 'object',
                 properties: {
