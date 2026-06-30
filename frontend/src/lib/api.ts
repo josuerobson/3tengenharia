@@ -681,7 +681,7 @@ export const fiveSApi = {
       })
     }
     const qStr = query.toString()
-    return request(`/5s/audits${qStr ? `?${qStr}` : ''}`)
+    return request(`/5s/reports${qStr ? `?${qStr}` : ''}`)
   },
 
   create(data: {
