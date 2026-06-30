@@ -681,7 +681,11 @@ export const fiveSApi = {
       })
     }
     const qStr = query.toString()
-    return request(`/5s/reports${qStr ? `?${qStr}` : ''}`)
+    return request(`/5s/reports${qStr ? `?${qStr}` : ''}`).then((res: any) => ({
+      audits: res.data || [],
+      total: res.pagination?.total ?? 0,
+      pages: res.pagination?.totalPages ?? 1,
+    }))
   },
 
   create(data: {
