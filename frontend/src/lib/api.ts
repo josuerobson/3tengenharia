@@ -384,6 +384,18 @@ export const assetsApi = {
     })
   },
 
+  resolveMaintenance(data: {
+    assetId: string
+    resolutionNotes: string
+    repairCost: number
+    action: 'RESOLVED' | 'WRITTEN_OFF'
+  }): Promise<{ message: string; maintenanceLog: any }> {
+    return request('/assets/maintenance/resolve', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
   listEmployees(): Promise<ApiEmployee[]> {
     return request('/assets/employees')
   },

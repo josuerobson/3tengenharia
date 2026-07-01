@@ -7,6 +7,7 @@ import type {
   CreateMaintenanceLogBody,
   CreateAssetBody,
   ReturnLoanBody,
+  ResolveMaintenanceLogBody,
 } from './assets.schema.js'
 
 // ── Erros de domínio ──────────────────────────────────────────────────────────
@@ -318,7 +319,6 @@ export const assetsService = {
     })
   },
 
-  // ── GET /assets/worksites ──────────────────────────────────────────────────
   async listWorksites() {
     return prisma.worksite.findMany({
       where: { isActive: true },
@@ -329,5 +329,54 @@ export const assetsService = {
       },
       orderBy: { name: 'asc' },
     })
+  },
+
+  // ── POST /assets/maintenance/resolve ───────────────────────────────────────
+  async resolveMaintenanceLog(
+    body: ResolveMaintenanceLogBody,
+    resolvedByUserId: string | null,
+  ) {
+    // 1. Busca o bem patrimonial
+    const asset = await prisma.asset.findUnique({
+      where: { id: body.assetId },
+      include: {
+        maintenanceLogs: {
+          where: { maintenanceStatus: { in: ['OPEN', 'IN_PROGRESS'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    })
+
+    if (!asset) throw new AssetNotFoundError(body.assetId)
+
+    // Encontra o log ativo de manutenção
+    const activeLog = asset.maintenanceLogs[0]
+    if (!activeLog) {
+      throw new Error(`Não há chamados de manutenção em aberto para o bem "${asset.assetTag}".`)
+    }
+
+    // 2. Atualiza o log de manutenção
+    const updatedLog = await prisma.assetMaintenanceLog.update({
+      where: { id: activeLog.id },
+      data: {
+        resolutionNotes: body.resolutionNotes,
+        repairCost: body.repairCost,
+        maintenanceStatus: body.action,
+        resolvedAt: new Date(),
+      },
+      include: {
+        asset: { select: assetBaseSelect },
+      },
+    })
+
+    // 3. Atualiza o status do bem patrimonial
+    const nextStatus = body.action === 'RESOLVED' ? 'AVAILABLE' : 'WRITTEN_OFF'
+    await prisma.asset.update({
+      where: { id: body.assetId },
+      data: { currentStatus: nextStatus },
+    })
+
+    return updatedLog
   },
 }

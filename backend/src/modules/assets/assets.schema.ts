@@ -92,4 +92,28 @@ export const returnLoanBodySchema = z.object({
 
 export type ReturnLoanBody = z.infer<typeof returnLoanBodySchema>
 
+export const resolveMaintenanceLogBodySchema = z.object({
+  assetId: z
+    .string({ required_error: 'assetId é obrigatório.' })
+    .cuid('ID do bem inválido.'),
+
+  resolutionNotes: z
+    .string({ required_error: 'resolutionNotes é obrigatório.' })
+    .min(5, 'Descreva a resolução com pelo menos 5 caracteres.')
+    .max(2000)
+    .trim(),
+
+  repairCost: z.coerce
+    .number({ required_error: 'repairCost é obrigatório.' })
+    .min(0, 'Custo de reparo não pode ser negativo.'),
+
+  action: z.enum(['RESOLVED', 'WRITTEN_OFF'], {
+    required_error: 'Ação é obrigatória (RESOLVED ou WRITTEN_OFF).',
+  }),
+})
+
+export type ResolveMaintenanceLogBody = z.infer<
+  typeof resolveMaintenanceLogBodySchema
+>
+
 

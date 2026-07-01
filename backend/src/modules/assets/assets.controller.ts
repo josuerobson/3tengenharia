@@ -6,6 +6,7 @@ import {
   createMaintenanceLogBodySchema,
   createAssetBodySchema,
   returnLoanBodySchema,
+  resolveMaintenanceLogBodySchema,
 } from './assets.schema.js'
 import {
   assetsService,
@@ -125,6 +126,26 @@ export function assetsController(_app: FastifyInstance) {
     async listWorksites(request: FastifyRequest, reply: FastifyReply) {
       const worksites = await assetsService.listWorksites()
       return reply.status(200).send(worksites)
+    },
+
+    // ── POST /assets/maintenance/resolve ─────────────────────────────────────
+    async resolveMaintenanceLog(request: FastifyRequest, reply: FastifyReply) {
+      const body = resolveMaintenanceLogBodySchema.parse(request.body)
+      const userId = request.currentUser.sub
+
+      let result
+      try {
+        result = await assetsService.resolveMaintenanceLog(body, userId)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+
+      return reply.status(200).send({
+        message:
+          `Manutenção resolvida para o bem "${result.asset.assetTag}". ` +
+          `Status do bem alterado para ${result.asset.currentStatus}.`,
+        maintenanceLog: result,
+      })
     },
   }
 }

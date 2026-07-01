@@ -46,6 +46,7 @@ enum AssetStatus {
   LOANED // Emprestado / em uso por colaborador
   MAINTENANCE // Aguardando ou em manutenção
   DAMAGED // Danificado — aguarda avaliação
+  WRITTEN_OFF // Bem baixado/descartado após avaria
 }
 
 /// Estado de resolução de um registro de manutenção/avaria

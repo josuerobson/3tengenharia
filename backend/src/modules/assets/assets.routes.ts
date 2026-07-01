@@ -58,10 +58,10 @@ const maintenanceLogResponseSchema = {
     defectPhotoUrl: { type: 'string', nullable: true },
     reportedByUserId: { type: 'string', nullable: true },
     reportedAt: { type: 'string' },
-    resolutionStatus: { type: 'string' },
+    maintenanceStatus: { type: 'string' },
+    repairCost: { type: 'number', nullable: true },
     resolvedAt: { type: 'string', nullable: true },
     resolutionNotes: { type: 'string', nullable: true },
-    resolvedByUserId: { type: 'string', nullable: true },
     asset: {
       type: 'object',
       properties: {
@@ -71,13 +71,6 @@ const maintenanceLogResponseSchema = {
         brand: { type: 'string', nullable: true },
         model: { type: 'string', nullable: true },
         currentStatus: { type: 'string' },
-      },
-    },
-    reportedByUser: {
-      type: ['object', 'null'],
-      properties: {
-        id: { type: 'string' },
-        email: { type: 'string' },
       },
     },
   },
@@ -299,6 +292,43 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     controller.createMaintenanceLog,
+  )
+
+  // ── POST /assets/maintenance/resolve ───────────────────────────────────────
+  app.post(
+    '/maintenance/resolve',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Registrar reparo/resolução de manutenção',
+        description:
+          'Registra o conserto ou baixa de um bem em manutenção, alterando seu status ' +
+          'para AVAILABLE ou WRITTEN_OFF, informando custos e descrição do reparo.',
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['assetId', 'resolutionNotes', 'repairCost', 'action'],
+          properties: {
+            assetId: { type: 'string' },
+            resolutionNotes: { type: 'string', minLength: 5 },
+            repairCost: { type: 'number', minimum: 0 },
+            action: { type: 'string', enum: ['RESOLVED', 'WRITTEN_OFF'] },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              message: { type: 'string' },
+              maintenanceLog: maintenanceLogResponseSchema,
+            },
+          },
+          404: { type: 'object', properties: { statusCode: { type: 'number' }, error: { type: 'string' }, message: { type: 'string' } } },
+        },
+      },
+    },
+    controller.resolveMaintenanceLog,
   )
 
   // ── GET /assets/employees ──────────────────────────────────────────────────

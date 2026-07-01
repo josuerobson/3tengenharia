@@ -70,6 +70,15 @@ export default function WarehousePage() {
   const [returnSubmitting, setReturnSubmitting] = useState(false)
   const [returnError, setReturnError] = useState<string | null>(null)
 
+  // Modal Reparo/Manutenção
+  const [repairModalOpen, setRepairModalOpen] = useState(false)
+  const [selectedAssetForRepair, setSelectedAssetForRepair] = useState<Asset | null>(null)
+  const [resolutionNotes, setResolutionNotes] = useState('')
+  const [repairCost, setRepairCost] = useState('')
+  const [repairAction, setRepairAction] = useState<'RESOLVED' | 'WRITTEN_OFF'>('RESOLVED')
+  const [repairSubmitting, setRepairSubmitting] = useState(false)
+  const [repairError, setRepairError] = useState<string | null>(null)
+
   // ── Carregar Dados ─────────────────────────────────────────────────────────
   const loadAssets = useCallback(async () => {
     try {
@@ -114,6 +123,39 @@ export default function WarehousePage() {
       setReturnSubmitting(false)
     }
   }, [selectedAssetForReturn, returnNotes, loadAssets])
+
+  const handleRepairSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedAssetForRepair) return
+
+    const parsedCost = parseFloat(repairCost.replace(',', '.'))
+    if (isNaN(parsedCost) || parsedCost < 0) {
+      setRepairError('Custo de reparo deve ser um valor numérico válido maior ou igual a zero.')
+      return
+    }
+
+    try {
+      setRepairSubmitting(true)
+      setRepairError(null)
+      await assetsApi.resolveMaintenance({
+        assetId: selectedAssetForRepair.id,
+        resolutionNotes: resolutionNotes.trim(),
+        repairCost: parsedCost,
+        action: repairAction,
+      })
+      setRepairModalOpen(false)
+      setSelectedAssetForRepair(null)
+      setResolutionNotes('')
+      setRepairCost('')
+      setRepairAction('RESOLVED')
+      loadAssets()
+    } catch (err: any) {
+      console.error(err)
+      setRepairError(err?.message ?? 'Erro ao relatar o reparo do equipamento.')
+    } finally {
+      setRepairSubmitting(false)
+    }
+  }
 
   // ── Métricas (KPIs) ────────────────────────────────────────────────────────
   const metrics = useMemo(() => {
@@ -472,6 +514,23 @@ export default function WarehousePage() {
                                 className="text-red-500 hover:text-red-700 hover:bg-red-50 font-bold"
                               >
                                 Relatar Defeito
+                              </Button>
+                            )}
+                            {asset.currentStatus === 'MAINTENANCE' && isManagerOrAdmin && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setSelectedAssetForRepair(asset)
+                                  setRepairModalOpen(true)
+                                  setResolutionNotes('')
+                                  setRepairCost('0,00')
+                                  setRepairAction('RESOLVED')
+                                  setRepairError(null)
+                                }}
+                                className="text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 font-bold"
+                              >
+                                Relatar Reparo
                               </Button>
                             )}
                           </td>
@@ -853,6 +912,118 @@ export default function WarehousePage() {
                 </>
               ) : (
                 'Confirmar Devolução'
+              )}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* ── Modal de Reparo/Resolução (Dialog) ────────────────────────────────── */}
+      <Dialog
+        open={repairModalOpen}
+        onClose={() => setRepairModalOpen(false)}
+        title="Relatar Conserto / Reparo"
+        description={`Registrar conserto do bem patrimonial ${selectedAssetForRepair?.assetTag}`}
+      >
+        <form onSubmit={handleRepairSubmit} className="space-y-4 pt-2">
+          {repairError && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2.5 text-xs text-red-600">
+              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+              <p className="font-semibold">{repairError}</p>
+            </div>
+          )}
+
+          <div>
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2 mb-2">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                Resumo do Equipamento
+              </p>
+              <div className="flex justify-between text-xs text-gray-700">
+                <span className="font-medium text-gray-500">Ferramenta:</span>
+                <span className="font-semibold text-gray-900">{selectedAssetForRepair?.description}</span>
+              </div>
+              {selectedAssetForRepair?.brand && (
+                <div className="flex justify-between text-xs text-gray-700">
+                  <span className="font-medium text-gray-500">Marca/Modelo:</span>
+                  <span className="font-semibold text-gray-900">{selectedAssetForRepair.brand} {selectedAssetForRepair.model && `• ${selectedAssetForRepair.model}`}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="resolutionNotes">Descrição do Conserto</Label>
+            <Textarea
+              id="resolutionNotes"
+              required
+              placeholder="Descreva detalhadamente o reparo efetuado. Ex: Trocada a carcaça de plástico trincada e substituído o rolamento interno."
+              value={resolutionNotes}
+              onChange={(e) => setResolutionNotes(e.target.value)}
+              className="min-h-[80px] mt-1.5"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="repairCost">Custo do Reparo (R$)</Label>
+            <Input
+              id="repairCost"
+              required
+              type="text"
+              placeholder="0,00"
+              value={repairCost}
+              onChange={(e) => setRepairCost(e.target.value)}
+              className="mt-1.5"
+            />
+          </div>
+
+          <div>
+            <Label>Ação / Disponibilidade</Label>
+            <div className="flex gap-4 mt-2">
+              <label className="flex items-center gap-2 text-sm text-gray-700 font-semibold cursor-pointer">
+                <input
+                  type="radio"
+                  name="repairAction"
+                  value="RESOLVED"
+                  checked={repairAction === 'RESOLVED'}
+                  onChange={() => setRepairAction('RESOLVED')}
+                  className="w-4 h-4 text-brand-primary border-gray-300 focus:ring-brand-primary"
+                />
+                Retornar para Disponibilidade
+              </label>
+              <label className="flex items-center gap-2 text-sm text-red-600 font-semibold cursor-pointer">
+                <input
+                  type="radio"
+                  name="repairAction"
+                  value="WRITTEN_OFF"
+                  checked={repairAction === 'WRITTEN_OFF'}
+                  onChange={() => setRepairAction('WRITTEN_OFF')}
+                  className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-600"
+                />
+                Dar Baixa Definitiva (Descarte)
+              </label>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setRepairModalOpen(false)}
+              disabled={repairSubmitting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={repairSubmitting}
+            >
+              {repairSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Salvando...
+                </>
+              ) : (
+                'Finalizar Manutenção'
               )}
             </Button>
           </div>
