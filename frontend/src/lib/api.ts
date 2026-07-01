@@ -366,6 +366,7 @@ export const assetsApi = {
     acquisitionValue?: number | null
     location?: string | null
     notes?: string | null
+    photoUrl?: string | null
   }): Promise<Asset> {
     return request('/assets', {
       method: 'POST',

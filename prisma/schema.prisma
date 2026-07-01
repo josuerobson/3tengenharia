@@ -302,6 +302,7 @@ model Asset {
   currentStatus    AssetStatus @default(AVAILABLE) @map("current_status")
   location         String? // Localização física atual
   notes            String?     @db.Text
+  photoUrl         String?     @map("photo_url") @db.Text
   createdAt        DateTime    @default(now()) @map("created_at")
   updatedAt        DateTime    @updatedAt @map("updated_at")
 

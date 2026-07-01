@@ -324,7 +324,51 @@ interface NewAssetModalProps {
     acquisitionValue?: number | null
     location?: string | null
     notes?: string | null
+    photoUrl?: string | null
   }) => Promise<void>
+}
+
+function compressImage(file: File, maxWidth = 800, maxHeight = 800, quality = 0.6): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = (event) => {
+      const img = new Image()
+      img.src = event.target?.result as string
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width)
+            width = maxWidth
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height)
+            height = maxHeight
+          }
+        }
+
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve(event.target?.result as string)
+          return
+        }
+
+        ctx.drawImage(img, 0, 0, width, height)
+        const dataUrl = canvas.toDataURL('image/jpeg', quality)
+        resolve(dataUrl)
+      }
+      img.onerror = (err) => reject(err)
+    }
+    reader.onerror = (err) => reject(err)
+  })
 }
 
 function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
@@ -342,6 +386,10 @@ function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  // Foto para novo cadastro
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null)
+
   // Limpa state ao abrir/fechar
   useEffect(() => {
     if (open) {
@@ -355,10 +403,42 @@ function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
       setAcquisitionValue('')
       setLocation('')
       setNotes('')
+      setPhotoPreview(null)
+      setPhotoBase64(null)
       setError('')
       setIsSubmitting(false)
+    } else {
+      if (photoPreview) URL.revokeObjectURL(photoPreview)
     }
   }, [open])
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhotoPreview(file ? URL.createObjectURL(file) : null)
+
+    if (file) {
+      try {
+        const compressed = await compressImage(file, 800, 800, 0.6)
+        setPhotoBase64(compressed)
+      } catch (err) {
+        console.error('Erro ao comprimir imagem:', err)
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setPhotoBase64(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      }
+    } else {
+      setPhotoBase64(null)
+    }
+  }
+
+  const handleRemovePhoto = useCallback(() => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhotoPreview(null)
+    setPhotoBase64(null)
+  }, [photoPreview])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -389,6 +469,7 @@ function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
         acquisitionValue: acquisitionValue ? parseFloat(acquisitionValue) : null,
         location: location.trim() || null,
         notes: notes.trim() || null,
+        photoUrl: photoBase64 || null,
       })
       onClose()
     } catch (err: any) {
@@ -549,6 +630,45 @@ function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
           />
         </div>
 
+        <div>
+          <Label>Foto do Equipamento (Opcional)</Label>
+          {photoPreview ? (
+            <div className="relative rounded-xl border border-gray-200 overflow-hidden bg-gray-50 max-w-sm mt-1.5">
+              <img
+                src={photoPreview}
+                alt="Preview do Equipamento"
+                className="w-full h-48 object-cover"
+              />
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon-sm"
+                onClick={handleRemovePhoto}
+                className="absolute top-2 right-2 rounded-full shadow-md"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center w-full mt-1.5">
+              <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-gray-200 border-dashed rounded-xl cursor-pointer bg-white hover:bg-gray-50 transition-colors">
+                <div className="flex flex-col items-center justify-center pt-4 pb-4">
+                  <Camera className="w-6 h-6 text-gray-400 mb-1" />
+                  <p className="text-xs text-gray-500 font-medium">Tire ou anexe uma foto</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">PNG, JPG (máx. 5MB)</p>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handlePhotoChange}
+                />
+              </label>
+            </div>
+          )}
+        </div>
+
         <Button
           type="submit"
           variant="accent"
@@ -615,6 +735,17 @@ function AssetCard({ asset, onReportDefect }: AssetCardProps) {
           {statusInfo?.label ?? asset.currentStatus}
         </Badge>
       </div>
+
+      {/* Imagem do item (se houver) */}
+      {asset.photoUrl && (
+        <div className="px-4 pb-2">
+          <img
+            src={asset.photoUrl}
+            alt={asset.description}
+            className="w-full h-32 object-cover rounded-xl border border-gray-100"
+          />
+        </div>
+      )}
 
       {/* Corpo */}
       <div className="px-4 flex-1">

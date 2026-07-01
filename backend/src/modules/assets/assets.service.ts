@@ -91,6 +91,7 @@ const assetBaseSelect = {
   category: true,
   currentStatus: true,
   location: true,
+  photoUrl: true,
 } as const
 
 // ── Service ───────────────────────────────────────────────────────────────────
@@ -125,6 +126,7 @@ export const assetsService = {
       acquisitionDate: asset.acquisitionDate ? asset.acquisitionDate.toISOString().split('T')[0] : null,
       acquisitionValue: asset.acquisitionValue ? Number(asset.acquisitionValue) : null,
       notes: asset.notes,
+      photoUrl: asset.photoUrl,
       currentBorrowee: asset.loans[0]?.borrowerEmployee?.fullName ?? null,
       activeLoanId: asset.loans[0]?.id ?? null,
     }))
@@ -163,6 +165,7 @@ export const assetsService = {
         acquisitionValue: body.acquisitionValue !== undefined && body.acquisitionValue !== null ? body.acquisitionValue : null,
         location: body.location || null,
         notes: body.notes || null,
+        photoUrl: body.photoUrl || null,
         currentStatus: 'AVAILABLE',
       }
     })

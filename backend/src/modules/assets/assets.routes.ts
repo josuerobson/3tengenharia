@@ -107,6 +107,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
                 currentStatus: { type: 'string' },
                 location: { type: 'string', nullable: true },
                 notes: { type: 'string', nullable: true },
+                photoUrl: { type: 'string', nullable: true },
                 currentBorrowee: { type: 'string', nullable: true },
                 activeLoanId: { type: 'string', nullable: true },
               },
@@ -144,6 +145,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
             acquisitionValue: { type: 'number', nullable: true },
             location: { type: 'string', nullable: true },
             notes: { type: 'string', nullable: true },
+            photoUrl: { type: 'string', nullable: true },
           },
         },
         response: {
@@ -162,6 +164,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
               currentStatus: { type: 'string' },
               location: { type: 'string', nullable: true },
               notes: { type: 'string', nullable: true },
+              photoUrl: { type: 'string', nullable: true },
             },
           },
         },

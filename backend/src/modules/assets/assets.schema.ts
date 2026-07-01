@@ -79,6 +79,7 @@ export const createAssetBodySchema = z.object({
   acquisitionValue: z.coerce.number().nullable().optional(),
   location: z.string().trim().nullable().optional(),
   notes: z.string().trim().nullable().optional(),
+  photoUrl: z.string().trim().nullable().optional(),
 })
 
 export type CreateAssetBody = z.infer<typeof createAssetBodySchema>

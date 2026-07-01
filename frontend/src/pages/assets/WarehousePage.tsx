@@ -122,6 +122,10 @@ export default function WarehousePage() {
   // Modal Reparo/Manutenção
   const [repairModalOpen, setRepairModalOpen] = useState(false)
   const [selectedAssetForRepair, setSelectedAssetForRepair] = useState<Asset | null>(null)
+
+  // Foto para novo cadastro
+  const [newAssetPhotoPreview, setNewAssetPhotoPreview] = useState<string | null>(null)
+  const [newAssetPhotoBase64, setNewAssetPhotoBase64] = useState<string | null>(null)
   const [resolutionNotes, setResolutionNotes] = useState('')
   const [repairCost, setRepairCost] = useState('')
   const [repairAction, setRepairAction] = useState<'RESOLVED' | 'WRITTEN_OFF'>('RESOLVED')
@@ -296,6 +300,51 @@ export default function WarehousePage() {
     setNewModalOpen(true)
   }
 
+  const handleNewAssetPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    if (newAssetPhotoPreview) URL.revokeObjectURL(newAssetPhotoPreview)
+    setNewAssetPhotoPreview(file ? URL.createObjectURL(file) : null)
+
+    if (file) {
+      try {
+        const compressed = await compressImage(file, 800, 800, 0.6)
+        setNewAssetPhotoBase64(compressed)
+      } catch (err) {
+        console.error('Erro ao comprimir imagem:', err)
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setNewAssetPhotoBase64(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      }
+    } else {
+      setNewAssetPhotoBase64(null)
+    }
+  }
+
+  const handleRemoveNewAssetPhoto = useCallback(() => {
+    if (newAssetPhotoPreview) URL.revokeObjectURL(newAssetPhotoPreview)
+    setNewAssetPhotoPreview(null)
+    setNewAssetPhotoBase64(null)
+  }, [newAssetPhotoPreview])
+
+  useEffect(() => {
+    if (!newModalOpen) {
+      handleRemoveNewAssetPhoto()
+      setAssetTag('')
+      setDescription('')
+      setCategory('POWER_TOOLS')
+      setBrand('')
+      setModel('')
+      setSerialNumber('')
+      setAcquisitionDate('')
+      setAcquisitionValue('')
+      setLocation('')
+      setNotes('')
+      setModalError(null)
+    }
+  }, [newModalOpen, handleRemoveNewAssetPhoto])
+
   const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!assetTag.trim()) {
@@ -322,6 +371,7 @@ export default function WarehousePage() {
         acquisitionValue: acquisitionValue ? parseFloat(acquisitionValue) : null,
         location: location.trim() || null,
         notes: notes.trim() || null,
+        photoUrl: newAssetPhotoBase64 || null,
       })
       setNewModalOpen(false)
       loadAssets()
@@ -900,8 +950,47 @@ export default function WarehousePage() {
               placeholder="Ex: Comprado com garantia estendida de 2 anos."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="min-h-[80px]"
+              className="min-h-[80px] mt-1.5"
             />
+          </div>
+
+          <div>
+            <Label>Foto do Equipamento (Opcional)</Label>
+            {newAssetPhotoPreview ? (
+              <div className="relative rounded-xl border border-gray-200 overflow-hidden bg-gray-50 max-w-sm mt-1.5">
+                <img
+                  src={newAssetPhotoPreview}
+                  alt="Preview do Equipamento"
+                  className="w-full h-48 object-cover"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon-sm"
+                  onClick={handleRemoveNewAssetPhoto}
+                  className="absolute top-2 right-2 rounded-full shadow-md"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center w-full mt-1.5">
+                <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-gray-200 border-dashed rounded-xl cursor-pointer bg-white hover:bg-gray-50 transition-colors">
+                  <div className="flex flex-col items-center justify-center pt-4 pb-4">
+                    <Camera className="w-6 h-6 text-gray-400 mb-1" />
+                    <p className="text-xs text-gray-500 font-medium">Tire ou anexe uma foto</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">PNG, JPG (máx. 5MB)</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleNewAssetPhotoChange}
+                  />
+                </label>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
