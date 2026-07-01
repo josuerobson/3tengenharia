@@ -766,6 +766,44 @@ export const fiveSApi = {
   },
 }
 
+export interface DashboardSummary {
+  general: {
+    activeUsers: number
+    activeWorksites: number
+  }
+  vehicles: {
+    totalVehicles: number
+    activeTrips: number
+    maintenanceVehicles: number
+    vehiclesWithAlert: number
+    availableVehicles: number
+  }
+  warehouse: {
+    totalAssets: number
+    availableAssets: number
+    loanedAssets: number
+    maintenanceAssets: number
+    activeLoans: number
+    openAssetMaintenances: number
+  }
+  timeLogs: {
+    pendingTimeLogs: number
+    totalHoursLast7Days: number
+  }
+  fiveS: {
+    totalAudits5S: number
+    conformAudits5S: number
+    pendingAudits5S: number
+    conformityRate5S: number
+  }
+}
+
+export const dashboardApi = {
+  getSummary(): Promise<DashboardSummary> {
+    return request('/dashboard/summary')
+  }
+}
+
 
 
 

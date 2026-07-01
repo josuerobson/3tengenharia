@@ -14,6 +14,7 @@ import { timeLogRoutes }           from './modules/time-logs/time-logs.routes.js
 import { fiveSRoutes }             from './modules/fiveS/fiveS.routes.js'
 import { userRoutes }              from './modules/users/users.routes.js'
 import { worksiteRoutes }          from './modules/worksites/worksites.routes.js'
+import { dashboardRoutes }         from './modules/dashboard/dashboard.routes.js'
 import { env } from './lib/env.js'
 
 export async function buildApp() {
@@ -81,6 +82,7 @@ export async function buildApp() {
       await v1.register(fiveSRoutes,            { prefix: '/5s' })         // Módulo 5S: Auditorias
       await v1.register(userRoutes,             { prefix: '/users' })      // Módulo: Usuários
       await v1.register(worksiteRoutes,         { prefix: '/worksites' })  // Módulo: Obras
+      await v1.register(dashboardRoutes,        { prefix: '/dashboard' })  // Módulo: Dashboard
     },
     { prefix: '/api/v1' },
   )

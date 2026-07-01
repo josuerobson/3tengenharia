@@ -29,6 +29,7 @@ import VehicleRegistrationPage from '@/pages/vehicles/VehicleRegistrationPage'
 import UsersPage                 from '@/pages/admin/UsersPage'
 import ProfilePage               from '@/pages/auth/ProfilePage'
 import WorksitesPage             from '@/pages/admin/WorksitesPage'
+import DashboardPage             from '@/pages/dashboard/DashboardPage'
 
 // ── Página placeholder genérica (substituir pelas páginas reais na Etapa 5) ──
 
@@ -70,10 +71,7 @@ export default function App() {
                 <Route index element={<Navigate to="/dashboard" replace />} />
 
                 {/* Dashboard */}
-                <Route
-                  path="dashboard"
-                  element={<PlaceholderPage title="Dashboard" description="Indicadores operacionais da 3T." />}
-                />
+                <Route path="dashboard" element={<DashboardPage />} />
 
                 {/* Módulo 1 — Veículos */}
                 <Route path="vehicles/trips/new"        element={<TripStartPage />} />
