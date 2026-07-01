@@ -420,6 +420,7 @@ export const assetsApi = {
   returnLoan(loanId: string, data: {
     returnedAt?: string | null
     returnNotes?: string | null
+    returnPhotoUrl?: string | null
   }): Promise<{ message: string; loan: any }> {
     return request(`/assets/loans/${loanId}/return`, {
       method: 'POST',

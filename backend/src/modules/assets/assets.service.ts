@@ -289,6 +289,7 @@ export const assetsService = {
         isReturned: true,
         returnedAt: body.returnedAt ?? new Date(),
         returnNotes: body.returnNotes ?? null,
+        returnPhotoUrl: body.returnPhotoUrl ?? null,
       },
       include: {
         asset: { select: assetBaseSelect },

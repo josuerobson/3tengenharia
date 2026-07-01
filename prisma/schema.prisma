@@ -342,6 +342,7 @@ model AssetLoan {
   returnedAt       DateTime? @map("returned_at") // Data/hora efetiva da devolução
   checkoutNotes    String?   @map("checkout_notes") @db.Text
   returnNotes      String?   @map("return_notes") @db.Text
+  returnPhotoUrl   String?   @map("return_photo_url") @db.Text
   isReturned       Boolean   @default(false) @map("is_returned")
 
   createdAt DateTime @default(now()) @map("created_at")

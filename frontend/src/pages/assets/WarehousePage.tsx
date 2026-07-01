@@ -17,6 +17,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   ClipboardList,
+  Camera,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -29,6 +31,49 @@ import { Dialog } from '@/components/ui/dialog'
 import { useAuth } from '@/contexts/AuthContext'
 import { assetsApi } from '@/lib/api'
 import { ASSET_CATEGORY_LABELS, type Asset } from '@/data/mockData'
+
+function compressImage(file: File, maxWidth = 800, maxHeight = 800, quality = 0.6): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = (event) => {
+      const img = new Image()
+      img.src = event.target?.result as string
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width)
+            width = maxWidth
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height)
+            height = maxHeight
+          }
+        }
+
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve(event.target?.result as string)
+          return
+        }
+
+        ctx.drawImage(img, 0, 0, width, height)
+        const dataUrl = canvas.toDataURL('image/jpeg', quality)
+        resolve(dataUrl)
+      }
+      img.onerror = (err) => reject(err)
+    }
+    reader.onerror = (err) => reject(err)
+  })
+}
 
 type ActiveTab = 'inventory' | 'loans' | 'maintenance'
 
@@ -70,6 +115,10 @@ export default function WarehousePage() {
   const [returnSubmitting, setReturnSubmitting] = useState(false)
   const [returnError, setReturnError] = useState<string | null>(null)
 
+  // Fotos de devolução
+  const [returnPhotoPreview, setReturnPhotoPreview] = useState<string | null>(null)
+  const [returnPhotoBase64, setReturnPhotoBase64] = useState<string | null>(null)
+
   // Modal Reparo/Manutenção
   const [repairModalOpen, setRepairModalOpen] = useState(false)
   const [selectedAssetForRepair, setSelectedAssetForRepair] = useState<Asset | null>(null)
@@ -105,6 +154,40 @@ export default function WarehousePage() {
     setReturnModalOpen(true)
   }, [])
 
+  const handleReturnPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    if (returnPhotoPreview) URL.revokeObjectURL(returnPhotoPreview)
+    setReturnPhotoPreview(file ? URL.createObjectURL(file) : null)
+
+    if (file) {
+      try {
+        const compressed = await compressImage(file, 800, 800, 0.6)
+        setReturnPhotoBase64(compressed)
+      } catch (err) {
+        console.error('Erro ao comprimir imagem:', err)
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setReturnPhotoBase64(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      }
+    } else {
+      setReturnPhotoBase64(null)
+    }
+  }
+
+  const handleRemoveReturnPhoto = useCallback(() => {
+    if (returnPhotoPreview) URL.revokeObjectURL(returnPhotoPreview)
+    setReturnPhotoPreview(null)
+    setReturnPhotoBase64(null)
+  }, [returnPhotoPreview])
+
+  useEffect(() => {
+    if (!returnModalOpen) {
+      handleRemoveReturnPhoto()
+    }
+  }, [returnModalOpen, handleRemoveReturnPhoto])
+
   const handleReturnSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedAssetForReturn?.activeLoanId) return
@@ -113,6 +196,7 @@ export default function WarehousePage() {
       setReturnError(null)
       await assetsApi.returnLoan(selectedAssetForReturn.activeLoanId, {
         returnNotes: returnNotes.trim() || undefined,
+        returnPhotoUrl: returnPhotoBase64 || null,
       })
       setReturnModalOpen(false)
       loadAssets()
@@ -122,7 +206,7 @@ export default function WarehousePage() {
     } finally {
       setReturnSubmitting(false)
     }
-  }, [selectedAssetForReturn, returnNotes, loadAssets])
+  }, [selectedAssetForReturn, returnNotes, returnPhotoBase64, loadAssets])
 
   const handleRepairSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -890,6 +974,45 @@ export default function WarehousePage() {
               onChange={(e) => setReturnNotes(e.target.value)}
               className="min-h-[80px] mt-1.5"
             />
+          </div>
+
+          <div>
+            <Label>Foto do Estado do Equipamento (Opcional)</Label>
+            {returnPhotoPreview ? (
+              <div className="relative rounded-xl border border-gray-200 overflow-hidden bg-gray-50 max-w-sm mt-1.5">
+                <img
+                  src={returnPhotoPreview}
+                  alt="Preview da Devolução"
+                  className="w-full h-48 object-cover"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon-sm"
+                  onClick={handleRemoveReturnPhoto}
+                  className="absolute top-2 right-2 rounded-full shadow-md"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center w-full mt-1.5">
+                <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-gray-200 border-dashed rounded-xl cursor-pointer bg-white hover:bg-gray-50 transition-colors">
+                  <div className="flex flex-col items-center justify-center pt-4 pb-4">
+                    <Camera className="w-6 h-6 text-gray-400 mb-1" />
+                    <p className="text-xs text-gray-500 font-medium">Tire ou anexe uma foto</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">PNG, JPG (máx. 5MB)</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleReturnPhotoChange}
+                  />
+                </label>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">

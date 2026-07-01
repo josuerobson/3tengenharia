@@ -18,6 +18,7 @@ const loanResponseSchema = {
     isReturned: { type: 'boolean' },
     returnedAt: { type: 'string', nullable: true },
     returnNotes: { type: 'string', nullable: true },
+    returnPhotoUrl: { type: 'string', nullable: true },
     returnedByUserId: { type: 'string', nullable: true },
     asset: {
       type: 'object',
@@ -238,6 +239,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
           properties: {
             returnedAt: { type: 'string', format: 'date-time' },
             returnNotes: { type: 'string' },
+            returnPhotoUrl: { type: 'string' },
           },
         },
         response: {
