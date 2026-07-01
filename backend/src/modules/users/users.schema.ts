@@ -27,6 +27,12 @@ export const createUserBodySchema = z.object({
     .trim()
     .min(1, 'WhatsApp não pode ser vazio.'),
 
+  cpf: z
+    .string({ required_error: 'CPF é obrigatório.' })
+    .trim()
+    .transform((val) => val.replace(/\D/g, ''))
+    .refine((val) => val.length === 11, 'CPF deve ter exatamente 11 dígitos.'),
+
   position: z
     .string({ required_error: 'Função é obrigatória.' })
     .trim()
@@ -54,6 +60,12 @@ export const updateUserBodySchema = z.object({
 
   fullName: z.string().trim().min(1).optional(),
   phone: z.string().trim().min(1).optional(),
+  cpf: z
+    .string()
+    .trim()
+    .transform((val) => val.replace(/\D/g, ''))
+    .refine((val) => val.length === 11, 'CPF deve ter exatamente 11 dígitos.')
+    .optional(),
   position: z.string().trim().min(1).optional(),
 
   isActive: z.boolean().optional(),

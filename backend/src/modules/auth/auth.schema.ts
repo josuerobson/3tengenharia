@@ -8,10 +8,21 @@ import { UserRole } from '@prisma/client'
 
 export const loginBodySchema = z.object({
   email: z
-    .string({ required_error: 'E-mail é obrigatório.' })
-    .email('E-mail inválido.')
+    .string({ required_error: 'E-mail ou CPF é obrigatório.' })
+    .trim()
     .toLowerCase()
-    .trim(),
+    .refine(
+      (val) => {
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+        if (isEmail) return true
+
+        const digitsOnly = val.replace(/\D/g, '')
+        if (digitsOnly.length === 11 && /^\d+$/.test(digitsOnly)) return true
+
+        return false
+      },
+      { message: 'Digite um e-mail válido ou um CPF com 11 dígitos.' }
+    ),
 
   password: z
     .string({ required_error: 'Senha é obrigatória.' })

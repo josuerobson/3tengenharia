@@ -12,7 +12,7 @@ import type { LoginBody, UserPublic, ChangePasswordBody } from './auth.schema.js
 export class InvalidCredentialsError extends Error {
   readonly statusCode = 401
   constructor() {
-    super('E-mail ou senha incorretos.')
+    super('E-mail, CPF ou senha incorretos.')
     this.name = 'InvalidCredentialsError'
   }
 }
@@ -72,14 +72,38 @@ export const authService = {
     user: UserPublic
     passwordHash: string
   }> {
-    // 1. Busca o usuário pelo e-mail (inclui hash para comparação)
-    const record = await prisma.user.findUnique({
-      where: { email: body.email },
-      select: {
-        ...userPublicSelect,
-        passwordHash: true,
-      },
-    })
+    const input = body.email.trim().toLowerCase()
+    const digitsOnly = input.replace(/\D/g, '')
+
+    let record = null
+
+    // 1. Se for um CPF válido (11 dígitos), tenta buscar pelo CPF do colaborador
+    if (digitsOnly.length === 11 && /^\d+$/.test(digitsOnly)) {
+      const employee = await prisma.employee.findUnique({
+        where: { cpf: digitsOnly },
+        select: { userId: true },
+      })
+      if (employee?.userId) {
+        record = await prisma.user.findUnique({
+          where: { id: employee.userId },
+          select: {
+            ...userPublicSelect,
+            passwordHash: true,
+          },
+        })
+      }
+    }
+
+    // 2. Se não encontrou por CPF (ou não era CPF), busca pelo e-mail
+    if (!record) {
+      record = await prisma.user.findUnique({
+        where: { email: input },
+        select: {
+          ...userPublicSelect,
+          passwordHash: true,
+        },
+      })
+    }
 
     // Usuário não encontrado — erro genérico para não revelar qual campo falhou
     if (!record) {

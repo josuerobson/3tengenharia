@@ -39,6 +39,14 @@ const ROLE_BADGE_VARIANTS: Record<string, 'default' | 'brand' | 'critical' | nul
   COLLABORATOR: 'default',
 }
 
+const formatCpf = (val: string) => {
+  const digits = val.replace(/\D/g, '')
+  if (digits.length <= 3) return digits
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`
+}
+
 export default function UsersPage() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
@@ -64,6 +72,7 @@ export default function UsersPage() {
   const [role, setRole] = useState<'ADMIN' | 'MANAGER' | 'COLLABORATOR'>('COLLABORATOR')
   const [isActive, setIsActive] = useState(true)
   const [fullName, setFullName] = useState('')
+  const [cpf, setCpf] = useState('')
   const [phone, setPhone] = useState('')
   const [position, setPosition] = useState('')
   const [isCustomPosition, setIsCustomPosition] = useState(false)
@@ -146,6 +155,7 @@ export default function UsersPage() {
     setIsActive(true)
     setFullName('')
     setPhone('')
+    setCpf('')
     setPosition('')
     setIsCustomPosition(false)
     setCustomPosition('')
@@ -161,6 +171,7 @@ export default function UsersPage() {
     setIsActive(user.isActive)
     setFullName(user.employee?.fullName ?? '')
     setPhone(user.employee?.phone ?? '')
+    setCpf(user.employee?.cpf ? formatCpf(user.employee.cpf) : '')
     const currentPos = user.employee?.position ?? ''
     setPosition(currentPos)
     setIsCustomPosition(false)
@@ -187,6 +198,15 @@ export default function UsersPage() {
       setFormError('Nome completo é obrigatório.')
       return
     }
+    const normalizedCpf = cpf.replace(/\D/g, '')
+    if (!normalizedCpf) {
+      setFormError('CPF é obrigatório.')
+      return
+    }
+    if (normalizedCpf.length !== 11) {
+      setFormError('CPF deve ter exatamente 11 dígitos.')
+      return
+    }
     if (!phone.trim()) {
       setFormError('WhatsApp é obrigatório.')
       return
@@ -209,6 +229,7 @@ export default function UsersPage() {
           isActive,
           fullName: fullName.trim(),
           phone: phone.trim(),
+          cpf: normalizedCpf,
           position: finalPosition,
           ...(password ? { password } : {}),
         })
@@ -221,6 +242,7 @@ export default function UsersPage() {
           isActive,
           fullName: fullName.trim(),
           phone: phone.trim(),
+          cpf: normalizedCpf,
           position: finalPosition,
         })
       }
@@ -400,7 +422,7 @@ export default function UsersPage() {
                             <>
                               <p className="text-xs font-bold text-gray-800 truncate">{u.employee.fullName}</p>
                               <p className="text-[10px] text-gray-500">
-                                {u.employee.position} · {u.employee.registration}
+                                {u.employee.position} · {u.employee.registration} {u.employee.cpf ? `· CPF: ${formatCpf(u.employee.cpf)}` : ''}
                               </p>
                             </>
                           ) : (
@@ -521,6 +543,23 @@ export default function UsersPage() {
             </div>
 
             <div>
+              <Label htmlFor="cpf" required>
+                CPF
+              </Label>
+              <Input
+                id="cpf"
+                placeholder="000.000.000-00"
+                value={cpf}
+                onChange={(e) => setCpf(formatCpf(e.target.value))}
+                className="mt-1.5 h-11"
+                maxLength={14}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <Label htmlFor="phone" required>
                 WhatsApp
               </Label>
@@ -533,9 +572,7 @@ export default function UsersPage() {
                 required
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="role" required>
                 Perfil de Acesso
@@ -552,7 +589,9 @@ export default function UsersPage() {
                 <option value="ADMIN">Administrador</option>
               </select>
             </div>
+          </div>
 
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="position" required>
                 Função
@@ -581,23 +620,25 @@ export default function UsersPage() {
                 <option value="CUSTOM">+ Adicionar nova função...</option>
               </select>
             </div>
-          </div>
 
-          {isCustomPosition && (
-            <div className="animate-slide-down">
-              <Label htmlFor="customPosition" required>
-                Nome da Nova Função
-              </Label>
-              <Input
-                id="customPosition"
-                placeholder="Ex: Encarregado de Obras"
-                value={customPosition}
-                onChange={(e) => setCustomPosition(e.target.value)}
-                className="mt-1.5 h-11"
-                required
-              />
-            </div>
-          )}
+            {isCustomPosition ? (
+              <div className="animate-slide-down">
+                <Label htmlFor="customPosition" required>
+                  Nome da Nova Função
+                </Label>
+                <Input
+                  id="customPosition"
+                  placeholder="Ex: Encarregado de Obras"
+                  value={customPosition}
+                  onChange={(e) => setCustomPosition(e.target.value)}
+                  className="mt-1.5 h-11"
+                  required
+                />
+              </div>
+            ) : (
+              <div />
+            )}
+          </div>
 
           <div className="flex items-center gap-2.5 pt-2">
             <input

@@ -4,7 +4,7 @@
 
 import { useState, useCallback } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
-import { KeyRound, Mail, AlertTriangle, Loader2 } from 'lucide-react'
+import { KeyRound, User, AlertTriangle, Loader2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { authApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -85,21 +85,21 @@ export default function LoginPage() {
 
         {/* Formulário */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* E-mail */}
+          {/* E-mail ou CPF */}
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
-              E-mail corporativo
+              E-mail ou CPF
             </Label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-400" />
+              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-400" />
               <Input
                 id="email"
-                type="email"
-                autoComplete="email"
+                type="text"
+                autoComplete="username"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="exemplo@3tengenharia.com.br"
+                placeholder="exemplo@3tengenharia.com.br ou CPF"
                 className="w-full bg-white/5 border-white/10 text-white placeholder-gray-500 pl-10 focus:border-brand-primary/50 focus:ring-brand-primary/20 rounded-xl"
               />
             </div>

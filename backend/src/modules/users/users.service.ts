@@ -19,6 +19,14 @@ export class EmailAlreadyExistsError extends Error {
   }
 }
 
+export class CpfAlreadyExistsError extends Error {
+  readonly statusCode = 409
+  constructor(cpf: string) {
+    super(`CPF já cadastrado: ${cpf}`)
+    this.name = 'CpfAlreadyExistsError'
+  }
+}
+
 export class EmployeeNotFoundError extends Error {
   readonly statusCode = 404
   constructor(id: string) {
@@ -48,6 +56,7 @@ export const usersService = {
             registration: true,
             position: true,
             phone: true,
+            cpf: true,
           },
         },
       },
@@ -64,10 +73,18 @@ export const usersService = {
       throw new EmailAlreadyExistsError(body.email)
     }
 
-    // 2. Hash password
+    // 2. Validar CPF único
+    const existingCpf = await prisma.employee.findUnique({
+      where: { cpf: body.cpf },
+    })
+    if (existingCpf) {
+      throw new CpfAlreadyExistsError(body.cpf)
+    }
+
+    // 3. Hash password
     const passwordHash = await bcrypt.hash(body.password, SALT_ROUNDS)
 
-    // 3. Inserir usuário
+    // 4. Inserir usuário
     const user = await prisma.user.create({
       data: {
         email: body.email,
@@ -77,14 +94,8 @@ export const usersService = {
       },
     })
 
-    // 4. Inserir Employee sob o capô
-    let cpf = ''
+    // 5. Inserir Employee sob o capô
     let registration = ''
-    while (true) {
-      cpf = Math.floor(10000000000 + Math.random() * 90000000000).toString()
-      const existing = await prisma.employee.findUnique({ where: { cpf } })
-      if (!existing) break
-    }
     while (true) {
       registration = 'MAT-' + Math.floor(100000 + Math.random() * 900000).toString()
       const existing = await prisma.employee.findUnique({ where: { registration } })
@@ -97,7 +108,7 @@ export const usersService = {
         fullName: body.fullName,
         phone: body.phone,
         position: body.position,
-        cpf,
+        cpf: body.cpf,
         registration,
         hireDate: new Date(),
         isActive: true,
@@ -115,6 +126,7 @@ export const usersService = {
             registration: true,
             position: true,
             phone: true,
+            cpf: true,
           },
         },
       },
@@ -141,7 +153,17 @@ export const usersService = {
       }
     }
 
-    // 3. Preparar data
+    // 3. Validar CPF único se alterado
+    if (body.cpf && body.cpf !== user.employee?.cpf) {
+      const existingCpf = await prisma.employee.findUnique({
+        where: { cpf: body.cpf },
+      })
+      if (existingCpf) {
+        throw new CpfAlreadyExistsError(body.cpf)
+      }
+    }
+
+    // 4. Preparar data
     const updateData: any = {}
     if (body.email) updateData.email = body.email
     if (body.password) {
@@ -150,17 +172,18 @@ export const usersService = {
     if (body.role) updateData.role = body.role
     if (body.isActive !== undefined) updateData.isActive = body.isActive
 
-    // 4. Salvar atualizações do User
+    // 5. Salvar atualizações do User
     await prisma.user.update({
       where: { id },
       data: updateData,
     })
 
-    // 5. Atualizar Employee
+    // 6. Atualizar Employee
     const empData: any = {}
     if (body.fullName !== undefined) empData.fullName = body.fullName
     if (body.phone !== undefined) empData.phone = body.phone
     if (body.position !== undefined) empData.position = body.position
+    if (body.cpf !== undefined) empData.cpf = body.cpf
     
     if (Object.keys(empData).length > 0) {
       if (user.employee?.id) {
@@ -170,13 +193,7 @@ export const usersService = {
         })
       } else {
         // Se por algum motivo o seed ou banco antigo não tiver employee para o user, cria
-        let cpf = ''
         let registration = ''
-        while (true) {
-          cpf = Math.floor(10000000000 + Math.random() * 90000000000).toString()
-          const existing = await prisma.employee.findUnique({ where: { cpf } })
-          if (!existing) break
-        }
         while (true) {
           registration = 'MAT-' + Math.floor(100000 + Math.random() * 900000).toString()
           const existing = await prisma.employee.findUnique({ where: { registration } })
@@ -188,10 +205,10 @@ export const usersService = {
             fullName: body.fullName || 'Usuário Sem Nome',
             phone: body.phone || null,
             position: body.position || 'Função Não Definida',
-            cpf,
+            cpf: body.cpf || Math.floor(10000000000 + Math.random() * 90000000000).toString(),
             registration,
-            hireDate: new Date(),
             isActive: true,
+            hireDate: new Date(),
           },
         })
       }
@@ -207,6 +224,7 @@ export const usersService = {
             registration: true,
             position: true,
             phone: true,
+            cpf: true,
           },
         },
       },

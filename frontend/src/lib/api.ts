@@ -469,6 +469,7 @@ export const usersApi = {
     role: 'ADMIN' | 'MANAGER' | 'COLLABORATOR'
     fullName: string
     phone: string
+    cpf: string
     position: string
     isActive: boolean
   }): Promise<ApiUser> {
@@ -486,6 +487,7 @@ export const usersApi = {
       role: 'ADMIN' | 'MANAGER' | 'COLLABORATOR'
       fullName: string
       phone: string
+      cpf: string
       position: string
       isActive: boolean
     }>,
