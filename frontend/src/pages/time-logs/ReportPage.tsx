@@ -68,9 +68,19 @@ const PERIOD_LABELS: Record<PeriodFilter, string> = {
 function formatTimeToHM(isoStr: string): string {
   const d = new Date(isoStr)
   if (isNaN(d.getTime())) return ''
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${hh}:${mm}`
+  try {
+    const formatter = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    return formatter.format(d)
+  } catch (e) {
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mm = String(d.getMinutes()).padStart(2, '0')
+    return `${hh}:${mm}`
+  }
 }
 
 // ── CSV Export (puro JavaScript) ──────────────────────────────────────────────

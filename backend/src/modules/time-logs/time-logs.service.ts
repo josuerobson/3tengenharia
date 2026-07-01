@@ -73,11 +73,10 @@ function buildDateTime(
   workDateStr: string,
   time: { hours: number; minutes: number },
 ): Date {
-  // workDateStr está no formato YYYY-MM-DD
-  const [year, month, day] = workDateStr.split('-').map(Number)
-  const dt = new Date(year!, month! - 1, day!)
-  dt.setHours(time.hours, time.minutes, 0, 0)
-  return dt
+  const hh = String(time.hours).padStart(2, '0')
+  const mm = String(time.minutes).padStart(2, '0')
+  const isoStr = `${workDateStr}T${hh}:${mm}:00-03:00`
+  return new Date(isoStr)
 }
 
 /**
