@@ -710,7 +710,7 @@ export const fiveSApi = {
       correctiveAction?: string
     },
   ): Promise<{ message: string; audit: ApiAudit5S }> {
-    return request(`/5s/audits/${auditId}`, {
+    return request(`/5s/audits/${auditId}/validate`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     })
