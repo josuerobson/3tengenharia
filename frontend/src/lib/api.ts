@@ -485,6 +485,7 @@ export const usersApi = {
     phone: string
     cpf: string
     position: string
+    registration: string
     isActive: boolean
   }): Promise<ApiUser> {
     return request('/users', {
@@ -503,6 +504,7 @@ export const usersApi = {
       phone: string
       cpf: string
       position: string
+      registration: string
       isActive: boolean
     }>,
   ): Promise<ApiUser> {

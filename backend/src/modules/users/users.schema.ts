@@ -38,6 +38,11 @@ export const createUserBodySchema = z.object({
     .trim()
     .min(1, 'Função não pode ser vazia.'),
 
+  registration: z
+    .string({ required_error: 'Matrícula é obrigatória.' })
+    .trim()
+    .min(1, 'Matrícula não pode ser vazia.'),
+
   isActive: z.boolean().optional().default(true),
 })
 
@@ -67,6 +72,7 @@ export const updateUserBodySchema = z.object({
     .refine((val) => val.length === 11, 'CPF deve ter exatamente 11 dígitos.')
     .optional(),
   position: z.string().trim().min(1).optional(),
+  registration: z.string().trim().min(1).optional(),
 
   isActive: z.boolean().optional(),
 })

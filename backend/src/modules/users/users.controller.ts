@@ -7,6 +7,7 @@ import {
   EmailAlreadyExistsError,
   EmployeeNotFoundError,
   EmployeeAlreadyLinkedError,
+  RegistrationAlreadyExistsError,
 } from './users.service.js'
 
 const DOMAIN_ERRORS = [
@@ -14,6 +15,7 @@ const DOMAIN_ERRORS = [
   EmailAlreadyExistsError,
   EmployeeNotFoundError,
   EmployeeAlreadyLinkedError,
+  RegistrationAlreadyExistsError,
 ]
 
 function rethrowDomain(err: unknown): never {

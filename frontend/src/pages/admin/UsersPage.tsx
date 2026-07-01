@@ -77,6 +77,7 @@ export default function UsersPage() {
   const [position, setPosition] = useState('')
   const [isCustomPosition, setIsCustomPosition] = useState(false)
   const [customPosition, setCustomPosition] = useState('')
+  const [registration, setRegistration] = useState('')
 
   const [formError, setFormError] = useState<string | null>(null)
   const [formSubmitting, setFormSubmitting] = useState(false)
@@ -159,6 +160,7 @@ export default function UsersPage() {
     setPosition('')
     setIsCustomPosition(false)
     setCustomPosition('')
+    setRegistration('')
     setFormError(null)
     setFormOpen(true)
   }
@@ -176,6 +178,7 @@ export default function UsersPage() {
     setPosition(currentPos)
     setIsCustomPosition(false)
     setCustomPosition('')
+    setRegistration(user.employee?.registration ?? '')
     setFormError(null)
     setFormOpen(true)
   }
@@ -196,6 +199,10 @@ export default function UsersPage() {
     }
     if (!fullName.trim()) {
       setFormError('Nome completo é obrigatório.')
+      return
+    }
+    if (!registration.trim()) {
+      setFormError('Número de Matrícula é obrigatório.')
       return
     }
     const normalizedCpf = cpf.replace(/\D/g, '')
@@ -231,6 +238,7 @@ export default function UsersPage() {
           phone: phone.trim(),
           cpf: normalizedCpf,
           position: finalPosition,
+          registration: registration.trim(),
           ...(password ? { password } : {}),
         })
       } else {
@@ -244,6 +252,7 @@ export default function UsersPage() {
           phone: phone.trim(),
           cpf: normalizedCpf,
           position: finalPosition,
+          registration: registration.trim(),
         })
       }
       setFormOpen(false)
@@ -543,6 +552,22 @@ export default function UsersPage() {
             </div>
 
             <div>
+              <Label htmlFor="registration" required>
+                Número da Matrícula
+              </Label>
+              <Input
+                id="registration"
+                placeholder="Ex: MAT-123456"
+                value={registration}
+                onChange={(e) => setRegistration(e.target.value)}
+                className="mt-1.5 h-11"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <Label htmlFor="cpf" required>
                 CPF
               </Label>
@@ -556,9 +581,7 @@ export default function UsersPage() {
                 required
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="phone" required>
                 WhatsApp
@@ -572,23 +595,23 @@ export default function UsersPage() {
                 required
               />
             </div>
+          </div>
 
-            <div>
-              <Label htmlFor="role" required>
-                Perfil de Acesso
-              </Label>
-              <select
-                id="role"
-                value={role}
-                onChange={(e) => setRole(e.target.value as any)}
-                className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
-                required
-              >
-                <option value="COLLABORATOR">Colaborador</option>
-                <option value="MANAGER">Gestor</option>
-                <option value="ADMIN">Administrador</option>
-              </select>
-            </div>
+          <div>
+            <Label htmlFor="role" required>
+              Perfil de Acesso
+            </Label>
+            <select
+              id="role"
+              value={role}
+              onChange={(e) => setRole(e.target.value as any)}
+              className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+              required
+            >
+              <option value="COLLABORATOR">Colaborador</option>
+              <option value="MANAGER">Gestor</option>
+              <option value="ADMIN">Administrador</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

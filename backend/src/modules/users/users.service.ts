@@ -35,6 +35,14 @@ export class EmployeeNotFoundError extends Error {
   }
 }
 
+export class RegistrationAlreadyExistsError extends Error {
+  readonly statusCode = 409
+  constructor(registration: string) {
+    super(`Matrícula já cadastrada: ${registration}`)
+    this.name = 'RegistrationAlreadyExistsError'
+  }
+}
+
 export class EmployeeAlreadyLinkedError extends Error {
   readonly statusCode = 409
   constructor(fullName: string) {
@@ -95,11 +103,11 @@ export const usersService = {
     })
 
     // 5. Inserir Employee sob o capô
-    let registration = ''
-    while (true) {
-      registration = 'MAT-' + Math.floor(100000 + Math.random() * 900000).toString()
-      const existing = await prisma.employee.findUnique({ where: { registration } })
-      if (!existing) break
+    const existingRegistration = await prisma.employee.findUnique({
+      where: { registration: body.registration },
+    })
+    if (existingRegistration) {
+      throw new RegistrationAlreadyExistsError(body.registration)
     }
 
     await prisma.employee.create({
@@ -109,7 +117,7 @@ export const usersService = {
         phone: body.phone,
         position: body.position,
         cpf: body.cpf,
-        registration,
+        registration: body.registration,
         hireDate: new Date(),
         isActive: true,
       },
@@ -163,6 +171,16 @@ export const usersService = {
       }
     }
 
+    // 3.1 Validar Matrícula única se alterada
+    if (body.registration && body.registration !== user.employee?.registration) {
+      const existingRegistration = await prisma.employee.findUnique({
+        where: { registration: body.registration },
+      })
+      if (existingRegistration) {
+        throw new RegistrationAlreadyExistsError(body.registration)
+      }
+    }
+
     // 4. Preparar data
     const updateData: any = {}
     if (body.email) updateData.email = body.email
@@ -184,6 +202,7 @@ export const usersService = {
     if (body.phone !== undefined) empData.phone = body.phone
     if (body.position !== undefined) empData.position = body.position
     if (body.cpf !== undefined) empData.cpf = body.cpf
+    if (body.registration !== undefined) empData.registration = body.registration
     
     if (Object.keys(empData).length > 0) {
       if (user.employee?.id) {

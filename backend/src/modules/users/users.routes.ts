@@ -63,7 +63,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         security: [{ bearerAuth: [] }],
         body: {
           type: 'object',
-          required: ['email', 'password', 'role', 'fullName', 'phone', 'position', 'cpf'],
+          required: ['email', 'password', 'role', 'fullName', 'phone', 'position', 'cpf', 'registration'],
           properties: {
             email: { type: 'string', format: 'email' },
             password: { type: 'string', minLength: 8 },
@@ -72,6 +72,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
             phone: { type: 'string' },
             position: { type: 'string' },
             cpf: { type: 'string', minLength: 11, maxLength: 14 },
+            registration: { type: 'string' },
             isActive: { type: 'boolean' },
           },
         },
@@ -131,6 +132,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
             phone: { type: 'string' },
             position: { type: 'string' },
             cpf: { type: 'string', minLength: 11, maxLength: 14 },
+            registration: { type: 'string' },
             isActive: { type: 'boolean' },
           },
         },
