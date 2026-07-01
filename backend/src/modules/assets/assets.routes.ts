@@ -4,6 +4,85 @@ import type { FastifyInstance } from 'fastify'
 import { UserRole } from '@prisma/client'
 import { assetsController } from './assets.controller.js'
 
+const loanResponseSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    assetId: { type: 'string' },
+    borrowerEmployeeId: { type: 'string' },
+    destinationWorksiteId: { type: 'string', nullable: true },
+    createdByUserId: { type: 'string', nullable: true },
+    checkoutAt: { type: 'string' },
+    expectedReturnAt: { type: 'string', nullable: true },
+    checkoutNotes: { type: 'string', nullable: true },
+    isReturned: { type: 'boolean' },
+    returnedAt: { type: 'string', nullable: true },
+    returnNotes: { type: 'string', nullable: true },
+    returnedByUserId: { type: 'string', nullable: true },
+    asset: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        assetTag: { type: 'string' },
+        description: { type: 'string' },
+        brand: { type: 'string', nullable: true },
+        model: { type: 'string', nullable: true },
+        currentStatus: { type: 'string' },
+      },
+    },
+    borrowerEmployee: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        fullName: { type: 'string' },
+        registration: { type: 'string' },
+      },
+    },
+    destinationWorksite: {
+      type: ['object', 'null'],
+      properties: {
+        id: { type: 'string' },
+        code: { type: 'string' },
+        name: { type: 'string' },
+      },
+    },
+  },
+}
+
+const maintenanceLogResponseSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    assetId: { type: 'string' },
+    issueDescription: { type: 'string' },
+    defectPhotoUrl: { type: 'string', nullable: true },
+    reportedByUserId: { type: 'string', nullable: true },
+    reportedAt: { type: 'string' },
+    resolutionStatus: { type: 'string' },
+    resolvedAt: { type: 'string', nullable: true },
+    resolutionNotes: { type: 'string', nullable: true },
+    resolvedByUserId: { type: 'string', nullable: true },
+    asset: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        assetTag: { type: 'string' },
+        description: { type: 'string' },
+        brand: { type: 'string', nullable: true },
+        model: { type: 'string', nullable: true },
+        currentStatus: { type: 'string' },
+      },
+    },
+    reportedByUser: {
+      type: ['object', 'null'],
+      properties: {
+        id: { type: 'string' },
+        email: { type: 'string' },
+      },
+    },
+  },
+}
+
 export async function assetRoutes(app: FastifyInstance): Promise<void> {
   const controller = assetsController(app)
 
@@ -129,7 +208,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
             type: 'object',
             properties: {
               message: { type: 'string' },
-              loan: { type: 'object' },
+              loan: loanResponseSchema,
             },
           },
           404: { type: 'object', properties: { statusCode: { type: 'number' }, error: { type: 'string' }, message: { type: 'string' } } },
@@ -173,7 +252,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
             type: 'object',
             properties: {
               message: { type: 'string' },
-              loan: { type: 'object' },
+              loan: loanResponseSchema,
             },
           },
           404: { type: 'object', properties: { statusCode: { type: 'number' }, error: { type: 'string' }, message: { type: 'string' } } },
@@ -211,7 +290,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
             type: 'object',
             properties: {
               message: { type: 'string' },
-              maintenanceLog: { type: 'object' },
+              maintenanceLog: maintenanceLogResponseSchema,
             },
           },
           404: { type: 'object', properties: { statusCode: { type: 'number' }, error: { type: 'string' }, message: { type: 'string' } } },
