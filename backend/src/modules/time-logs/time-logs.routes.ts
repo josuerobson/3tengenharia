@@ -2,6 +2,7 @@
 
 import type { FastifyInstance } from 'fastify'
 import { timeLogsController } from './time-logs.controller.js'
+import { UserRole } from '@prisma/client'
 
 export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   const controller = timeLogsController(app)
@@ -150,6 +151,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
                 totalMinutesWorked: { type: 'integer' },
                 notes: { type: 'string', nullable: true },
                 isValidated: { type: 'boolean' },
+                enteredByUserId: { type: 'string', nullable: true },
                 employee: {
                   type: 'object',
                   properties: {
@@ -172,5 +174,148 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     controller.listTimeLogs,
+  )
+
+  const timeLogResponseProperties = {
+    id: { type: 'string' },
+    employeeId: { type: 'string' },
+    worksiteId: { type: 'string' },
+    workDate: { type: 'string' },
+    clockIn: { type: 'string' },
+    clockOut: { type: 'string' },
+    breakStart: { type: 'string', nullable: true },
+    breakEnd: { type: 'string', nullable: true },
+    shiftType: { type: 'string' },
+    totalMinutesWorked: { type: 'integer' },
+    notes: { type: 'string', nullable: true },
+    isValidated: { type: 'boolean' },
+    enteredByUserId: { type: 'string', nullable: true },
+    employee: {
+      type: 'object',
+      properties: {
+        fullName: { type: 'string' },
+        registration: { type: 'string' },
+        position: { type: 'string' },
+      },
+    },
+    worksite: {
+      type: 'object',
+      properties: {
+        code: { type: 'string' },
+        name: { type: 'string' },
+      },
+    },
+  }
+
+  // ── PATCH /time-logs/:id/validate ──────────────────────────────────────────
+  app.patch(
+    '/:id/validate',
+    {
+      onRequest: [app.authenticate],
+      preHandler: [app.requireRole([UserRole.MANAGER, UserRole.ADMIN])],
+      schema: {
+        tags: ['TimeLogs'],
+        summary: 'Validar/aprovar um lançamento de horas',
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['isValidated'],
+          properties: {
+            isValidated: { type: 'boolean' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              message: { type: 'string' },
+              timeLog: {
+                type: 'object',
+                properties: timeLogResponseProperties,
+              },
+            },
+          },
+        },
+      },
+    },
+    controller.validateTimeLog,
+  )
+
+  // ── PATCH /time-logs/:id ───────────────────────────────────────────────────
+  app.patch(
+    '/:id',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['TimeLogs'],
+        summary: 'Atualizar um lançamento de horas',
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          properties: {
+            clockIn: { type: 'string' },
+            clockOut: { type: 'string' },
+            breakStart: { type: 'string', nullable: true },
+            breakEnd: { type: 'string', nullable: true },
+            shiftType: { type: 'string', enum: ['REGULAR', 'OVERTIME', 'ON_CALL', 'ABSENCE', 'VACATION', 'HOLIDAY'] },
+            notes: { type: 'string', nullable: true },
+            isValidated: { type: 'boolean' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              message: { type: 'string' },
+              timeLog: {
+                type: 'object',
+                properties: timeLogResponseProperties,
+              },
+            },
+          },
+        },
+      },
+    },
+    controller.updateTimeLog,
+  )
+
+  // ── DELETE /time-logs/:id ──────────────────────────────────────────────────
+  app.delete(
+    '/:id',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['TimeLogs'],
+        summary: 'Excluir um lançamento de horas',
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        response: {
+          204: {
+            type: 'null',
+          },
+        },
+      },
+    },
+    controller.deleteTimeLog,
   )
 }

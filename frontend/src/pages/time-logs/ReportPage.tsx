@@ -16,11 +16,13 @@ import {
   CheckCircle2,
   BarChart2,
   Loader2,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   SHIFT_TYPE_LABELS,
   type ShiftType,
@@ -53,6 +55,9 @@ interface TimeLogEntry {
   overtimeHours: number
   hasInconsistency: boolean
   inconsistencyNote?: string
+  notes?: string | null
+  enteredByUserId?: string | null
+  isValidated: boolean
 }
 
 type PeriodFilter = 'TODAY' | 'WEEK' | 'MONTH'
@@ -178,7 +183,17 @@ function KPICard({ icon: Icon, iconBg, iconColor, label, value, sub, alert }: KP
 
 // ── Linha da tabela ───────────────────────────────────────────────────────────
 
-function TableRow({ log, index }: { log: TimeLogEntry; index: number }) {
+interface TableRowProps {
+  log: TimeLogEntry
+  index: number
+  isAuthorized: boolean
+  currentUserId: string | undefined
+  onValidate: (id: string, isValidated: boolean) => void
+  onEdit: (log: TimeLogEntry) => void
+  onDelete: (log: TimeLogEntry) => void
+}
+
+function TableRow({ log, index, isAuthorized, currentUserId, onValidate, onEdit, onDelete }: TableRowProps) {
   const dateLabel = new Date(log.logDate + 'T12:00:00').toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
@@ -273,6 +288,48 @@ function TableRow({ log, index }: { log: TimeLogEntry; index: number }) {
           </p>
         )}
       </td>
+
+      {/* Ações */}
+      <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
+        <div className="flex items-center gap-1.5 justify-end">
+          {isAuthorized && !log.isValidated && (
+            <button
+              onClick={() => onValidate(log.id, true)}
+              className="text-xs font-bold text-emerald-600 hover:text-white hover:bg-emerald-500 border border-emerald-200 hover:border-emerald-500 bg-emerald-50 px-2 py-1 rounded-lg transition-all duration-150 active:scale-[0.95]"
+              title="Aprovar/Validar"
+            >
+              Aprovar
+            </button>
+          )}
+          {isAuthorized && log.isValidated && (
+            <button
+              onClick={() => onValidate(log.id, false)}
+              className="text-xs font-bold text-gray-600 hover:text-white hover:bg-gray-500 border border-gray-200 hover:border-gray-500 bg-gray-50 px-2 py-1 rounded-lg transition-all duration-150 active:scale-[0.95]"
+              title="Desfazer Validação"
+            >
+              Desfazer
+            </button>
+          )}
+          {(isAuthorized || (!log.isValidated && log.enteredByUserId === currentUserId)) && (
+            <>
+              <button
+                onClick={() => onEdit(log)}
+                className="text-xs font-bold text-blue-600 hover:text-white hover:bg-blue-500 border border-blue-200 hover:border-blue-500 bg-blue-50 px-2 py-1 rounded-lg transition-all duration-150 active:scale-[0.95]"
+                title="Editar horários"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => onDelete(log)}
+                className="text-xs font-bold text-red-600 hover:text-white hover:bg-red-500 border border-red-200 hover:border-red-500 bg-red-50 px-2 py-1 rounded-lg transition-all duration-150 active:scale-[0.95]"
+                title="Excluir lançamento"
+              >
+                Excluir
+              </button>
+            </>
+          )}
+        </div>
+      </td>
     </tr>
   )
 }
@@ -311,7 +368,37 @@ function SortableTh({ label, sortKey, currentKey, currentDir, onSort }: Sortable
 
 // ── Página principal ──────────────────────────────────────────────────────────
 
+const validateTimes = (
+  entry: string,
+  start: string,
+  end: string,
+  exit: string,
+): string | null => {
+  if (!entry || !exit) return 'Entrada e Saída são obrigatórios.'
+  const toM = (t: string) => {
+    const [h, m] = t.split(':').map(Number)
+    return h! * 60 + m!
+  }
+  const entM = toM(entry)
+  const extM = toM(exit)
+  if (extM <= entM) return 'Horário de saída deve ser posterior ao de entrada.'
+
+  if (start || end) {
+    if (!start || !end) return 'O intervalo de almoço deve ter início e fim informados juntos.'
+    const stM = toM(start)
+    const ndM = toM(end)
+    if (stM <= entM) return 'Início do intervalo deve ser após a entrada.'
+    if (ndM >= extM) return 'Fim do intervalo deve ser antes da saída.'
+    if (ndM <= stM) return 'Fim do intervalo deve ser após o início.'
+  }
+  return null
+}
+
 export default function ReportPage() {
+  const { user: currentUser } = useAuth()
+  const currentUserId = currentUser?.id
+  const isAuthorized = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+
   // ── Estados de Dados e Filtro ───────────────────────────────────────────
   const [logs, setLogs] = useState<ApiTimeLog[]>([])
   const [worksites, setWorksites] = useState<ApiWorksite[]>([])
@@ -326,6 +413,79 @@ export default function ReportPage() {
   // ── Ordenação ──────────────────────────────────────────────────────────
   const [sortKey, setSortKey] = useState<SortKey>('logDate')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  // ── Ações/Modais ───────────────────────────────────────────────────────
+  const [editingLog, setEditingLog] = useState<TimeLogEntry | null>(null)
+  const [deletingLog, setDeletingLog] = useState<TimeLogEntry | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSubmitting, setActionSubmitting] = useState(false)
+
+  // Estados locais do formulário de edição
+  const [editEntryTime, setEditEntryTime] = useState('')
+  const [editExitTime, setEditExitTime] = useState('')
+  const [editBreakStart, setEditBreakStart] = useState('')
+  const [editBreakEnd, setEditBreakEnd] = useState('')
+  const [editShiftType, setEditShiftType] = useState<ShiftType>('REGULAR')
+  const [editNotes, setEditNotes] = useState('')
+
+  const handleValidate = async (id: string, isValidated: boolean) => {
+    try {
+      setLoading(true)
+      await timeLogsApi.validate(id, { isValidated })
+      loadData()
+    } catch (err: any) {
+      console.error(err)
+      alert(err?.message ?? 'Falha ao validar lançamento de horas.')
+      setLoading(false)
+    }
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingLog) return
+
+    const timeError = validateTimes(editEntryTime, editBreakStart, editBreakEnd, editExitTime)
+    if (timeError) {
+      setActionError(timeError)
+      return
+    }
+
+    try {
+      setActionSubmitting(true)
+      setActionError(null)
+      await timeLogsApi.update(editingLog.id, {
+        clockIn: editEntryTime,
+        clockOut: editExitTime,
+        breakStart: editBreakStart || null,
+        breakEnd: editBreakEnd || null,
+        shiftType: editShiftType,
+        notes: editNotes.trim() || null,
+      })
+      setEditingLog(null)
+      loadData()
+    } catch (err: any) {
+      console.error(err)
+      setActionError(err?.message ?? 'Falha ao atualizar lançamento de horas.')
+    } finally {
+      setActionSubmitting(false)
+    }
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingLog) return
+    try {
+      setActionSubmitting(true)
+      setActionError(null)
+      await timeLogsApi.delete(deletingLog.id)
+      setDeletingLog(null)
+      loadData()
+    } catch (err: any) {
+      console.error(err)
+      setActionError(err?.message ?? 'Falha ao excluir lançamento de horas.')
+    } finally {
+      setActionSubmitting(false)
+    }
+  }
 
   const handleSort = useCallback((key: SortKey) => {
     setSortKey((prev) => {
@@ -418,6 +578,9 @@ export default function ReportPage() {
         overtimeHours,
         hasInconsistency,
         inconsistencyNote,
+        notes: log.notes,
+        enteredByUserId: log.enteredByUserId,
+        isValidated: log.isValidated,
       }
     })
   }, [logs])
@@ -658,11 +821,33 @@ export default function ReportPage() {
                   <SortableTh label="Horas"          sortKey="totalHours"    currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                   <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Turno</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                  <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedLogs.map((log, i) => (
-                  <TableRow key={log.id} log={log} index={i} />
+                  <TableRow
+                    key={log.id}
+                    log={log}
+                    index={i}
+                    isAuthorized={isAuthorized}
+                    currentUserId={currentUserId}
+                    onValidate={handleValidate}
+                    onEdit={(l) => {
+                      setEditingLog(l)
+                      setEditEntryTime(l.entryTime)
+                      setEditExitTime(l.exitTime)
+                      setEditBreakStart(l.breakStartTime || '')
+                      setEditBreakEnd(l.breakEndTime || '')
+                      setEditShiftType(l.shiftType)
+                      setEditNotes(l.notes || '')
+                      setActionError(null)
+                    }}
+                    onDelete={(l) => {
+                      setDeletingLog(l)
+                      setActionError(null)
+                    }}
+                  />
                 ))}
               </tbody>
               {/* Rodapé com totais */}
@@ -681,7 +866,7 @@ export default function ReportPage() {
                       </p>
                     )}
                   </td>
-                  <td colSpan={2} className="px-3 py-3">
+                  <td colSpan={3} className="px-3 py-3">
                     {kpis.inconsistencies > 0 ? (
                       <span className="text-xs font-semibold text-red-600 flex items-center gap-1">
                         <AlertCircle size={13} />
@@ -711,6 +896,201 @@ export default function ReportPage() {
               As linhas marcadas em vermelho requerem revisão do gestor ou encarregado.
               Use o botão "Exportar CSV" para compartilhar com o RH.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Edição ──────────────────────────────────────────────── */}
+      {editingLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white w-full max-w-lg rounded-3xl border border-gray-100 shadow-xl overflow-hidden animate-scale-in">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-slate-50">
+              <div>
+                <h3 className="font-bold text-gray-900 text-lg">Editar Lançamento</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {editingLog.employeeName} · {editingLog.registration}
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingLog(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              {actionError && (
+                <div className="p-3.5 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2.5 text-xs text-red-800">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span>{actionError}</span>
+                </div>
+              )}
+
+              {/* Grid Entrada e Saída */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                    Entrada
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={editEntryTime}
+                    onChange={(e) => setEditEntryTime(e.target.value)}
+                    className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                    Saída
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={editExitTime}
+                    onChange={(e) => setEditExitTime(e.target.value)}
+                    className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+                  />
+                </div>
+              </div>
+
+              {/* Grid Intervalo */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                    Início Intervalo
+                  </label>
+                  <input
+                    type="time"
+                    value={editBreakStart}
+                    onChange={(e) => setEditBreakStart(e.target.value)}
+                    className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                    Fim Intervalo
+                  </label>
+                  <input
+                    type="time"
+                    value={editBreakEnd}
+                    onChange={(e) => setEditBreakEnd(e.target.value)}
+                    className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+                  />
+                </div>
+              </div>
+
+              {/* Tipo de Turno */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                  Tipo de Turno
+                </label>
+                <select
+                  value={editShiftType}
+                  onChange={(e) => setEditShiftType(e.target.value as ShiftType)}
+                  className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+                  required
+                >
+                  <option value="REGULAR">Regular</option>
+                  <option value="OVERTIME">Hora Extra</option>
+                  <option value="ON_CALL">Sobreaviso</option>
+                  <option value="ABSENCE">Falta</option>
+                  <option value="VACATION">Férias</option>
+                  <option value="HOLIDAY">Feriado</option>
+                </select>
+              </div>
+
+              {/* Observações */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                  Observações / Justificativa
+                </label>
+                <textarea
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="Justifique as alterações nos horários se necessário..."
+                  className="mt-1.5 w-full h-24 rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150 resize-none"
+                  maxLength={500}
+                />
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-3 pt-3 border-t border-gray-100 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingLog(null)}
+                  disabled={actionSubmitting}
+                  className="px-4 py-2 font-semibold"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="accent"
+                  disabled={actionSubmitting}
+                  className="px-6 py-2 font-semibold flex items-center gap-2"
+                >
+                  {actionSubmitting && <Loader2 size={14} className="animate-spin" />}
+                  Salvar
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Confirmação de Exclusão ──────────────────────────────────── */}
+      {deletingLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl border border-gray-100 shadow-xl overflow-hidden animate-scale-in">
+            {/* Header */}
+            <div className="p-6 pb-4 border-b border-gray-100 flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 text-lg">Excluir Lançamento</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Tem certeza que deseja excluir o lançamento de horas para <span className="font-semibold text-gray-800">{deletingLog.employeeName}</span> no dia <span className="font-semibold text-gray-800">{deletingLog.logDate.split('-').reverse().join('/')}</span>?
+                </p>
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {actionError && (
+              <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-800 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <span>{actionError}</span>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="bg-slate-50 px-6 py-4 flex gap-3 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeletingLog(null)}
+                disabled={actionSubmitting}
+                className="px-4 py-2 font-semibold"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleDeleteConfirm}
+                disabled={actionSubmitting}
+                className="bg-red-600 hover:bg-red-700 text-white border-2 border-red-600 hover:border-red-700 px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2"
+              >
+                {actionSubmitting && <Loader2 size={14} className="animate-spin" />}
+                Confirmar Exclusão
+              </Button>
+            </div>
           </div>
         </div>
       )}

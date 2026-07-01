@@ -11,7 +11,7 @@
 
 import { prisma } from '../../lib/prisma.js'
 import { UserRole } from '@prisma/client'
-import type { BulkTimeLogBody, DuplicateEmployeeDetail, ListTimeLogsQuery } from './time-logs.schema.js'
+import type { BulkTimeLogBody, DuplicateEmployeeDetail, ListTimeLogsQuery, ValidateTimeLogBody, UpdateTimeLogBody } from './time-logs.schema.js'
 import type { JwtPayload } from '../../types/fastify.js'
 
 // ── Erros de domínio ──────────────────────────────────────────────────────────
@@ -63,6 +63,22 @@ export class DuplicateTimeLogError extends Error {
   }
 }
 
+export class TimeLogNotFoundError extends Error {
+  readonly statusCode = 404
+  constructor(id: string) {
+    super(`Lançamento de horas não encontrado: ${id}`)
+    this.name = 'TimeLogNotFoundError'
+  }
+}
+
+export class ForbiddenError extends Error {
+  readonly statusCode = 403
+  constructor(message: string) {
+    super(message)
+    this.name = 'ForbiddenError'
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
@@ -77,6 +93,21 @@ function buildDateTime(
   const mm = String(time.minutes).padStart(2, '0')
   const isoStr = `${workDateStr}T${hh}:${mm}:00-03:00`
   return new Date(isoStr)
+}
+
+function parseTime(timeStr: string) {
+  const [hh, mm] = timeStr.split(':').map(Number)
+  return { hours: hh!, minutes: mm!, totalMinutes: hh! * 60 + mm! }
+}
+
+function getTimeStringFromDate(d: Date): string {
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  return formatter.format(d)
 }
 
 /**
@@ -289,6 +320,130 @@ export const timeLogsService = {
         },
       },
       orderBy: { workDate: 'desc' },
+    })
+  },
+
+  async validate(id: string, body: ValidateTimeLogBody, currentUser: JwtPayload) {
+    if (currentUser.role !== UserRole.MANAGER && currentUser.role !== UserRole.ADMIN) {
+      throw new ForbiddenError('Somente gestores ou administradores podem validar lançamentos.')
+    }
+
+    const existing = await prisma.timeLog.findUnique({
+      where: { id },
+    })
+    if (!existing) throw new TimeLogNotFoundError(id)
+
+    return prisma.timeLog.update({
+      where: { id },
+      data: {
+        isValidated: body.isValidated,
+        validatedAt: body.isValidated ? new Date() : null,
+        validatedByUserId: body.isValidated ? currentUser.sub : null,
+      },
+      include: {
+        employee: {
+          select: { id: true, fullName: true, registration: true, position: true },
+        },
+        worksite: {
+          select: { id: true, code: true, name: true },
+        },
+      },
+    })
+  },
+
+  async update(id: string, body: UpdateTimeLogBody, currentUser: JwtPayload) {
+    const existing = await prisma.timeLog.findUnique({
+      where: { id },
+    })
+    if (!existing) throw new TimeLogNotFoundError(id)
+
+    // Permissões
+    if (currentUser.role !== UserRole.MANAGER && currentUser.role !== UserRole.ADMIN) {
+      if (existing.isValidated) {
+        throw new ForbiddenError('Não é possível alterar um lançamento já validado.')
+      }
+      if (existing.enteredByUserId !== currentUser.sub) {
+        throw new ForbiddenError('Você não tem permissão para alterar este lançamento.')
+      }
+    }
+
+    // Merge e cálculo de horários usando America/Sao_Paulo timezone
+    const workDateStr = existing.workDate.toISOString().split('T')[0]!
+
+    const clockInStr = body.clockIn !== undefined ? body.clockIn : (existing.clockIn ? getTimeStringFromDate(existing.clockIn) : '08:00')
+    const clockOutStr = body.clockOut !== undefined ? body.clockOut : (existing.clockOut ? getTimeStringFromDate(existing.clockOut) : '17:00')
+    const breakStartStr = body.breakStart !== undefined ? body.breakStart : (existing.breakStart ? getTimeStringFromDate(existing.breakStart) : null)
+    const breakEndStr = body.breakEnd !== undefined ? body.breakEnd : (existing.breakEnd ? getTimeStringFromDate(existing.breakEnd) : null)
+
+    const clockInParsed = parseTime(clockInStr)
+    const clockOutParsed = parseTime(clockOutStr)
+    const breakStartParsed = breakStartStr ? parseTime(breakStartStr) : undefined
+    const breakEndParsed = breakEndStr ? parseTime(breakEndStr) : undefined
+
+    const clockInDt = buildDateTime(workDateStr, clockInParsed)
+    const clockOutDt = buildDateTime(workDateStr, clockOutParsed)
+    const breakStartDt = breakStartStr ? buildDateTime(workDateStr, breakStartParsed!) : null
+    const breakEndDt = breakEndStr ? buildDateTime(workDateStr, breakEndParsed!) : null
+
+    const totalMinutesWorked = calcTotalMinutes(
+      clockInParsed,
+      clockOutParsed,
+      breakStartParsed,
+      breakEndParsed,
+    )
+
+    const updateData: any = {
+      clockIn: clockInDt,
+      clockOut: clockOutDt,
+      breakStart: breakStartDt,
+      breakEnd: breakEndDt,
+      totalMinutesWorked,
+    }
+
+    if (body.shiftType !== undefined) updateData.shiftType = body.shiftType
+    if (body.notes !== undefined) updateData.notes = body.notes
+    if (body.isValidated !== undefined) {
+      if (currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.ADMIN) {
+        updateData.isValidated = body.isValidated
+        updateData.validatedAt = body.isValidated ? new Date() : null
+        updateData.validatedByUserId = body.isValidated ? currentUser.sub : null
+      } else {
+        throw new ForbiddenError('Somente gestores ou administradores podem alterar o status de validação.')
+      }
+    }
+
+    return prisma.timeLog.update({
+      where: { id },
+      data: updateData,
+      include: {
+        employee: {
+          select: { id: true, fullName: true, registration: true, position: true },
+        },
+        worksite: {
+          select: { id: true, code: true, name: true },
+        },
+      },
+    })
+  },
+
+  async delete(id: string, currentUser: JwtPayload) {
+    const existing = await prisma.timeLog.findUnique({
+      where: { id },
+    })
+    if (!existing) throw new TimeLogNotFoundError(id)
+
+    // Permissões
+    if (currentUser.role !== UserRole.MANAGER && currentUser.role !== UserRole.ADMIN) {
+      if (existing.isValidated) {
+        throw new ForbiddenError('Não é possível excluir um lançamento já validado.')
+      }
+      if (existing.enteredByUserId !== currentUser.sub) {
+        throw new ForbiddenError('Você não tem permissão para excluir este lançamento.')
+      }
+    }
+
+    await prisma.timeLog.delete({
+      where: { id },
     })
   },
 }

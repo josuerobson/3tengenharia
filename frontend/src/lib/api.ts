@@ -569,6 +569,7 @@ export interface ApiTimeLog {
   totalMinutesWorked: number
   notes?: string | null
   isValidated: boolean
+  enteredByUserId?: string | null
   employee: {
     fullName: string
     registration: string
@@ -625,6 +626,40 @@ export const timeLogsApi = {
     return request('/time-logs/bulk', {
       method: 'POST',
       body: JSON.stringify(data),
+    })
+  },
+
+  validate(
+    id: string,
+    data: { isValidated: boolean },
+  ): Promise<{ message: string; timeLog: ApiTimeLog }> {
+    return request(`/time-logs/${id}/validate`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
+  update(
+    id: string,
+    data: Partial<{
+      clockIn: string
+      clockOut: string
+      breakStart: string | null
+      breakEnd: string | null
+      shiftType: string
+      notes: string | null
+      isValidated: boolean
+    }>,
+  ): Promise<{ message: string; timeLog: ApiTimeLog }> {
+    return request(`/time-logs/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
+  delete(id: string): Promise<void> {
+    return request(`/time-logs/${id}`, {
+      method: 'DELETE',
     })
   },
 }

@@ -126,3 +126,38 @@ export const listTimeLogsQuerySchema = z.object({
 
 export type ListTimeLogsQuery = z.infer<typeof listTimeLogsQuerySchema>
 
+export const validateTimeLogBodySchema = z.object({
+  isValidated: z.boolean({ required_error: 'isValidated é obrigatório.' }),
+})
+
+export type ValidateTimeLogBody = z.infer<typeof validateTimeLogBodySchema>
+
+export const updateTimeLogBodySchema = z.object({
+  clockIn: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, 'Horário deve estar no formato HH:mm.')
+    .optional(),
+  clockOut: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, 'Horário deve estar no formato HH:mm.')
+    .optional(),
+  breakStart: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, 'Horário deve estar no formato HH:mm.')
+    .optional()
+    .nullable(),
+  breakEnd: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, 'Horário deve estar no formato HH:mm.')
+    .optional()
+    .nullable(),
+  shiftType: z
+    .enum(['REGULAR', 'OVERTIME', 'ON_CALL', 'ABSENCE', 'VACATION', 'HOLIDAY'])
+    .optional(),
+  notes: z.string().trim().max(500).optional().nullable(),
+  isValidated: z.boolean().optional(),
+})
+
+export type UpdateTimeLogBody = z.infer<typeof updateTimeLogBodySchema>
+
+

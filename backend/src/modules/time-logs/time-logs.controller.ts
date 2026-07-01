@@ -1,13 +1,20 @@
 // src/modules/time-logs/time-logs.controller.ts
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import { bulkTimeLogBodySchema, listTimeLogsQuerySchema } from './time-logs.schema.js'
+import {
+  bulkTimeLogBodySchema,
+  listTimeLogsQuerySchema,
+  validateTimeLogBodySchema,
+  updateTimeLogBodySchema,
+} from './time-logs.schema.js'
 import {
   timeLogsService,
   WorksiteNotFoundError,
   CoordinatorWorksiteMismatchError,
   EmployeeNotLinkedError,
   DuplicateTimeLogError,
+  TimeLogNotFoundError,
+  ForbiddenError,
 } from './time-logs.service.js'
 
 const DOMAIN_ERRORS = [
@@ -15,6 +22,8 @@ const DOMAIN_ERRORS = [
   CoordinatorWorksiteMismatchError,
   EmployeeNotLinkedError,
   DuplicateTimeLogError,
+  TimeLogNotFoundError,
+  ForbiddenError,
 ]
 
 function rethrowDomain(err: unknown): never {
@@ -69,6 +78,58 @@ export function timeLogsController(_app: FastifyInstance) {
       }
 
       return reply.status(200).send(result)
+    },
+
+    // ── PATCH /time-logs/:id/validate ────────────────────────────────────────
+    async validateTimeLog(request: FastifyRequest, reply: FastifyReply) {
+      const { id } = request.params as { id: string }
+      const body = validateTimeLogBodySchema.parse(request.body)
+      const currentUser = request.currentUser
+
+      let result
+      try {
+        result = await timeLogsService.validate(id, body, currentUser)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+
+      return reply.status(200).send({
+        message: body.isValidated ? 'Lançamento validado com sucesso.' : 'Validação revogada com sucesso.',
+        timeLog: result,
+      })
+    },
+
+    // ── PATCH /time-logs/:id ─────────────────────────────────────────────────
+    async updateTimeLog(request: FastifyRequest, reply: FastifyReply) {
+      const { id } = request.params as { id: string }
+      const body = updateTimeLogBodySchema.parse(request.body)
+      const currentUser = request.currentUser
+
+      let result
+      try {
+        result = await timeLogsService.update(id, body, currentUser)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+
+      return reply.status(200).send({
+        message: 'Lançamento atualizado com sucesso.',
+        timeLog: result,
+      })
+    },
+
+    // ── DELETE /time-logs/:id ─────────────────────────────────────────────────
+    async deleteTimeLog(request: FastifyRequest, reply: FastifyReply) {
+      const { id } = request.params as { id: string }
+      const currentUser = request.currentUser
+
+      try {
+        await timeLogsService.delete(id, currentUser)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+
+      return reply.status(204).send()
     },
   }
 }
