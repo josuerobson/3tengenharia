@@ -8,6 +8,7 @@ import {
   ChevronDown, ChevronUp, X, Filter, Download,
   AlertTriangle, CheckCircle2, TrendingUp, Car,
   Navigation, Route, ArrowRight, Eye, RefreshCw,
+  ExternalLink,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { tripsApi, type ApiTrip } from '@/lib/api'
@@ -223,18 +224,38 @@ function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void })
                     <MapPin size={12} className="text-emerald-500" />
                     <p className="text-xs text-gray-400 font-medium">GPS Partida</p>
                   </div>
-                  <p className="text-xs font-semibold text-gray-700 leading-snug">
-                    {trip.departureGeolocation ?? 'Não disponível'}
-                  </p>
+                  {trip.departureGeolocation ? (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.departureGeolocation)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1 mt-0.5"
+                    >
+                      <span>{trip.departureGeolocation}</span>
+                      <ExternalLink size={10} className="flex-shrink-0" />
+                    </a>
+                  ) : (
+                    <p className="text-xs text-gray-400 mt-0.5">Não disponível</p>
+                  )}
                 </div>
                 <div className="p-3">
                   <div className="flex items-center gap-1.5 mb-1">
                     <MapPin size={12} className="text-red-500" />
                     <p className="text-xs text-gray-400 font-medium">GPS Chegada</p>
                   </div>
-                  <p className="text-xs font-semibold text-gray-700 leading-snug">
-                    {trip.arrivalGeolocation ?? 'Não disponível'}
-                  </p>
+                  {trip.arrivalGeolocation ? (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.arrivalGeolocation)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1 mt-0.5"
+                    >
+                      <span>{trip.arrivalGeolocation}</span>
+                      <ExternalLink size={10} className="flex-shrink-0" />
+                    </a>
+                  ) : (
+                    <p className="text-xs text-gray-400 mt-0.5">Não disponível</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -723,13 +744,29 @@ export default function TripHistoryPage() {
                     {trip.departureGeolocation && (
                       <div className="col-span-2">
                         <p className="text-xs text-gray-400 mb-0.5 flex items-center gap-1"><MapPin size={10} className="text-emerald-500"/>GPS Partida</p>
-                        <p className="text-xs font-medium text-gray-700">{trip.departureGeolocation}</p>
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.departureGeolocation)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-semibold text-brand-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          <span>{trip.departureGeolocation}</span>
+                          <ExternalLink size={10} />
+                        </a>
                       </div>
                     )}
                     {trip.arrivalGeolocation && (
                       <div className="col-span-2">
                         <p className="text-xs text-gray-400 mb-0.5 flex items-center gap-1"><MapPin size={10} className="text-red-500"/>GPS Chegada</p>
-                        <p className="text-xs font-medium text-gray-700">{trip.arrivalGeolocation}</p>
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.arrivalGeolocation)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-semibold text-brand-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          <span>{trip.arrivalGeolocation}</span>
+                          <ExternalLink size={10} />
+                        </a>
                       </div>
                     )}
                   </div>
