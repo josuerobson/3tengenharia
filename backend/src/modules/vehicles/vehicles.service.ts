@@ -232,6 +232,7 @@ export const vehiclesService = {
         departureDateTime: new Date(),
         initialKm: body.initialKm,
         maintenanceAlertActive,
+        departureGeolocation: body.departureGeolocation ?? null,
       },
       include: {
         vehicle: { select: { id: true, licensePlate: true, model: true } },
@@ -292,6 +293,7 @@ export const vehiclesService = {
           distanceTraveled,
           arrivalDateTime,
           notes: body.notes ?? null,
+          arrivalGeolocation: body.arrivalGeolocation ?? null,
         },
         include: {
           vehicle: { select: { id: true, licensePlate: true, model: true } },

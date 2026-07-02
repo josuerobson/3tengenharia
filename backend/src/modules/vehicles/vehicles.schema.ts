@@ -28,6 +28,7 @@ export const startTripBodySchema = z.object({
     .trim(),
 
   purpose: z.string().trim().max(500).optional(),
+  departureGeolocation: z.string().trim().optional(),
 })
 
 export type StartTripBody = z.infer<typeof startTripBodySchema>
@@ -48,6 +49,7 @@ export const endTripBodySchema = z.object({
   arrivalDateTime: z.coerce.date().optional(),
 
   notes: z.string().trim().max(1000).optional(),
+  arrivalGeolocation: z.string().trim().optional(),
 })
 
 export type EndTripParams = z.infer<typeof endTripParamsSchema>

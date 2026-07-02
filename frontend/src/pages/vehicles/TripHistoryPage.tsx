@@ -214,6 +214,32 @@ function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void })
             </div>
           </div>
 
+          {/* Geolocalizações */}
+          {(trip.departureGeolocation || trip.arrivalGeolocation) && (
+            <div className="rounded-2xl border border-gray-100 overflow-hidden">
+              <div className="grid grid-cols-2 divide-x divide-gray-100 bg-gray-50/50">
+                <div className="p-3">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <MapPin size={12} className="text-emerald-500" />
+                    <p className="text-xs text-gray-400 font-medium">GPS Partida</p>
+                  </div>
+                  <p className="text-xs font-semibold text-gray-700 leading-snug">
+                    {trip.departureGeolocation ?? 'Não disponível'}
+                  </p>
+                </div>
+                <div className="p-3">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <MapPin size={12} className="text-red-500" />
+                    <p className="text-xs text-gray-400 font-medium">GPS Chegada</p>
+                  </div>
+                  <p className="text-xs font-semibold text-gray-700 leading-snug">
+                    {trip.arrivalGeolocation ?? 'Não disponível'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Alerta de manutenção */}
           {trip.maintenanceAlertActive && (
             <div className="flex items-start gap-3 p-3 rounded-2xl bg-red-50 border border-red-200">
@@ -694,6 +720,18 @@ export default function TripHistoryPage() {
                       <p className="text-xs text-gray-400 mb-0.5 flex items-center gap-1"><Navigation size={10}/>Finalidade</p>
                       <p className="text-xs font-medium text-gray-700">{trip.purpose}</p>
                     </div>
+                    {trip.departureGeolocation && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-400 mb-0.5 flex items-center gap-1"><MapPin size={10} className="text-emerald-500"/>GPS Partida</p>
+                        <p className="text-xs font-medium text-gray-700">{trip.departureGeolocation}</p>
+                      </div>
+                    )}
+                    {trip.arrivalGeolocation && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-400 mb-0.5 flex items-center gap-1"><MapPin size={10} className="text-red-500"/>GPS Chegada</p>
+                        <p className="text-xs font-medium text-gray-700">{trip.arrivalGeolocation}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

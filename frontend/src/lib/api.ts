@@ -123,6 +123,8 @@ export interface ApiTrip {
   distanceTraveled: number | null
   maintenanceAlertActive: boolean
   notes: string | null
+  departureGeolocation: string | null
+  arrivalGeolocation: string | null
   createdAt: string
   vehicle: {
     id: string
@@ -194,6 +196,7 @@ export const tripsApi = {
     destination: string
     purpose?: string
     driverEmployeeId?: string
+    departureGeolocation?: string
   }): Promise<{ message: string; trip: ApiTrip; maintenanceAlert?: unknown }> {
     return request('/vehicles/trips/start', { method: 'POST', body: JSON.stringify(data) })
   },
@@ -202,6 +205,7 @@ export const tripsApi = {
     finalKm: number
     arrivalDateTime?: string
     notes?: string
+    arrivalGeolocation?: string
   }): Promise<{ message: string; trip: ApiTrip; distanceTraveled: number }> {
     return request(`/vehicles/trips/${tripId}/end`, { method: 'POST', body: JSON.stringify(data) })
   },

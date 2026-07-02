@@ -324,6 +324,26 @@ interface DepartureData {
 
 type TripPageState = 'STEP_1' | 'STEP_2' | 'COMPLETED'
 
+function getCurrentCoordinates(): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(null)
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        resolve(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`)
+      },
+      (error) => {
+        console.warn('Erro ao obter geolocalização:', error.message)
+        resolve(null)
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    )
+  })
+}
+
 // ── Página principal ─────────────────────────────────────────────────────────
 
 export default function TripStartPage() {
@@ -481,12 +501,14 @@ export default function TripStartPage() {
     setApiError(null)
     try {
       const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+      const coords = await getCurrentCoordinates()
       const res = await tripsApi.start({
         vehicleId:   selectedVehicle.id,
         initialKm:   initialKmValue,
         origin:      origin.trim(),
         destination: destination.trim(),
         purpose:     purpose.trim() || undefined,
+        departureGeolocation: coords || undefined,
         ...(isManagerOrAdmin && selectedDriverId ? { driverEmployeeId: selectedDriverId } : {}),
       })
       setActiveTripId(res.trip.id)
@@ -512,7 +534,8 @@ export default function TripStartPage() {
     setIsSubmitting(true)
     setApiError(null)
     try {
-      await tripsApi.end(activeTripId, { finalKm: finalKmValue })
+      const coords = await getCurrentCoordinates()
+      await tripsApi.end(activeTripId, { finalKm: finalKmValue, arrivalGeolocation: coords || undefined })
       setPageState('COMPLETED')
     } catch (err) {
       setApiError(err instanceof Error ? err.message : 'Erro ao encerrar viagem.')
