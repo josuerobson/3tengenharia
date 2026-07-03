@@ -387,6 +387,15 @@ export default function TripStartPage() {
   const [purpose, setPurpose]                 = useState('')
   const [step1Errors, setStep1Errors]         = useState<Partial<Record<string, string>>>({})
 
+  // Auto-preenche o KM inicial com o odômetro atual do veículo selecionado
+  useEffect(() => {
+    if (selectedVehicle) {
+      setInitialKm(selectedVehicle.currentKm.toString())
+    } else {
+      setInitialKm('')
+    }
+  }, [selectedVehicle])
+
   // ── Dados do Passo 2 ───────────────────────────────────────────────────
   const [departureData, setDepartureData] = useState<DepartureData | null>(null)
   const [finalKm, setFinalKm]             = useState('')
