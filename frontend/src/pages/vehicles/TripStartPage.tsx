@@ -35,7 +35,7 @@ import {
   formatKm,
   formatDuration,
 } from '@/data/mockData'
-import { vehiclesApi, tripsApi, assetsApi, type ApiVehicle, type ApiTrip, type ApiEmployee, type ApiWorksite } from '@/lib/api'
+import { vehiclesApi, tripsApi, assetsApi, authApi, type ApiVehicle, type ApiTrip, type ApiEmployee, type ApiWorksite } from '@/lib/api'
 import IncidentReportModal from '@/components/vehicles/IncidentReportModal'
 
 // Usa ApiVehicle como tipo Vehicle para este componente
@@ -408,6 +408,7 @@ export default function TripStartPage() {
   const [isSubmitting, setIsSubmitting]   = useState(false)
   const [arrivalOdometerPhoto, setArrivalOdometerPhoto] = useState<string>('')
   const odometerFileInputRef              = useRef<HTMLInputElement>(null)
+  const [currentEmployeeProfile, setCurrentEmployeeProfile] = useState<ApiEmployee | null>(null)
 
   const selectedDriver = useMemo(() => {
     const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
@@ -421,13 +422,13 @@ export default function TripStartPage() {
     const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
     const expiryStr = isManagerOrAdmin
       ? selectedDriver?.cnhExpirationDate
-      : currentUser?.cnhExpirationDate
+      : currentEmployeeProfile?.cnhExpirationDate
 
     if (!expiryStr) return false
     const expiryDate = new Date(expiryStr)
     expiryDate.setHours(23, 59, 59, 999)
     return expiryDate < new Date()
-  }, [selectedDriver, currentUser])
+  }, [selectedDriver, currentEmployeeProfile, currentUser])
 
   // ── Carregamento centralizado de dados ──────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -435,11 +436,12 @@ export default function TripStartPage() {
     setApiError(null)
     try {
       const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
-      const [vehRes, tripsRes, empRes, worksitesRes] = await Promise.all([
+      const [vehRes, tripsRes, empRes, worksitesRes, meRes] = await Promise.all([
         vehiclesApi.list(),
         tripsApi.list({ limit: 100 }),
         isManagerOrAdmin ? assetsApi.listEmployees() : Promise.resolve([]),
         assetsApi.listWorksites(),
+        !isManagerOrAdmin ? authApi.me() : Promise.resolve(null),
       ])
       setVehiclesList(vehRes.vehicles)
       const openTrips = tripsRes.trips.filter(t => t.arrivalDateTime === null || t.finalKm === null)
@@ -449,6 +451,9 @@ export default function TripStartPage() {
       }
       if (Array.isArray(worksitesRes)) {
         setWorksitesList(worksitesRes)
+      }
+      if (meRes?.user?.employee) {
+        setCurrentEmployeeProfile(meRes.user.employee as unknown as ApiEmployee)
       }
     } catch (err) {
       setApiError(err instanceof Error ? err.message : 'Erro ao carregar dados do servidor.')

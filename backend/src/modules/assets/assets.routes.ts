@@ -355,6 +355,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
                 fullName: { type: 'string' },
                 registration: { type: 'string' },
                 position: { type: 'string' },
+                cnhExpirationDate: { type: ['string', 'null'] },
               },
             },
           },
