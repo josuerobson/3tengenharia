@@ -342,6 +342,8 @@ export const vehiclesService = {
           distanceTraveled:      true,
           maintenanceAlertActive: true,
           notes:                 true,
+          departureGeolocation:  true,
+          arrivalGeolocation:    true,
           createdAt:             true,
           vehicle: {
             select: {
