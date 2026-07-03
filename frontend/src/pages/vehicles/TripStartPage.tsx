@@ -261,6 +261,26 @@ function VehicleCombobox({ value, onChange, error, vehicles, loadingVehicles }: 
                 const isDisabled = vehicle.status !== 'ACTIVE' || hasActiveTrip
                 const isSelected = value?.id === vehicle.id
 
+                const needsMaintenance = (() => {
+                  let kmAlert = false
+                  let dayAlert = false
+                  if (vehicle.maintenanceKmThreshold !== null) {
+                    const baseKm = vehicle.lastMaintenanceKm ?? 0
+                    if (vehicle.currentKm - baseKm >= vehicle.maintenanceKmThreshold) {
+                      kmAlert = true
+                    }
+                  }
+                  if (vehicle.maintenanceDayThreshold !== null && vehicle.lastMaintenanceDate) {
+                    const lastDate = new Date(vehicle.lastMaintenanceDate)
+                    const msPerDay = 1000 * 60 * 60 * 24
+                    const daysSince = Math.floor((new Date().getTime() - lastDate.getTime()) / msPerDay)
+                    if (daysSince >= vehicle.maintenanceDayThreshold) {
+                      dayAlert = true
+                    }
+                  }
+                  return kmAlert || dayAlert
+                })()
+
                 return (
                   <button
                     key={vehicle.id}
@@ -283,7 +303,7 @@ function VehicleCombobox({ value, onChange, error, vehicles, loadingVehicles }: 
                       <Car size={15} className="text-brand-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-sm text-gray-900">
                           {vehicle.licensePlate}
                         </span>
@@ -294,6 +314,11 @@ function VehicleCombobox({ value, onChange, error, vehicles, loadingVehicles }: 
                         ) : (
                           <Badge variant={badge.variant} dot>
                             {badge.label}
+                          </Badge>
+                        )}
+                        {needsMaintenance && (
+                          <Badge variant="critical" dot className="animate-pulse flex-shrink-0">
+                            Manutenção Crítica
                           </Badge>
                         )}
                       </div>
@@ -429,6 +454,51 @@ export default function TripStartPage() {
     expiryDate.setHours(23, 59, 59, 999)
     return expiryDate < new Date()
   }, [selectedDriver, currentEmployeeProfile, currentUser])
+
+  const vehicleMaintenanceAlert = useMemo(() => {
+    if (!selectedVehicle) return null
+
+    let kmAlert = false
+    let dayAlert = false
+    let kmSince: number | undefined
+    let daysSince: number | undefined
+
+    if (selectedVehicle.maintenanceKmThreshold !== null) {
+      const baseKm = selectedVehicle.lastMaintenanceKm ?? 0
+      kmSince = selectedVehicle.currentKm - baseKm
+      if (kmSince >= selectedVehicle.maintenanceKmThreshold) {
+        kmAlert = true
+      }
+    }
+
+    if (selectedVehicle.maintenanceDayThreshold !== null && selectedVehicle.lastMaintenanceDate) {
+      const now = new Date()
+      const lastDate = new Date(selectedVehicle.lastMaintenanceDate)
+      const msPerDay = 1000 * 60 * 60 * 24
+      daysSince = Math.floor((now.getTime() - lastDate.getTime()) / msPerDay)
+      if (daysSince >= selectedVehicle.maintenanceDayThreshold) {
+        dayAlert = true
+      }
+    }
+
+    if (!kmAlert && !dayAlert) return null
+
+    const messages: string[] = []
+    if (kmAlert && kmSince !== undefined) {
+      messages.push(
+        `Ultrapassou o limite de quilometragem em ${(kmSince - (selectedVehicle.maintenanceKmThreshold ?? 0)).toLocaleString('pt-BR')} km (rodou ${kmSince.toLocaleString('pt-BR')} km desde a última manutenção, limite de ${selectedVehicle.maintenanceKmThreshold?.toLocaleString('pt-BR')} km).`
+      )
+    }
+    if (dayAlert && daysSince !== undefined) {
+      messages.push(
+        `Ultrapassou o limite de prazo em ${(daysSince - (selectedVehicle.maintenanceDayThreshold ?? 0))} dias (faz ${daysSince} dias desde a última manutenção, limite de ${selectedVehicle.maintenanceDayThreshold} dias).`
+      )
+    }
+
+    return {
+      message: messages.join(' '),
+    }
+  }, [selectedVehicle])
 
   // ── Carregamento centralizado de dados ──────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -824,15 +894,33 @@ export default function TripStartPage() {
             </div>
 
             {/* Seleção de Veículo */}
-            <div>
-              <Label required>Veículo</Label>
-              <VehicleCombobox
-                value={selectedVehicle}
-                onChange={setSelectedVehicle}
-                error={step1Errors.vehicle}
-                vehicles={vehiclesList}
-                loadingVehicles={loadingVehicles}
-              />
+            <div className="space-y-2.5">
+              <div>
+                <Label required>Veículo</Label>
+                <VehicleCombobox
+                  value={selectedVehicle}
+                  onChange={setSelectedVehicle}
+                  error={step1Errors.vehicle}
+                  vehicles={vehiclesList}
+                  loadingVehicles={loadingVehicles}
+                />
+              </div>
+
+              {/* Alerta de Manutenção Crítica */}
+              {vehicleMaintenanceAlert && (
+                <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl animate-fade-in">
+                  <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5 animate-pulse" size={20} />
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-red-800">Atenção: Manutenção Preventiva Crítica!</p>
+                    <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                      Este veículo necessita de revisão preventiva urgente:
+                    </p>
+                    <p className="text-xs text-red-650 mt-1 font-semibold leading-relaxed">
+                      {vehicleMaintenanceAlert.message}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Motorista */}
