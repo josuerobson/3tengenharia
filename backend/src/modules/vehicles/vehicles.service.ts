@@ -356,6 +356,16 @@ export const vehiclesService = {
               name: true,
             },
           },
+          incidents: {
+            select: {
+              id:          true,
+              description: true,
+              location:    true,
+              photos:      true,
+              createdAt:   true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
           vehicle: {
             select: {
               id:           true,
@@ -455,5 +465,22 @@ export const vehiclesService = {
     // Soft delete — muda status para INACTIVE preservando histórico de viagens
     await prisma.vehicle.update({ where: { id }, data: { status: 'INACTIVE' } })
     return true
+  },
+
+  async createIncident(tripId: string, body: { description: string; location: string; photos?: string[] | undefined }) {
+    const trip = await prisma.vehicleTrip.findUnique({
+      where: { id: tripId },
+    })
+    if (!trip) {
+      throw new TripNotFoundError(tripId)
+    }
+    return prisma.tripIncident.create({
+      data: {
+        tripId,
+        description: body.description,
+        location: body.location,
+        photos: body.photos ?? [],
+      },
+    })
   },
 }

@@ -146,6 +146,16 @@ export interface ApiTrip {
     code: string
     name: string
   } | null
+  incidents: ApiTripIncident[]
+}
+
+export interface ApiTripIncident {
+  id: string
+  tripId: string
+  description: string
+  location: string
+  photos: string[]
+  createdAt: string
 }
 
 // ── Endpoints de Veículos ─────────────────────────────────────────────────────
@@ -215,6 +225,14 @@ export const tripsApi = {
     arrivalGeolocation?: string
   }): Promise<{ message: string; trip: ApiTrip; distanceTraveled: number }> {
     return request(`/vehicles/trips/${tripId}/end`, { method: 'POST', body: JSON.stringify(data) })
+  },
+
+  createIncident(tripId: string, data: {
+    description: string
+    location: string
+    photos?: string[]
+  }): Promise<{ message: string; incident: ApiTripIncident }> {
+    return request(`/vehicles/trips/${tripId}/incidents`, { method: 'POST', body: JSON.stringify(data) })
   },
 }
 

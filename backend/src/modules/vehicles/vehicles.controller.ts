@@ -6,6 +6,7 @@ import {
   endTripParamsSchema,
   endTripBodySchema,
 } from './vehicles.schema.js'
+import { createIncidentBodySchema } from './tripIncidents.schema.js'
 import {
   vehiclesService,
   VehicleNotFoundError,
@@ -144,6 +145,21 @@ export function vehiclesController(_app: FastifyInstance) {
       const ok = await vehiclesService.remove(id)
       if (!ok) return reply.status(404).send({ message: 'Veículo não encontrado.' })
       return reply.status(204).send()
+    },
+
+    // ── POST /vehicles/trips/:id/incidents (createIncident) ───────────────────
+    async createIncident(request: FastifyRequest, reply: FastifyReply) {
+      const { id: tripId } = request.params as { id: string }
+      try {
+        const body = createIncidentBodySchema.parse(request.body)
+        const incident = await vehiclesService.createIncident(tripId, body)
+        return reply.status(201).send({
+          message: 'Sinistro registrado com sucesso.',
+          incident,
+        })
+      } catch (err) {
+        return rethrowDomain(err)
+      }
     },
   }
 }

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { tripsApi, type ApiTrip } from '@/lib/api'
+import IncidentReportModal from '@/components/vehicles/IncidentReportModal'
 
 // ── Alias de tipo local para compatibilidade com o restante do componente ─────
 type Trip = ApiTrip
@@ -287,6 +288,48 @@ function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void })
               </div>
             </div>
           )}
+
+          {/* Sinistros Registrados */}
+          {trip.incidents && trip.incidents.length > 0 && (
+            <div className="space-y-3 pt-1">
+              <p className="text-xs font-bold text-red-500 uppercase tracking-wider flex items-center gap-1.5">
+                <AlertTriangle size={14} className="text-red-500 animate-pulse" />
+                Sinistros Registrados ({trip.incidents.length})
+              </p>
+              <div className="space-y-2.5">
+                {trip.incidents.map((inc) => {
+                  const dt = formatDateTime(inc.createdAt)
+                  return (
+                    <div key={inc.id} className="p-3.5 bg-red-50/30 border border-red-100 rounded-2xl text-left space-y-2">
+                      <div className="flex items-center justify-between text-xs text-red-700 font-semibold">
+                        <span className="flex items-center gap-1">
+                          <MapPin size={11} /> {inc.location}
+                        </span>
+                        <span>{dt.date} às {dt.time}</span>
+                      </div>
+                      <p className="text-xs text-gray-700 leading-relaxed">{inc.description}</p>
+                      
+                      {inc.photos && inc.photos.length > 0 && (
+                        <div className="grid grid-cols-4 gap-2 pt-1">
+                          {inc.photos.map((photo, pIdx) => (
+                            <a
+                              key={pIdx}
+                              href={photo}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="h-14 rounded-xl border border-red-150 overflow-hidden block hover:opacity-90 active:scale-95 transition-all"
+                            >
+                              <img src={photo} alt={`Foto Sinistro ${pIdx + 1}`} className="w-full h-full object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -303,6 +346,7 @@ export default function TripHistoryPage() {
   const [trips, setTrips]       = useState<Trip[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
+  const [incidentTrip, setIncidentTrip] = useState<Trip | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -795,6 +839,57 @@ export default function TripHistoryPage() {
                         </a>
                       </div>
                     )}
+
+                    {/* Sinistros no expandido */}
+                    {trip.incidents && trip.incidents.length > 0 && (
+                      <div className="col-span-2 sm:col-span-4 border-t border-gray-100 pt-3 mt-1 space-y-2 text-left">
+                        <p className="text-xs font-bold text-red-500 uppercase tracking-wider flex items-center gap-1">
+                          <AlertTriangle size={12} />
+                          Ocorrências de Sinistro ({trip.incidents.length})
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {trip.incidents.map((inc) => (
+                            <div key={inc.id} className="p-3 bg-red-50/30 border border-red-100 rounded-xl space-y-1.5">
+                              <div className="flex items-center justify-between text-[10px] text-red-750 font-bold">
+                                <span className="truncate max-w-[120px]">Local: {inc.location}</span>
+                                <span>{formatDateTime(inc.createdAt).date}</span>
+                              </div>
+                              <p className="text-xs text-gray-700 leading-snug">{inc.description}</p>
+                              
+                              {inc.photos && inc.photos.length > 0 && (
+                                <div className="flex gap-1 overflow-x-auto pt-1">
+                                  {inc.photos.map((photo, pIdx) => (
+                                    <a
+                                      key={pIdx}
+                                      href={photo}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="w-12 h-12 rounded-lg overflow-hidden border border-red-100 flex-shrink-0"
+                                    >
+                                      <img src={photo} alt="Sinistro" className="w-full h-full object-cover" />
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Botão de sinistro em viagem em andamento */}
+                    {isOngoing(trip) && (
+                      <div className="col-span-2 sm:col-span-4 border-t border-gray-100 pt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setIncidentTrip(trip)}
+                          className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-red-650 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition-all shadow-sm active:scale-[0.98]"
+                        >
+                          <AlertTriangle size={13} />
+                          Reportar Sinistro / Ocorrência
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -806,6 +901,20 @@ export default function TripHistoryPage() {
       {/* Modal de detalhe */}
       {detailTrip && (
         <TripDetailModal trip={detailTrip} onClose={() => setDetailTrip(null)} />
+      )}
+
+      {/* Modal de Registro de Sinistro */}
+      {incidentTrip && (
+        <IncidentReportModal
+          tripId={incidentTrip.id}
+          vehiclePlate={incidentTrip.vehicle.licensePlate}
+          vehicleModel={incidentTrip.vehicle.model}
+          onClose={() => setIncidentTrip(null)}
+          onSuccess={() => {
+            setIncidentTrip(null)
+            void fetchData()
+          }}
+        />
       )}
     </div>
   )

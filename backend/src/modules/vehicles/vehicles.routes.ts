@@ -136,4 +136,26 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
     },
     controller.endTrip,
   )
+
+  // ── POST /vehicles/trips/:id/incidents ─────────────────────────────────────────
+  app.post(
+    '/trips/:id/incidents',
+    {
+      onRequest: [app.authenticate],
+      schema: schema({
+        tags: ['Vehicles'], summary: 'Registrar sinistro na viagem', security: [{ bearerAuth: [] }],
+        params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+        body: {
+          type: 'object',
+          required: ['description', 'location'],
+          properties: {
+            description: { type: 'string' },
+            location:    { type: 'string' },
+            photos:      { type: 'array', items: { type: 'string' } },
+          },
+        },
+      }),
+    },
+    controller.createIncident,
+  )
 }

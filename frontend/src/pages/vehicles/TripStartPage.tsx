@@ -19,6 +19,7 @@ import {
   ArrowRight,
   RotateCcw,
   AlertCircle,
+  AlertTriangle,
   User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -33,6 +34,7 @@ import {
   formatDuration,
 } from '@/data/mockData'
 import { vehiclesApi, tripsApi, assetsApi, type ApiVehicle, type ApiTrip, type ApiEmployee, type ApiWorksite } from '@/lib/api'
+import IncidentReportModal from '@/components/vehicles/IncidentReportModal'
 
 // Usa ApiVehicle como tipo Vehicle para este componente
 type Vehicle = ApiVehicle
@@ -370,6 +372,7 @@ export default function TripStartPage() {
   const [worksitesList, setWorksitesList]     = useState<ApiWorksite[]>([])
   const [loadingVehicles, setLoadingVehicles] = useState(true)
   const [apiError, setApiError]               = useState<string | null>(null)
+  const [incidentTrip, setIncidentTrip]       = useState<ApiTrip | null>(null)
 
   // ── Trip ID salvo após startTrip (para encerrar no passo 2) ────────────
   const [activeTripId, setActiveTripId] = useState<string | null>(null)
@@ -698,14 +701,24 @@ export default function TripStartPage() {
                     Início: {new Date(trip.departureDateTime).toLocaleDateString('pt-BR')} às {new Date(trip.departureDateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleSelectOngoingTrip(trip)}
-                  className="sm:self-center flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-white bg-brand-primary hover:bg-[#003d4f] rounded-xl transition-all shadow-sm flex-shrink-0"
-                >
-                  <CheckCircle2 size={13} />
-                  Encerrar Viagem
-                </button>
+                <div className="flex gap-2 sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => setIncidentTrip(trip)}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-bold text-red-650 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition-all shadow-sm flex-shrink-0"
+                  >
+                    <AlertTriangle size={13} />
+                    Reportar Sinistro
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectOngoingTrip(trip)}
+                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-white bg-brand-primary hover:bg-[#003d4f] rounded-xl transition-all shadow-sm flex-shrink-0"
+                  >
+                    <CheckCircle2 size={13} />
+                    Encerrar Viagem
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -964,6 +977,54 @@ export default function TripStartPage() {
               </div>
             )}
 
+            {/* Ações */}
+            <div className="flex flex-col gap-3 pt-1">
+              <div className="flex gap-3">
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className="flex-shrink-0"
+                  onClick={handleBackToStep1}
+                  disabled={isSubmitting}
+                >
+                  <ArrowLeft size={18} />
+                  Voltar
+                </Button>
+                <Button
+                  variant="accent"
+                  size="lg"
+                  className="flex-1 text-base font-bold shadow-lg shadow-brand-accent/20"
+                  onClick={handleStep2Submit}
+                  disabled={isSubmitting || distanceTraveled === null}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Encerrando...
+                    </>
+                  ) : (
+                    'Encerrar Viagem'
+                  )}
+                </Button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeTripId && departureData) {
+                    setIncidentTrip({
+                      id: activeTripId,
+                      vehicle: departureData.vehicle,
+                    } as unknown as ApiTrip)
+                  }
+                }}
+                className="w-full h-12 border border-red-200 hover:bg-red-50 text-red-650 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.99]"
+              >
+                <AlertTriangle size={15} />
+                Registrar Sinistro / Ocorrência
+              </button>
+            </div>
+
             {/* Aviso de manutenção (se aplicável) */}
             {departureData.vehicle.maintenanceKmThreshold &&
               departureData.vehicle.lastMaintenanceKm &&
@@ -1022,11 +1083,22 @@ export default function TripStartPage() {
           </div>
         )}
       </div>
+      {/* Modal de Registro de Sinistro */}
+      {incidentTrip && (
+        <IncidentReportModal
+          tripId={incidentTrip.id}
+          vehiclePlate={incidentTrip.vehicle.licensePlate}
+          vehicleModel={incidentTrip.vehicle.model}
+          onClose={() => setIncidentTrip(null)}
+          onSuccess={() => {
+            setIncidentTrip(null)
+            void fetchData()
+          }}
+        />
+      )}
     </div>
   )
 }
-
-// ── Helper visual para linhas de informação ───────────────────────────────────
 
 function InfoRow({
   icon: Icon,
