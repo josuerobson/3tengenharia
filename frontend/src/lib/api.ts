@@ -466,6 +466,7 @@ export interface ApiEmployee {
   fullName: string
   registration: string
   position: string
+  cnhExpirationDate?: string | null
 }
 
 export interface ApiWorksite {
@@ -494,6 +495,7 @@ export interface ApiUser {
     position: string
     phone?: string | null
     cpf?: string
+    cnhExpirationDate?: string | null
     worksite?: {
       code: string
       name: string
@@ -518,6 +520,7 @@ export const usersApi = {
     position: string
     registration: string
     isActive: boolean
+    cnhExpirationDate?: string | null
   }): Promise<ApiUser> {
     return request('/users', {
       method: 'POST',
@@ -537,6 +540,7 @@ export const usersApi = {
       position: string
       registration: string
       isActive: boolean
+      cnhExpirationDate?: string | null
     }>,
   ): Promise<ApiUser> {
     return request(`/users/${id}`, {

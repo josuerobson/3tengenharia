@@ -65,6 +65,7 @@ export const usersService = {
             position: true,
             phone: true,
             cpf: true,
+            cnhExpirationDate: true,
           },
         },
       },
@@ -120,6 +121,7 @@ export const usersService = {
         registration: body.registration,
         hireDate: new Date(),
         isActive: true,
+        cnhExpirationDate: body.cnhExpirationDate ?? null,
       },
     })
 
@@ -135,6 +137,7 @@ export const usersService = {
             position: true,
             phone: true,
             cpf: true,
+            cnhExpirationDate: true,
           },
         },
       },
@@ -203,6 +206,7 @@ export const usersService = {
     if (body.position !== undefined) empData.position = body.position
     if (body.cpf !== undefined) empData.cpf = body.cpf
     if (body.registration !== undefined) empData.registration = body.registration
+    if (body.cnhExpirationDate !== undefined) empData.cnhExpirationDate = body.cnhExpirationDate
     
     if (Object.keys(empData).length > 0) {
       if (user.employee?.id) {
@@ -228,6 +232,7 @@ export const usersService = {
             registration,
             isActive: true,
             hireDate: new Date(),
+            cnhExpirationDate: body.cnhExpirationDate ?? null,
           },
         })
       }
@@ -244,6 +249,7 @@ export const usersService = {
             position: true,
             phone: true,
             cpf: true,
+            cnhExpirationDate: true,
           },
         },
       },

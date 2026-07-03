@@ -318,6 +318,7 @@ export const assetsService = {
         fullName: true,
         registration: true,
         position: true,
+        cnhExpirationDate: true,
       },
       orderBy: { fullName: 'asc' },
     })

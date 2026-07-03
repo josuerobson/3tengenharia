@@ -50,6 +50,7 @@ export const userPublicSchema = z.object({
       position: z.string(),
       cpf: z.string().optional(),
       worksiteId: z.string().nullable(),
+      cnhExpirationDate: z.date().nullable().optional(),
       worksite: z
         .object({
           code: z.string(),

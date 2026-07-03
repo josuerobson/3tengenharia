@@ -78,6 +78,7 @@ export default function UsersPage() {
   const [isCustomPosition, setIsCustomPosition] = useState(false)
   const [customPosition, setCustomPosition] = useState('')
   const [registration, setRegistration] = useState('')
+  const [cnhExpirationDate, setCnhExpirationDate] = useState('')
 
   const [formError, setFormError] = useState<string | null>(null)
   const [formSubmitting, setFormSubmitting] = useState(false)
@@ -161,6 +162,7 @@ export default function UsersPage() {
     setIsCustomPosition(false)
     setCustomPosition('')
     setRegistration('')
+    setCnhExpirationDate('')
     setFormError(null)
     setFormOpen(true)
   }
@@ -179,6 +181,7 @@ export default function UsersPage() {
     setIsCustomPosition(false)
     setCustomPosition('')
     setRegistration(user.employee?.registration ?? '')
+    setCnhExpirationDate(user.employee?.cnhExpirationDate ? user.employee.cnhExpirationDate.slice(0, 10) : '')
     setFormError(null)
     setFormOpen(true)
   }
@@ -239,6 +242,7 @@ export default function UsersPage() {
           cpf: normalizedCpf,
           position: finalPosition,
           registration: registration.trim(),
+          cnhExpirationDate: cnhExpirationDate || null,
           ...(password ? { password } : {}),
         })
       } else {
@@ -253,6 +257,7 @@ export default function UsersPage() {
           cpf: normalizedCpf,
           position: finalPosition,
           registration: registration.trim(),
+          cnhExpirationDate: cnhExpirationDate || null,
         })
       }
       setFormOpen(false)
@@ -433,6 +438,18 @@ export default function UsersPage() {
                               <p className="text-[10px] text-gray-500">
                                 {u.employee.position} · {u.employee.registration} {u.employee.cpf ? `· CPF: ${formatCpf(u.employee.cpf)}` : ''}
                               </p>
+                              {u.employee.cnhExpirationDate && (
+                                <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                  <span>Validade CNH:</span>
+                                  <span className={cn(
+                                    "font-semibold",
+                                    new Date(u.employee.cnhExpirationDate) < new Date() ? "text-red-500" : "text-gray-700"
+                                  )}>
+                                    {new Date(u.employee.cnhExpirationDate).toLocaleDateString('pt-BR')}
+                                    {new Date(u.employee.cnhExpirationDate) < new Date() && " (Vencida)"}
+                                  </span>
+                                </p>
+                              )}
                             </>
                           ) : (
                             <p className="text-xs text-gray-400 italic">Sem dados de colaborador</p>
@@ -597,21 +614,36 @@ export default function UsersPage() {
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="role" required>
-              Perfil de Acesso
-            </Label>
-            <select
-              id="role"
-              value={role}
-              onChange={(e) => setRole(e.target.value as any)}
-              className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
-              required
-            >
-              <option value="COLLABORATOR">Colaborador</option>
-              <option value="MANAGER">Gestor</option>
-              <option value="ADMIN">Administrador</option>
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="role" required>
+                Perfil de Acesso
+              </Label>
+              <select
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value as any)}
+                className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+                required
+              >
+                <option value="COLLABORATOR">Colaborador</option>
+                <option value="MANAGER">Gestor</option>
+                <option value="ADMIN">Administrador</option>
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="cnhExpirationDate">
+                Validade da CNH
+              </Label>
+              <Input
+                id="cnhExpirationDate"
+                type="date"
+                value={cnhExpirationDate}
+                onChange={(e) => setCnhExpirationDate(e.target.value)}
+                className="mt-1.5 h-11"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

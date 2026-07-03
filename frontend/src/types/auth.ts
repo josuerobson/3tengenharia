@@ -10,6 +10,7 @@ export interface AuthUser {
   name: string
   /** ID do funcionário vinculado (null se o usuário não tem perfil de colaborador físico) */
   employeeId: string | null
+  cnhExpirationDate?: string | null
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {

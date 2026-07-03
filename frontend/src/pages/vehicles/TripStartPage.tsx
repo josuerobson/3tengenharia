@@ -409,6 +409,26 @@ export default function TripStartPage() {
   const [arrivalOdometerPhoto, setArrivalOdometerPhoto] = useState<string>('')
   const odometerFileInputRef              = useRef<HTMLInputElement>(null)
 
+  const selectedDriver = useMemo(() => {
+    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+    if (isManagerOrAdmin) {
+      return employeesList.find(e => e.id === selectedDriverId)
+    }
+    return null
+  }, [employeesList, selectedDriverId, currentUser])
+
+  const isCnhExpired = useMemo(() => {
+    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+    const expiryStr = isManagerOrAdmin
+      ? selectedDriver?.cnhExpirationDate
+      : currentUser?.cnhExpirationDate
+
+    if (!expiryStr) return false
+    const expiryDate = new Date(expiryStr)
+    expiryDate.setHours(23, 59, 59, 999)
+    return expiryDate < new Date()
+  }, [selectedDriver, currentUser])
+
   // ── Carregamento centralizado de dados ──────────────────────────────────────
   const fetchData = useCallback(async () => {
     setLoadingVehicles(true)
@@ -506,11 +526,13 @@ export default function TripStartPage() {
     const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
     if (isManagerOrAdmin && !selectedDriverId) {
       errors.driver = 'Selecione o motorista responsável pela viagem.'
+    } else if (isCnhExpired) {
+      errors.driver = 'A CNH do motorista está vencida. Não é possível iniciar a viagem.'
     }
 
     setStep1Errors(errors)
     return Object.keys(errors).length === 0
-  }, [selectedVehicle, initialKm, origin, destination, currentUser, selectedDriverId, selectedWorksiteId])
+  }, [selectedVehicle, initialKm, origin, destination, currentUser, selectedDriverId, selectedWorksiteId, isCnhExpired])
 
   const handleOdometerPhotoAdd = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -939,6 +961,26 @@ export default function TripStartPage() {
               />
             </div>
 
+            {isCnhExpired && (
+              <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl animate-fade-in mb-3">
+                <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+                <div className="text-left">
+                  <p className="text-sm font-bold text-red-800">CNH Vencida!</p>
+                  <p className="text-xs text-red-700 mt-0.5">
+                    O motorista selecionado está com a CNH vencida (vencimento em:{' '}
+                    {(() => {
+                      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+                      const expiry = isManagerOrAdmin
+                        ? selectedDriver?.cnhExpirationDate
+                        : currentUser?.cnhExpirationDate
+                      return expiry ? new Date(expiry).toLocaleDateString('pt-BR') : ''
+                    })()}
+                    ). Não é permitido iniciar uma nova viagem com a CNH vencida.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {apiError && (
               <p className="text-sm text-red-500 flex items-center gap-1.5 bg-red-50 rounded-xl px-3 py-2 border border-red-200">
                 <AlertCircle size={14} /> {apiError}
@@ -949,7 +991,7 @@ export default function TripStartPage() {
               size="lg"
               className="w-full mt-2"
               onClick={() => void handleStep1Submit()}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isCnhExpired}
             >
               {isSubmitting ? 'Registrando...' : 'Registrar Saída'}
               <ArrowRight size={18} />

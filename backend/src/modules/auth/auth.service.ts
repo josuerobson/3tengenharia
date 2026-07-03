@@ -51,6 +51,7 @@ const userPublicSelect = {
       position: true,
       cpf: true,
       worksiteId: true,
+      cnhExpirationDate: true,
       worksite: {
         select: {
           code: true,

@@ -44,6 +44,7 @@ export const createUserBodySchema = z.object({
     .min(1, 'Matrícula não pode ser vazia.'),
 
   isActive: z.boolean().optional().default(true),
+  cnhExpirationDate: z.coerce.date().optional().nullable(),
 })
 
 export type CreateUserBody = z.infer<typeof createUserBodySchema>
@@ -75,6 +76,7 @@ export const updateUserBodySchema = z.object({
   registration: z.string().trim().min(1).optional(),
 
   isActive: z.boolean().optional(),
+  cnhExpirationDate: z.coerce.date().optional().nullable(),
 })
 
 export type UpdateUserBody = z.infer<typeof updateUserBodySchema>
