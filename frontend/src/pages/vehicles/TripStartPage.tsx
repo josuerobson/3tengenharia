@@ -330,16 +330,28 @@ function getCurrentCoordinates(): Promise<string | null> {
       resolve(null)
       return
     }
+    // Tenta primeiro com alta precisão
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords
         resolve(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`)
       },
       (error) => {
-        console.warn('Erro ao obter geolocalização:', error.message)
-        resolve(null)
+        console.warn('Erro ao obter geolocalização com alta precisão, tentando baixa:', error.message)
+        // Fallback: baixa precisão (mais rápido e tolerante a ambientes fechados/sem sinal de satélite)
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords
+            resolve(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`)
+          },
+          (err) => {
+            console.warn('Erro na geolocalização de baixa precisão:', err.message)
+            resolve(null)
+          },
+          { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 } // Aceita cache de até 5 minutos
+        )
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 } // 8s timeout, aceita cache de até 1 minuto
     )
   })
 }
