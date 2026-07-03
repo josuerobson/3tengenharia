@@ -11,7 +11,7 @@ import {
   ExternalLink, FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { tripsApi, type ApiTrip } from '@/lib/api'
+import { tripsApi, type ApiTrip, type ApiTripIncident } from '@/lib/api'
 import IncidentReportModal from '@/components/vehicles/IncidentReportModal'
 
 // ── Alias de tipo local para compatibilidade com o restante do componente ─────
@@ -81,7 +81,15 @@ function TripStatusBadge({ trip }: { trip: Trip }) {
 
 // ── Detail Modal ──────────────────────────────────────────────────────────────
 
-function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
+function TripDetailModal({
+  trip,
+  onClose,
+  onSelectIncident,
+}: {
+  trip: Trip
+  onClose: () => void
+  onSelectIncident: (inc: ApiTripIncident) => void
+}) {
   const dep = formatDateTime(trip.departureDateTime)
   const arr = trip.arrivalDateTime ? formatDateTime(trip.arrivalDateTime) : null
 
@@ -294,33 +302,34 @@ function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void })
             <div className="space-y-3 pt-1">
               <p className="text-xs font-bold text-red-500 uppercase tracking-wider flex items-center gap-1.5">
                 <AlertTriangle size={14} className="text-red-500 animate-pulse" />
-                Sinistros Registrados ({trip.incidents.length})
+                Sinistros Registrados ({trip.incidents.length}) - Clique para ver detalhes
               </p>
               <div className="space-y-2.5">
                 {trip.incidents.map((inc) => {
                   const dt = formatDateTime(inc.createdAt)
                   return (
-                    <div key={inc.id} className="p-3.5 bg-red-50/30 border border-red-100 rounded-2xl text-left space-y-2">
+                    <div
+                      key={inc.id}
+                      onClick={() => onSelectIncident(inc)}
+                      className="p-3.5 bg-red-50/30 border border-red-100 rounded-2xl text-left space-y-2 cursor-pointer hover:bg-red-55 active:scale-[0.99] transition-all"
+                    >
                       <div className="flex items-center justify-between text-xs text-red-700 font-semibold">
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 truncate max-w-[185px]">
                           <MapPin size={11} /> {inc.location}
                         </span>
-                        <span>{dt.date} às {dt.time}</span>
+                        <span className="flex-shrink-0">{dt.date} às {dt.time}</span>
                       </div>
-                      <p className="text-xs text-gray-700 leading-relaxed">{inc.description}</p>
+                      <p className="text-xs text-gray-700 line-clamp-3 leading-relaxed">{inc.description}</p>
                       
                       {inc.photos && inc.photos.length > 0 && (
                         <div className="grid grid-cols-4 gap-2 pt-1">
                           {inc.photos.map((photo, pIdx) => (
-                            <a
+                            <div
                               key={pIdx}
-                              href={photo}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="h-14 rounded-xl border border-red-150 overflow-hidden block hover:opacity-90 active:scale-95 transition-all"
+                              className="h-12 rounded-xl border border-red-150 overflow-hidden"
                             >
                               <img src={photo} alt={`Foto Sinistro ${pIdx + 1}`} className="w-full h-full object-cover" />
-                            </a>
+                            </div>
                           ))}
                         </div>
                       )}
@@ -336,6 +345,132 @@ function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void })
   )
 }
 
+// ── Modal de Detalhes Completo do Sinistro ────────────────────────────────────
+
+interface IncidentDetailModalProps {
+  incident: ApiTripIncident
+  onClose: () => void
+}
+
+function IncidentDetailModal({ incident, onClose }: IncidentDetailModalProps) {
+  const [activePhoto, setActivePhoto] = useState<string | null>(null)
+  const dt = formatDateTime(incident.createdAt)
+  const isCoords = /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(incident.location.trim())
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden border border-gray-100 shadow-2xl animate-scale-in">
+        
+        {/* Cabeçalho */}
+        <div className="bg-red-50 px-6 py-4 flex items-center justify-between border-b border-red-100">
+          <div className="flex items-center gap-2 text-red-700">
+            <AlertTriangle size={20} className="animate-pulse" />
+            <div>
+              <h3 className="text-base font-bold">Detalhes da Ocorrência</h3>
+              <p className="text-xs text-red-650 font-medium">Registrado em {dt.date} às {dt.time}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-red-100 text-red-700 transition-colors outline-none"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Conteúdo */}
+        <div className="p-6 space-y-4 text-left">
+          
+          {/* Local */}
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <MapPin size={12} className="text-red-500" /> Local do Sinistro
+            </p>
+            {isCoords ? (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(incident.location)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-semibold text-brand-primary hover:underline inline-flex items-center gap-1.5"
+              >
+                <span>{incident.location}</span>
+                <ExternalLink size={12} />
+              </a>
+            ) : (
+              <p className="text-sm font-semibold text-gray-800">{incident.location}</p>
+            )}
+          </div>
+
+          {/* Descrição */}
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+              Descrição do Ocorrido
+            </p>
+            <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+              {incident.description}
+            </div>
+          </div>
+
+          {/* Galeria de Fotos */}
+          {incident.photos && incident.photos.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Fotos de Registro ({incident.photos.length}) - Clique para ampliar
+              </p>
+              <div className="grid grid-cols-3 gap-2.5">
+                {incident.photos.map((photo, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => setActivePhoto(photo)}
+                    className="h-24 rounded-2xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 active:scale-95 transition-all shadow-sm"
+                  >
+                    <img src={photo} alt={`Anexo ${idx + 1}`} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Botão Fechar */}
+          <div className="pt-2 border-t border-gray-100 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 h-11 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm rounded-xl transition-colors"
+            >
+              Fechar
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* Lightbox / Zoom da Foto */}
+      {activePhoto && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
+          onClick={() => setActivePhoto(null)}
+        >
+          <button
+            onClick={() => setActivePhoto(null)}
+            className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={activePhoto}
+            alt="Visualização Ampliada"
+            className="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Componente principal ───────────────────────────────────────────────────────
 
 type FilterStatus = 'all' | 'ongoing' | 'completed' | 'alert'
@@ -347,6 +482,7 @@ export default function TripHistoryPage() {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [incidentTrip, setIncidentTrip] = useState<Trip | null>(null)
+  const [selectedIncident, setSelectedIncident] = useState<ApiTripIncident | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -845,29 +981,30 @@ export default function TripHistoryPage() {
                       <div className="col-span-2 sm:col-span-4 border-t border-gray-100 pt-3 mt-1 space-y-2 text-left">
                         <p className="text-xs font-bold text-red-500 uppercase tracking-wider flex items-center gap-1">
                           <AlertTriangle size={12} />
-                          Ocorrências de Sinistro ({trip.incidents.length})
+                          Ocorrências de Sinistro ({trip.incidents.length}) - Clique para ver detalhes
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {trip.incidents.map((inc) => (
-                            <div key={inc.id} className="p-3 bg-red-50/30 border border-red-100 rounded-xl space-y-1.5">
+                            <div
+                              key={inc.id}
+                              onClick={() => setSelectedIncident(inc)}
+                              className="p-3 bg-red-50/30 border border-red-100 rounded-xl space-y-1.5 cursor-pointer hover:bg-red-50 active:scale-[0.99] transition-all text-left"
+                            >
                               <div className="flex items-center justify-between text-[10px] text-red-750 font-bold">
-                                <span className="truncate max-w-[120px]">Local: {inc.location}</span>
+                                <span className="truncate max-w-[125px]">Local: {inc.location}</span>
                                 <span>{formatDateTime(inc.createdAt).date}</span>
                               </div>
-                              <p className="text-xs text-gray-700 leading-snug">{inc.description}</p>
+                              <p className="text-xs text-gray-750 line-clamp-2 leading-snug">{inc.description}</p>
                               
                               {inc.photos && inc.photos.length > 0 && (
                                 <div className="flex gap-1 overflow-x-auto pt-1">
                                   {inc.photos.map((photo, pIdx) => (
-                                    <a
+                                    <div
                                       key={pIdx}
-                                      href={photo}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="w-12 h-12 rounded-lg overflow-hidden border border-red-100 flex-shrink-0"
+                                      className="w-10 h-10 rounded-lg overflow-hidden border border-red-100 flex-shrink-0"
                                     >
                                       <img src={photo} alt="Sinistro" className="w-full h-full object-cover" />
-                                    </a>
+                                    </div>
                                   ))}
                                 </div>
                               )}
@@ -900,7 +1037,11 @@ export default function TripHistoryPage() {
 
       {/* Modal de detalhe */}
       {detailTrip && (
-        <TripDetailModal trip={detailTrip} onClose={() => setDetailTrip(null)} />
+        <TripDetailModal
+          trip={detailTrip}
+          onClose={() => setDetailTrip(null)}
+          onSelectIncident={setSelectedIncident}
+        />
       )}
 
       {/* Modal de Registro de Sinistro */}
@@ -914,6 +1055,14 @@ export default function TripHistoryPage() {
             setIncidentTrip(null)
             void fetchData()
           }}
+        />
+      )}
+
+      {/* Modal de Detalhe do Sinistro */}
+      {selectedIncident && (
+        <IncidentDetailModal
+          incident={selectedIncident}
+          onClose={() => setSelectedIncident(null)}
         />
       )}
     </div>
