@@ -32,7 +32,7 @@ import {
   formatKm,
   formatDuration,
 } from '@/data/mockData'
-import { vehiclesApi, tripsApi, assetsApi, type ApiVehicle, type ApiTrip, type ApiEmployee } from '@/lib/api'
+import { vehiclesApi, tripsApi, assetsApi, type ApiVehicle, type ApiTrip, type ApiEmployee, type ApiWorksite } from '@/lib/api'
 
 // Usa ApiVehicle como tipo Vehicle para este componente
 type Vehicle = ApiVehicle
@@ -320,6 +320,7 @@ interface DepartureData {
   destination: string
   purpose: string
   departureTime: Date
+  worksite?: { id: string; code: string; name: string } | null
 }
 
 type TripPageState = 'STEP_1' | 'STEP_2' | 'COMPLETED'
@@ -366,6 +367,7 @@ export default function TripStartPage() {
   const [vehiclesList, setVehiclesList]       = useState<Vehicle[]>([])
   const [ongoingTrips, setOngoingTrips]       = useState<ApiTrip[]>([])
   const [employeesList, setEmployeesList]     = useState<ApiEmployee[]>([])
+  const [worksitesList, setWorksitesList]     = useState<ApiWorksite[]>([])
   const [loadingVehicles, setLoadingVehicles] = useState(true)
   const [apiError, setApiError]               = useState<string | null>(null)
 
@@ -378,6 +380,7 @@ export default function TripStartPage() {
   // ── Dados do Passo 1 ───────────────────────────────────────────────────
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
   const [selectedDriverId, setSelectedDriverId] = useState('')
+  const [selectedWorksiteId, setSelectedWorksiteId] = useState('')
   const [initialKm, setInitialKm]             = useState('')
   const [origin, setOrigin]                   = useState('')
   const [destination, setDestination]         = useState('')
@@ -396,16 +399,20 @@ export default function TripStartPage() {
     setApiError(null)
     try {
       const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
-      const [vehRes, tripsRes, empRes] = await Promise.all([
+      const [vehRes, tripsRes, empRes, worksitesRes] = await Promise.all([
         vehiclesApi.list(),
         tripsApi.list({ limit: 100 }),
         isManagerOrAdmin ? assetsApi.listEmployees() : Promise.resolve([]),
+        assetsApi.listWorksites(),
       ])
       setVehiclesList(vehRes.vehicles)
       const openTrips = tripsRes.trips.filter(t => t.arrivalDateTime === null || t.finalKm === null)
       setOngoingTrips(openTrips)
       if (isManagerOrAdmin && Array.isArray(empRes)) {
         setEmployeesList(empRes)
+      }
+      if (Array.isArray(worksitesRes)) {
+        setWorksitesList(worksitesRes)
       }
     } catch (err) {
       setApiError(err instanceof Error ? err.message : 'Erro ao carregar dados do servidor.')
@@ -442,6 +449,7 @@ export default function TripStartPage() {
       destination: trip.destination,
       purpose: trip.purpose ?? '',
       departureTime: new Date(trip.departureDateTime),
+      worksite: trip.worksite,
     })
     setPageState('STEP_2')
   }, [vehiclesList])
@@ -477,6 +485,7 @@ export default function TripStartPage() {
     }
     if (!origin.trim()) errors.origin = 'Informe a origem.'
     if (!destination.trim()) errors.destination = 'Informe o destino.'
+    if (!selectedWorksiteId) errors.worksite = 'Selecione a obra / centro de custo.'
 
     const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
     if (isManagerOrAdmin && !selectedDriverId) {
@@ -485,7 +494,7 @@ export default function TripStartPage() {
 
     setStep1Errors(errors)
     return Object.keys(errors).length === 0
-  }, [selectedVehicle, initialKm, origin, destination, currentUser, selectedDriverId])
+  }, [selectedVehicle, initialKm, origin, destination, currentUser, selectedDriverId, selectedWorksiteId])
 
   // ── Validação Passo 2 ─────────────────────────────────────────────────
   const validateStep2 = useCallback((): boolean => {
@@ -514,6 +523,7 @@ export default function TripStartPage() {
     try {
       const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
       const coords = await getCurrentCoordinates()
+      const selectedWorksite = worksitesList.find(w => w.id === selectedWorksiteId)
       const res = await tripsApi.start({
         vehicleId:   selectedVehicle.id,
         initialKm:   initialKmValue,
@@ -521,6 +531,7 @@ export default function TripStartPage() {
         destination: destination.trim(),
         purpose:     purpose.trim() || undefined,
         departureGeolocation: coords || undefined,
+        worksiteId:  selectedWorksiteId || undefined,
         ...(isManagerOrAdmin && selectedDriverId ? { driverEmployeeId: selectedDriverId } : {}),
       })
       setActiveTripId(res.trip.id)
@@ -531,6 +542,7 @@ export default function TripStartPage() {
         destination: destination.trim(),
         purpose: purpose.trim(),
         departureTime: new Date(res.trip.departureDateTime),
+        worksite: selectedWorksite || null,
       })
       setPageState('STEP_2')
     } catch (err) {
@@ -538,7 +550,7 @@ export default function TripStartPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }, [validateStep1, selectedVehicle, initialKm, origin, destination, purpose, currentUser, selectedDriverId])
+  }, [validateStep1, selectedVehicle, initialKm, origin, destination, purpose, currentUser, selectedDriverId, selectedWorksiteId, worksitesList])
 
   const handleStep2Submit = useCallback(async () => {
     if (!validateStep2() || !activeTripId) return
@@ -570,6 +582,7 @@ export default function TripStartPage() {
     setActiveTripId(null)
     setApiError(null)
     setSelectedDriverId('')
+    setSelectedWorksiteId('')
     void fetchData()
   }, [fetchData])
 
@@ -579,6 +592,7 @@ export default function TripStartPage() {
     setStep2Errors({})
     setActiveTripId(null)
     setDepartureData(null)
+    setSelectedWorksiteId('')
     void fetchData()
   }, [fetchData])
 
@@ -603,6 +617,9 @@ export default function TripStartPage() {
             <InfoRow icon={Car} label="Veículo" value={`${departureData.vehicle.licensePlate} — ${departureData.vehicle.model}`} />
             <InfoRow icon={Navigation} label="Rota" value={`${departureData.origin} → ${departureData.destination}`} />
             <InfoRow icon={Gauge} label="Distância" value={`${dist.toLocaleString('pt-BR')} km percorridos`} />
+            {departureData.worksite && (
+              <InfoRow icon={FileText} label="Obra / Centro de Custo" value={`${departureData.worksite.code} — ${departureData.worksite.name}`} />
+            )}
             {durationMinutes && (
               <InfoRow icon={Clock} label="Duração" value={formatDuration(durationMinutes)} />
             )}
@@ -751,6 +768,32 @@ export default function TripStartPage() {
               </div>
             )}
 
+            {/* Obra / Centro de Custo */}
+            <div>
+              <Label htmlFor="worksite" required>
+                Obra / Centro de Custo
+              </Label>
+              <select
+                id="worksite"
+                value={selectedWorksiteId}
+                onChange={(e) => setSelectedWorksiteId(e.target.value)}
+                className="mt-1.5 w-full h-12 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+                required
+              >
+                <option value="">Selecionar obra / centro de custo...</option>
+                {worksitesList.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code} — {w.name}
+                  </option>
+                ))}
+              </select>
+              {step1Errors.worksite && (
+                <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                  <span className="font-semibold">⚠</span> {step1Errors.worksite}
+                </p>
+              )}
+            </div>
+
             {/* KM Inicial */}
             <div>
               <Label htmlFor="initialKm" required>KM Inicial (Odômetro)</Label>
@@ -866,6 +909,9 @@ export default function TripStartPage() {
                 label="Hora de Saída"
                 value={departureData.departureTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
               />
+              {departureData.worksite && (
+                <InfoRow icon={FileText} label="Obra / C. Custo" value={`${departureData.worksite.code} — ${departureData.worksite.name}`} />
+              )}
               {departureData.purpose && (
                 <InfoRow icon={FileText} label="Finalidade" value={departureData.purpose} />
               )}

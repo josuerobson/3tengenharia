@@ -140,6 +140,12 @@ export interface ApiTrip {
     fullName: string
     registration: string
   } | null
+  worksiteId: string | null
+  worksite: {
+    id: string
+    code: string
+    name: string
+  } | null
 }
 
 // ── Endpoints de Veículos ─────────────────────────────────────────────────────
@@ -197,6 +203,7 @@ export const tripsApi = {
     purpose?: string
     driverEmployeeId?: string
     departureGeolocation?: string
+    worksiteId?: string
   }): Promise<{ message: string; trip: ApiTrip; maintenanceAlert?: unknown }> {
     return request('/vehicles/trips/start', { method: 'POST', body: JSON.stringify(data) })
   },

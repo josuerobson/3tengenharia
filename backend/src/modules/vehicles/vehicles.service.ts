@@ -233,10 +233,12 @@ export const vehiclesService = {
         initialKm: body.initialKm,
         maintenanceAlertActive,
         departureGeolocation: body.departureGeolocation ?? null,
+        worksiteId: body.worksiteId ?? null,
       },
       include: {
         vehicle: { select: { id: true, licensePlate: true, model: true } },
         driverEmployee: { select: { id: true, fullName: true, registration: true } },
+        worksite: { select: { id: true, code: true, name: true } },
       },
     })
 
@@ -298,6 +300,7 @@ export const vehiclesService = {
         include: {
           vehicle: { select: { id: true, licensePlate: true, model: true } },
           driverEmployee: { select: { id: true, fullName: true } },
+          worksite: { select: { id: true, code: true, name: true } },
         },
       }),
 
@@ -345,6 +348,14 @@ export const vehiclesService = {
           departureGeolocation:  true,
           arrivalGeolocation:    true,
           createdAt:             true,
+          worksiteId:            true,
+          worksite: {
+            select: {
+              id:   true,
+              code: true,
+              name: true,
+            },
+          },
           vehicle: {
             select: {
               id:           true,

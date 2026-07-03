@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronUp, X, Filter, Download,
   AlertTriangle, CheckCircle2, TrendingUp, Car,
   Navigation, Route, ArrowRight, Eye, RefreshCw,
-  ExternalLink,
+  ExternalLink, FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { tripsApi, type ApiTrip } from '@/lib/api'
@@ -148,6 +148,19 @@ function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void })
               <p className="text-xs text-gray-400">{trip.driverEmployee?.registration ?? ''}</p>
             </div>
           </div>
+
+          {/* Obra / Centro de Custo */}
+          {trip.worksite && (
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-gray-50">
+              <div className="w-10 h-10 rounded-xl bg-[#00475B]/10 flex items-center justify-center flex-shrink-0">
+                <FileText size={18} className="text-[#00475B]" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 font-medium">Obra / Centro de Custo</p>
+                <p className="text-sm font-semibold text-gray-800">{trip.worksite.code} — {trip.worksite.name}</p>
+              </div>
+            </div>
+          )}
 
           {/* Finalidade */}
           <div className="flex items-start gap-3 p-3 rounded-2xl bg-gray-50">
@@ -677,6 +690,13 @@ export default function TripHistoryPage() {
                       <User size={10} className="text-gray-300" />
                       <span className="text-xs text-gray-400 truncate">{trip.driverEmployee?.fullName ?? '—'}</span>
                     </div>
+                    {/* Obra */}
+                    {trip.worksite && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <FileText size={10} className="text-gray-300" />
+                        <span className="text-xs text-gray-400 truncate font-medium">Obra: {trip.worksite.code}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Métricas direita */}
@@ -737,6 +757,12 @@ export default function TripHistoryPage() {
                         {trip.finalKm != null && <> → {trip.finalKm.toLocaleString('pt-BR')} km</>}
                       </p>
                     </div>
+                    {trip.worksite && (
+                      <div className="col-span-2 sm:col-span-4">
+                        <p className="text-xs text-gray-400 mb-0.5 flex items-center gap-1"><FileText size={10}/>Obra / Centro de Custo</p>
+                        <p className="text-xs font-semibold text-gray-700">{trip.worksite.code} — {trip.worksite.name}</p>
+                      </div>
+                    )}
                     <div className="col-span-2 sm:col-span-4">
                       <p className="text-xs text-gray-400 mb-0.5 flex items-center gap-1"><Navigation size={10}/>Finalidade</p>
                       <p className="text-xs font-medium text-gray-700">{trip.purpose}</p>

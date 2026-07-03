@@ -136,6 +136,9 @@ model Worksite {
   // Auditorias 5S realizadas nesta obra
   audits5S Audit5S[]
 
+  // Viagens de veículos vinculadas a esta obra
+  vehicleTrips VehicleTrip[]
+
   @@index([code])
   @@index([isActive])
   @@map("worksites")
@@ -259,6 +262,10 @@ model VehicleTrip {
   driverEmployeeId String?   @map("driver_employee_id")
   driverEmployee   Employee? @relation("TripEmployeeDriver", fields: [driverEmployeeId], references: [id], onDelete: SetNull)
 
+  // Obra / Centro de Custo vinculado à viagem
+  worksiteId String?   @map("worksite_id")
+  worksite   Worksite? @relation(fields: [worksiteId], references: [id], onDelete: SetNull)
+
   // Dados da viagem
   origin            String
   destination       String
@@ -280,6 +287,7 @@ model VehicleTrip {
 
   @@index([vehicleId])
   @@index([driverEmployeeId])
+  @@index([worksiteId])
   @@index([departureDateTime])
   @@index([vehicleId, departureDateTime]) // Histórico de um veículo em um período
   @@index([driverEmployeeId, departureDateTime]) // Histórico de um motorista em um período
