@@ -1102,7 +1102,10 @@ export default function TripStartPage() {
                       Encerrando...
                     </>
                   ) : (
-                    'Encerrar Viagem'
+                    <>
+                      <CheckCircle2 size={20} />
+                      Encerrar Viagem
+                    </>
                   )}
                 </Button>
               </div>
@@ -1146,39 +1149,6 @@ export default function TripStartPage() {
                   </div>
                 ) : null
               })()}
-
-            {/* Ações */}
-            <div className="flex gap-3 pt-1">
-              <Button
-                variant="ghost"
-                size="lg"
-                className="flex-shrink-0"
-                onClick={handleBackToStep1}
-                disabled={isSubmitting}
-              >
-                <ArrowLeft size={18} />
-                Voltar
-              </Button>
-              <Button
-                variant="accent"
-                size="lg"
-                className="flex-1 text-base font-bold shadow-lg shadow-brand-accent/20"
-                onClick={handleStep2Submit}
-                disabled={isSubmitting || distanceTraveled === null}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Encerrando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 size={20} />
-                    Encerrar Viagem
-                  </>
-                )}
-              </Button>
-            </div>
           </div>
         )}
       </div>
