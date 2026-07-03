@@ -296,6 +296,7 @@ export const vehiclesService = {
           arrivalDateTime,
           notes: body.notes ?? null,
           arrivalGeolocation: body.arrivalGeolocation ?? null,
+          arrivalOdometerPhoto: body.arrivalOdometerPhoto,
         },
         include: {
           vehicle: { select: { id: true, licensePlate: true, model: true } },

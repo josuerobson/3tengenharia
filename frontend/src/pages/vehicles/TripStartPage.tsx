@@ -21,6 +21,8 @@ import {
   AlertCircle,
   AlertTriangle,
   User,
+  Camera,
+  Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -404,6 +406,8 @@ export default function TripStartPage() {
   const [finalKm, setFinalKm]             = useState('')
   const [step2Errors, setStep2Errors]     = useState<Partial<Record<string, string>>>({})
   const [isSubmitting, setIsSubmitting]   = useState(false)
+  const [arrivalOdometerPhoto, setArrivalOdometerPhoto] = useState<string>('')
+  const odometerFileInputRef              = useRef<HTMLInputElement>(null)
 
   // ── Carregamento centralizado de dados ──────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -508,6 +512,47 @@ export default function TripStartPage() {
     return Object.keys(errors).length === 0
   }, [selectedVehicle, initialKm, origin, destination, currentUser, selectedDriverId, selectedWorksiteId])
 
+  const handleOdometerPhotoAdd = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    const file = files[0]
+    if (!file.type.startsWith('image/')) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+        const maxDim = 1024
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width)
+            width = maxDim
+          } else {
+            width = Math.round((width * maxDim) / height)
+            height = maxDim
+          }
+        }
+
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height)
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7)
+          setArrivalOdometerPhoto(compressedBase64)
+          setStep2Errors(prev => ({ ...prev, photo: undefined }))
+        }
+      }
+      img.src = event.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  }, [])
+
   // ── Validação Passo 2 ─────────────────────────────────────────────────
   const validateStep2 = useCallback((): boolean => {
     const errors: Record<string, string> = {}
@@ -522,9 +567,12 @@ export default function TripStartPage() {
         errors.finalKm = `KM final não pode ser menor que o KM inicial (${departureData.initialKm.toLocaleString('pt-BR')} km).`
       }
     }
+    if (!arrivalOdometerPhoto) {
+      errors.photo = 'A foto do hodômetro de chegada é obrigatória.'
+    }
     setStep2Errors(errors)
     return Object.keys(errors).length === 0
-  }, [departureData, finalKm])
+  }, [departureData, finalKm, arrivalOdometerPhoto])
 
   // ── Handlers ──────────────────────────────────────────────────────────
   const handleStep1Submit = useCallback(async () => {
@@ -571,14 +619,18 @@ export default function TripStartPage() {
     setApiError(null)
     try {
       const coords = await getCurrentCoordinates()
-      await tripsApi.end(activeTripId, { finalKm: finalKmValue, arrivalGeolocation: coords || undefined })
+      await tripsApi.end(activeTripId, {
+        finalKm: finalKmValue,
+        arrivalGeolocation: coords || undefined,
+        arrivalOdometerPhoto,
+      })
       setPageState('COMPLETED')
     } catch (err) {
       setApiError(err instanceof Error ? err.message : 'Erro ao encerrar viagem.')
     } finally {
       setIsSubmitting(false)
     }
-  }, [validateStep2, activeTripId, finalKm])
+  }, [validateStep2, activeTripId, finalKm, arrivalOdometerPhoto])
 
   const handleReset = useCallback(() => {
     setPageState('STEP_1')
@@ -595,6 +647,7 @@ export default function TripStartPage() {
     setApiError(null)
     setSelectedDriverId('')
     setSelectedWorksiteId('')
+    setArrivalOdometerPhoto('')
     void fetchData()
   }, [fetchData])
 
@@ -605,6 +658,7 @@ export default function TripStartPage() {
     setActiveTripId(null)
     setDepartureData(null)
     setSelectedWorksiteId('')
+    setArrivalOdometerPhoto('')
     void fetchData()
   }, [fetchData])
 
@@ -958,6 +1012,51 @@ export default function TripStartPage() {
               />
             </div>
 
+            {/* Foto Comprovante do Hodômetro */}
+            <div className="space-y-1.5">
+              <Label required>Foto Comprovante do Hodômetro (Chegada)</Label>
+              
+              {arrivalOdometerPhoto ? (
+                <div className="relative rounded-2xl border border-gray-150 overflow-hidden w-full h-44 bg-gray-50 flex items-center justify-center group">
+                  <img
+                    src={arrivalOdometerPhoto}
+                    alt="Foto Hodômetro Chegada"
+                    className="w-full h-full object-contain"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setArrivalOdometerPhoto('')}
+                    className="absolute bottom-3 right-3 p-2 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-lg transition-colors flex items-center gap-1 text-xs font-bold"
+                  >
+                    <Trash2 size={14} /> Excluir e Tirar Outra
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => odometerFileInputRef.current?.click()}
+                    className="w-full h-32 rounded-2xl border-2 border-dashed border-gray-200 hover:border-brand-primary/50 hover:bg-slate-50 flex flex-col items-center justify-center text-gray-400 hover:text-brand-primary transition-all gap-2"
+                  >
+                    <Camera size={26} />
+                    <span className="text-xs font-bold">Capturar Foto do Painel/Hodômetro</span>
+                    <span className="text-[10px] text-gray-400">Clique para abrir a câmera</span>
+                  </button>
+                  <input
+                    ref={odometerFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleOdometerPhotoAdd}
+                    className="hidden"
+                  />
+                </div>
+              )}
+              {step2Errors.photo && (
+                <p className="text-xs text-red-500 font-semibold">{step2Errors.photo}</p>
+              )}
+            </div>
+
             {/* Cálculo em tempo real */}
             {distanceTraveled !== null && (
               <div className="bg-brand-primary/5 border border-brand-primary/15 rounded-2xl p-5 text-center animate-fade-in">
@@ -995,7 +1094,7 @@ export default function TripStartPage() {
                   size="lg"
                   className="flex-1 text-base font-bold shadow-lg shadow-brand-accent/20"
                   onClick={handleStep2Submit}
-                  disabled={isSubmitting || distanceTraveled === null}
+                  disabled={isSubmitting || distanceTraveled === null || !arrivalOdometerPhoto}
                 >
                   {isSubmitting ? (
                     <>

@@ -125,6 +125,7 @@ export interface ApiTrip {
   notes: string | null
   departureGeolocation: string | null
   arrivalGeolocation: string | null
+  arrivalOdometerPhoto: string | null
   createdAt: string
   vehicle: {
     id: string
@@ -223,6 +224,7 @@ export const tripsApi = {
     arrivalDateTime?: string
     notes?: string
     arrivalGeolocation?: string
+    arrivalOdometerPhoto: string
   }): Promise<{ message: string; trip: ApiTrip; distanceTraveled: number }> {
     return request(`/vehicles/trips/${tripId}/end`, { method: 'POST', body: JSON.stringify(data) })
   },

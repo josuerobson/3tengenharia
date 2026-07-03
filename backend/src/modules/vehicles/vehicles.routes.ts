@@ -124,12 +124,13 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
         params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
         body: {
           type: 'object',
-          required: ['finalKm'],
+          required: ['finalKm', 'arrivalOdometerPhoto'],
           properties: {
-            finalKm:            { type: 'integer', minimum: 0 },
-            arrivalDateTime:    { type: 'string', format: 'date-time' },
-            notes:              { type: 'string' },
-            arrivalGeolocation: { type: 'string' },
+            finalKm:              { type: 'integer', minimum: 0 },
+            arrivalDateTime:      { type: 'string', format: 'date-time' },
+            notes:                { type: 'string' },
+            arrivalGeolocation:   { type: 'string' },
+            arrivalOdometerPhoto: { type: 'string' },
           },
         },
       }),

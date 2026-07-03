@@ -51,6 +51,7 @@ export const endTripBodySchema = z.object({
 
   notes: z.string().trim().max(1000).optional(),
   arrivalGeolocation: z.string().trim().optional(),
+  arrivalOdometerPhoto: z.string({ required_error: 'A foto do hodômetro de chegada é obrigatória.' }).min(1, 'A foto do hodômetro de chegada é obrigatória.'),
 })
 
 export type EndTripParams = z.infer<typeof endTripParamsSchema>

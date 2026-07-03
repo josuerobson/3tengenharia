@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronUp, X, Filter, Download,
   AlertTriangle, CheckCircle2, TrendingUp, Car,
   Navigation, Route, ArrowRight, Eye, RefreshCw,
-  ExternalLink, FileText,
+  ExternalLink, FileText, Camera,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { tripsApi, type ApiTrip, type ApiTripIncident } from '@/lib/api'
@@ -85,10 +85,12 @@ function TripDetailModal({
   trip,
   onClose,
   onSelectIncident,
+  onZoomPhoto,
 }: {
   trip: Trip
   onClose: () => void
   onSelectIncident: (inc: ApiTripIncident) => void
+  onZoomPhoto: (photoUrl: string) => void
 }) {
   const dep = formatDateTime(trip.departureDateTime)
   const arr = trip.arrivalDateTime ? formatDateTime(trip.arrivalDateTime) : null
@@ -279,6 +281,25 @@ function TripDetailModal({
                     <p className="text-xs text-gray-400 mt-0.5">Não disponível</p>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+           {/* Comprovante do Hodômetro de Chegada */}
+          {trip.arrivalOdometerPhoto && (
+            <div className="space-y-1.5 text-left border-t border-gray-100 pt-3">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                <Camera size={12} /> Comprovante do Hodômetro (Chegada)
+              </p>
+              <div
+                onClick={() => onZoomPhoto(trip.arrivalOdometerPhoto!)}
+                className="w-full max-w-xs h-40 rounded-2xl border border-gray-150 overflow-hidden bg-gray-50 flex items-center justify-center relative cursor-zoom-in hover:opacity-95 transition-all shadow-sm"
+              >
+                <img
+                  src={trip.arrivalOdometerPhoto}
+                  alt="Hodômetro de Chegada"
+                  className="w-full h-full object-cover"
+                />
               </div>
             </div>
           )}
@@ -483,6 +504,7 @@ export default function TripHistoryPage() {
   const [error, setError]       = useState<string | null>(null)
   const [incidentTrip, setIncidentTrip] = useState<Trip | null>(null)
   const [selectedIncident, setSelectedIncident] = useState<ApiTripIncident | null>(null)
+  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -1014,6 +1036,21 @@ export default function TripHistoryPage() {
                       </div>
                     )}
 
+                    {/* Foto do Hodômetro de Chegada no expandido */}
+                    {trip.arrivalOdometerPhoto && (
+                      <div className="col-span-2 sm:col-span-4 border-t border-gray-100 pt-3 mt-1 space-y-1.5 text-left">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                          <Camera size={11} /> Comprovante do Hodômetro (Chegada)
+                        </p>
+                        <div
+                          onClick={() => setLightboxPhoto(trip.arrivalOdometerPhoto)}
+                          className="w-32 h-20 rounded-xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 active:scale-95 transition-all shadow-sm bg-gray-50 flex items-center justify-center"
+                        >
+                          <img src={trip.arrivalOdometerPhoto} alt="Hodômetro de Chegada" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    )}
+
                     {/* Botão de sinistro em viagem em andamento */}
                     {isOngoing(trip) && (
                       <div className="col-span-2 sm:col-span-4 border-t border-gray-100 pt-2 flex justify-end">
@@ -1041,6 +1078,7 @@ export default function TripHistoryPage() {
           trip={detailTrip}
           onClose={() => setDetailTrip(null)}
           onSelectIncident={setSelectedIncident}
+          onZoomPhoto={setLightboxPhoto}
         />
       )}
 
@@ -1064,6 +1102,27 @@ export default function TripHistoryPage() {
           incident={selectedIncident}
           onClose={() => setSelectedIncident(null)}
         />
+      )}
+
+      {/* Lightbox Genérico para Fotos */}
+      {lightboxPhoto && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
+          onClick={() => setLightboxPhoto(null)}
+        >
+          <button
+            onClick={() => setLightboxPhoto(null)}
+            className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={lightboxPhoto}
+            alt="Visualização Ampliada"
+            className="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   )

@@ -280,6 +280,7 @@ model VehicleTrip {
   distanceTraveled  Int?      @map("distance_traveled") // finalKm - initialKm (calculado pela app)
   departureGeolocation String? @map("departure_geolocation")
   arrivalGeolocation   String? @map("arrival_geolocation")
+  arrivalOdometerPhoto String? @map("arrival_odometer_photo")
 
   // Indica se havia alerta de manutenção ativo no momento da saída
   maintenanceAlertActive Boolean @default(false) @map("maintenance_alert_active")
