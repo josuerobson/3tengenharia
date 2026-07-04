@@ -35,7 +35,7 @@ import {
   formatKm,
   formatDuration,
 } from '@/data/mockData'
-import { vehiclesApi, tripsApi, assetsApi, authApi, type ApiVehicle, type ApiTrip, type ApiEmployee, type ApiWorksite } from '@/lib/api'
+import { vehiclesApi, tripsApi, assetsApi, authApi, maintenanceApi, type ApiVehicle, type ApiTrip, type ApiEmployee, type ApiWorksite, type ApiMaintenanceAlert } from '@/lib/api'
 import IncidentReportModal from '@/components/vehicles/IncidentReportModal'
 
 // Usa ApiVehicle como tipo Vehicle para este componente
@@ -115,9 +115,10 @@ interface VehicleComboboxProps {
   error?: string
   vehicles: Vehicle[]
   loadingVehicles?: boolean
+  allAlerts: ApiMaintenanceAlert[]
 }
 
-function VehicleCombobox({ value, onChange, error, vehicles, loadingVehicles }: VehicleComboboxProps) {
+function VehicleCombobox({ value, onChange, error, vehicles, loadingVehicles, allAlerts }: VehicleComboboxProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -261,25 +262,9 @@ function VehicleCombobox({ value, onChange, error, vehicles, loadingVehicles }: 
                 const isDisabled = vehicle.status !== 'ACTIVE' || hasActiveTrip
                 const isSelected = value?.id === vehicle.id
 
-                const needsMaintenance = (() => {
-                  let kmAlert = false
-                  let dayAlert = false
-                  if (vehicle.maintenanceKmThreshold !== null) {
-                    const baseKm = vehicle.lastMaintenanceKm ?? 0
-                    if (vehicle.currentKm - baseKm >= vehicle.maintenanceKmThreshold) {
-                      kmAlert = true
-                    }
-                  }
-                  if (vehicle.maintenanceDayThreshold !== null && vehicle.lastMaintenanceDate) {
-                    const lastDate = new Date(vehicle.lastMaintenanceDate)
-                    const msPerDay = 1000 * 60 * 60 * 24
-                    const daysSince = Math.floor((new Date().getTime() - lastDate.getTime()) / msPerDay)
-                    if (daysSince >= vehicle.maintenanceDayThreshold) {
-                      dayAlert = true
-                    }
-                  }
-                  return kmAlert || dayAlert
-                })()
+                const needsMaintenance = allAlerts.some(
+                  a => a.vehicleId === vehicle.id && (a.urgency === 'critical' || a.urgency === 'high')
+                )
 
                 return (
                   <button
@@ -400,6 +385,7 @@ export default function TripStartPage() {
   const [loadingVehicles, setLoadingVehicles] = useState(true)
   const [apiError, setApiError]               = useState<string | null>(null)
   const [incidentTrip, setIncidentTrip]       = useState<ApiTrip | null>(null)
+  const [allMaintenanceAlerts, setAllMaintenanceAlerts] = useState<ApiMaintenanceAlert[]>([])
 
   // ── Trip ID salvo após startTrip (para encerrar no passo 2) ────────────
   const [activeTripId, setActiveTripId] = useState<string | null>(null)
@@ -458,47 +444,26 @@ export default function TripStartPage() {
   const vehicleMaintenanceAlert = useMemo(() => {
     if (!selectedVehicle) return null
 
-    let kmAlert = false
-    let dayAlert = false
-    let kmSince: number | undefined
-    let daysSince: number | undefined
+    const criticalAlerts = allMaintenanceAlerts.filter(
+      a => a.vehicleId === selectedVehicle.id && (a.urgency === 'critical' || a.urgency === 'high')
+    )
+    if (criticalAlerts.length === 0) return null
 
-    if (selectedVehicle.maintenanceKmThreshold !== null) {
-      const baseKm = selectedVehicle.lastMaintenanceKm ?? 0
-      kmSince = selectedVehicle.currentKm - baseKm
-      if (kmSince >= selectedVehicle.maintenanceKmThreshold) {
-        kmAlert = true
+    const messages = criticalAlerts.map(a => {
+      const details: string[] = []
+      if (a.kmRemaining !== null && a.kmRemaining < 0) {
+        details.push(`Vencido há ${Math.abs(a.kmRemaining).toLocaleString('pt-BR')} km`)
       }
-    }
-
-    if (selectedVehicle.maintenanceDayThreshold !== null && selectedVehicle.lastMaintenanceDate) {
-      const now = new Date()
-      const lastDate = new Date(selectedVehicle.lastMaintenanceDate)
-      const msPerDay = 1000 * 60 * 60 * 24
-      daysSince = Math.floor((now.getTime() - lastDate.getTime()) / msPerDay)
-      if (daysSince >= selectedVehicle.maintenanceDayThreshold) {
-        dayAlert = true
+      if (a.daysRemaining !== null && a.daysRemaining < 0) {
+        details.push(`Vencido há ${Math.abs(a.daysRemaining)} dias`)
       }
-    }
-
-    if (!kmAlert && !dayAlert) return null
-
-    const messages: string[] = []
-    if (kmAlert && kmSince !== undefined) {
-      messages.push(
-        `Ultrapassou o limite de quilometragem em ${(kmSince - (selectedVehicle.maintenanceKmThreshold ?? 0)).toLocaleString('pt-BR')} km (rodou ${kmSince.toLocaleString('pt-BR')} km desde a última manutenção, limite de ${selectedVehicle.maintenanceKmThreshold?.toLocaleString('pt-BR')} km).`
-      )
-    }
-    if (dayAlert && daysSince !== undefined) {
-      messages.push(
-        `Ultrapassou o limite de prazo em ${(daysSince - (selectedVehicle.maintenanceDayThreshold ?? 0))} dias (faz ${daysSince} dias desde a última manutenção, limite de ${selectedVehicle.maintenanceDayThreshold} dias).`
-      )
-    }
+      return `${a.name} (${details.join(', ') || 'Vencido'})`
+    })
 
     return {
-      message: messages.join(' '),
+      message: messages.join(' · '),
     }
-  }, [selectedVehicle])
+  }, [selectedVehicle, allMaintenanceAlerts])
 
   // ── Carregamento centralizado de dados ──────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -506,12 +471,13 @@ export default function TripStartPage() {
     setApiError(null)
     try {
       const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
-      const [vehRes, tripsRes, empRes, worksitesRes, meRes] = await Promise.all([
+      const [vehRes, tripsRes, empRes, worksitesRes, meRes, alertsRes] = await Promise.all([
         vehiclesApi.list(),
         tripsApi.list({ limit: 100 }),
         isManagerOrAdmin ? assetsApi.listEmployees() : Promise.resolve([]),
         assetsApi.listWorksites(),
         !isManagerOrAdmin ? authApi.me() : Promise.resolve(null),
+        maintenanceApi.listAllAlerts().catch(() => [] as ApiMaintenanceAlert[]),
       ])
       setVehiclesList(vehRes.vehicles)
       const openTrips = tripsRes.trips.filter(t => t.arrivalDateTime === null || t.finalKm === null)
@@ -524,6 +490,9 @@ export default function TripStartPage() {
       }
       if (meRes?.user?.employee) {
         setCurrentEmployeeProfile(meRes.user.employee as unknown as ApiEmployee)
+      }
+      if (Array.isArray(alertsRes)) {
+        setAllMaintenanceAlerts(alertsRes)
       }
     } catch (err) {
       setApiError(err instanceof Error ? err.message : 'Erro ao carregar dados do servidor.')
@@ -921,6 +890,7 @@ export default function TripStartPage() {
                   error={step1Errors.vehicle}
                   vehicles={vehiclesList}
                   loadingVehicles={loadingVehicles}
+                  allAlerts={allMaintenanceAlerts}
                 />
               </div>
 

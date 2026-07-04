@@ -187,6 +187,9 @@ export const vehiclesService = {
         maintenanceDayThreshold: true,
         lastMaintenanceKm: true,
         lastMaintenanceDate: true,
+        maintenanceTypes: {
+          where: { isActive: true },
+        },
       },
     })
 
@@ -219,7 +222,48 @@ export const vehiclesService = {
     // 5. Verifica se há alerta de manutenção ativo já no momento da saída
     //    (usando o initialKm como novo odômetro)
     const preExistingAlert = checkMaintenanceThresholds(vehicle, body.initialKm)
-    const maintenanceAlertActive = preExistingAlert !== null
+    
+    // Também checa os tipos específicos de manutenção baseando-se no initialKm
+    let hasCriticalMaintenanceTypeAlert = false
+    const today = new Date()
+    const urgencyOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, ok: 1 }
+    
+    for (const t of vehicle.maintenanceTypes ?? []) {
+      if (!t.isActive) continue
+      
+      let kmUrgency = 'ok'
+      if (t.intervalKm !== null) {
+        const baseKm = t.lastServiceKm ?? 0
+        const pct = Math.min(100, ((body.initialKm - baseKm) / t.intervalKm) * 100)
+        if (pct >= 100) kmUrgency = 'critical'
+        else if (pct >= 85) kmUrgency = 'high'
+      }
+      
+      let daysUrgency = 'ok'
+      if (t.intervalDays !== null) {
+        const baseDate = t.lastServiceDate ? new Date(t.lastServiceDate) : new Date(0)
+        const dueDateMs = baseDate.getTime() + t.intervalDays * 86_400_000
+        const daysRemaining = Math.ceil((dueDateMs - today.getTime()) / 86_400_000)
+        const elapsed = t.intervalDays - daysRemaining
+        const pct = Math.min(100, (elapsed / t.intervalDays) * 100)
+        if (pct >= 100) daysUrgency = 'critical'
+        else if (pct >= 85) daysUrgency = 'high'
+      }
+      
+      const candidates = [kmUrgency, daysUrgency]
+      const urgency = candidates.sort((a, b) => {
+        const valA = urgencyOrder[a] ?? 0
+        const valB = urgencyOrder[b] ?? 0
+        return valB - valA
+      })[0] ?? 'ok'
+      
+      if (urgency === 'critical' || urgency === 'high') {
+        hasCriticalMaintenanceTypeAlert = true
+        break
+      }
+    }
+
+    const maintenanceAlertActive = preExistingAlert !== null || hasCriticalMaintenanceTypeAlert
 
     // 6. Cria o registro da viagem
     const trip = await prisma.vehicleTrip.create({
@@ -261,6 +305,9 @@ export const vehiclesService = {
             maintenanceDayThreshold: true,
             lastMaintenanceKm: true,
             lastMaintenanceDate: true,
+            maintenanceTypes: {
+              where: { isActive: true },
+            },
           },
         },
       },
@@ -283,7 +330,48 @@ export const vehiclesService = {
     const arrivalDateTime = body.arrivalDateTime ?? new Date()
 
     const alert = checkMaintenanceThresholds(trip.vehicle, body.finalKm)
-    const needsMaintenance = alert !== null
+    
+    // Também checa os tipos específicos de manutenção baseando-se no finalKm
+    let hasCriticalMaintenanceTypeAlert = false
+    const today = new Date()
+    const urgencyOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, ok: 1 }
+    
+    for (const t of trip.vehicle.maintenanceTypes ?? []) {
+      if (!t.isActive) continue
+      
+      let kmUrgency = 'ok'
+      if (t.intervalKm !== null) {
+        const baseKm = t.lastServiceKm ?? 0
+        const pct = Math.min(100, ((body.finalKm - baseKm) / t.intervalKm) * 100)
+        if (pct >= 100) kmUrgency = 'critical'
+        else if (pct >= 85) kmUrgency = 'high'
+      }
+      
+      let daysUrgency = 'ok'
+      if (t.intervalDays !== null) {
+        const baseDate = t.lastServiceDate ? new Date(t.lastServiceDate) : new Date(0)
+        const dueDateMs = baseDate.getTime() + t.intervalDays * 86_400_000
+        const daysRemaining = Math.ceil((dueDateMs - today.getTime()) / 86_400_000)
+        const elapsed = t.intervalDays - daysRemaining
+        const pct = Math.min(100, (elapsed / t.intervalDays) * 100)
+        if (pct >= 100) daysUrgency = 'critical'
+        else if (pct >= 85) daysUrgency = 'high'
+      }
+      
+      const candidates = [kmUrgency, daysUrgency]
+      const urgency = candidates.sort((a, b) => {
+        const valA = urgencyOrder[a] ?? 0
+        const valB = urgencyOrder[b] ?? 0
+        return valB - valA
+      })[0] ?? 'ok'
+      
+      if (urgency === 'critical' || urgency === 'high') {
+        hasCriticalMaintenanceTypeAlert = true
+        break
+      }
+    }
+
+    const needsMaintenance = alert !== null || hasCriticalMaintenanceTypeAlert
 
     // 5. Executa em transação: atualiza viagem + veículo atomicamente
     const [updatedTrip] = await prisma.$transaction([
