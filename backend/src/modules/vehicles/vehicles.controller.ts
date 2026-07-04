@@ -17,6 +17,7 @@ import {
   FinalKmBelowInitialError,
   VehicleAlreadyInTripError,
   OnlySelfTripCreationAllowedError,
+  VehiclePhotosRequiredError,
 } from './vehicles.service.js'
 
 /** Erros de domínio deste módulo — re-lançados para o error-handler global */
@@ -29,6 +30,7 @@ const DOMAIN_ERRORS = [
   FinalKmBelowInitialError,
   VehicleAlreadyInTripError,
   OnlySelfTripCreationAllowedError,
+  VehiclePhotosRequiredError,
 ]
 
 function rethrowDomain(err: unknown): never {

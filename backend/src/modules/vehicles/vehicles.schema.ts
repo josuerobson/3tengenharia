@@ -30,6 +30,10 @@ export const startTripBodySchema = z.object({
   purpose: z.string().trim().max(500).optional(),
   departureGeolocation: z.string().trim().optional(),
   worksiteId: z.string().cuid('ID da obra inválido.').optional().nullable(),
+  departurePhotoFront: z.string().trim().optional(),
+  departurePhotoBack:  z.string().trim().optional(),
+  departurePhotoRight: z.string().trim().optional(),
+  departurePhotoLeft:  z.string().trim().optional(),
 })
 
 export type StartTripBody = z.infer<typeof startTripBodySchema>

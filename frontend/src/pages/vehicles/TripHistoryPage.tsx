@@ -305,6 +305,61 @@ function TripDetailModal({
             </div>
           )}
 
+          {/* Fotos de Saída (Ciclo de 10 Viagens) */}
+          {(trip.departurePhotoFront || trip.departurePhotoBack || trip.departurePhotoRight || trip.departurePhotoLeft) && (
+            <div className="space-y-1.5 text-left border-t border-gray-100 pt-3">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                <Camera size={12} /> Fotos de Registro da Saída
+              </p>
+              <div className="grid grid-cols-4 gap-2.5 max-w-lg">
+                {trip.departurePhotoFront && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] text-gray-400 font-semibold text-center">Frente</span>
+                    <div
+                      onClick={() => onZoomPhoto(trip.departurePhotoFront!)}
+                      className="h-16 rounded-xl border border-gray-150 overflow-hidden bg-gray-50 flex items-center justify-center cursor-zoom-in hover:opacity-90 transition-all shadow-sm"
+                    >
+                      <img src={trip.departurePhotoFront} alt="Frente" className="w-full h-full object-cover" />
+                    </div>
+                  </div>
+                )}
+                {trip.departurePhotoBack && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] text-gray-400 font-semibold text-center">Trás</span>
+                    <div
+                      onClick={() => onZoomPhoto(trip.departurePhotoBack!)}
+                      className="h-16 rounded-xl border border-gray-150 overflow-hidden bg-gray-50 flex items-center justify-center cursor-zoom-in hover:opacity-90 transition-all shadow-sm"
+                    >
+                      <img src={trip.departurePhotoBack} alt="Trás" className="w-full h-full object-cover" />
+                    </div>
+                  </div>
+                )}
+                {trip.departurePhotoRight && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] text-gray-400 font-semibold text-center">Dir.</span>
+                    <div
+                      onClick={() => onZoomPhoto(trip.departurePhotoRight!)}
+                      className="h-16 rounded-xl border border-gray-150 overflow-hidden bg-gray-50 flex items-center justify-center cursor-zoom-in hover:opacity-90 transition-all shadow-sm"
+                    >
+                      <img src={trip.departurePhotoRight} alt="Direita" className="w-full h-full object-cover" />
+                    </div>
+                  </div>
+                )}
+                {trip.departurePhotoLeft && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] text-gray-400 font-semibold text-center">Esq.</span>
+                    <div
+                      onClick={() => onZoomPhoto(trip.departurePhotoLeft!)}
+                      className="h-16 rounded-xl border border-gray-150 overflow-hidden bg-gray-50 flex items-center justify-center cursor-zoom-in hover:opacity-90 transition-all shadow-sm"
+                    >
+                      <img src={trip.departurePhotoLeft} alt="Esquerda" className="w-full h-full object-cover" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Alerta de manutenção */}
           {trip.maintenanceAlertActive && (
             <div className="flex items-start gap-3 p-3 rounded-2xl bg-red-50 border border-red-200">
@@ -1053,6 +1108,61 @@ export default function TripHistoryPage() {
                           className="w-32 h-20 rounded-xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 active:scale-95 transition-all shadow-sm bg-gray-50 flex items-center justify-center"
                         >
                           <img src={trip.arrivalOdometerPhoto} alt="Hodômetro de Chegada" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Fotos de Saída (Ciclo de 10 Viagens) */}
+                    {(trip.departurePhotoFront || trip.departurePhotoBack || trip.departurePhotoRight || trip.departurePhotoLeft) && (
+                      <div className="col-span-2 sm:col-span-4 border-t border-gray-100 pt-3 mt-1 space-y-1.5 text-left">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                          <Camera size={11} /> Fotos de Registro da Saída
+                        </p>
+                        <div className="grid grid-cols-4 gap-2.5 max-w-sm">
+                          {trip.departurePhotoFront && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[9px] text-gray-400 font-semibold text-center">Frente</span>
+                              <div
+                                onClick={() => setLightboxPhoto(trip.departurePhotoFront!)}
+                                className="h-12 rounded-xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 transition-all shadow-sm bg-gray-50 flex items-center justify-center"
+                              >
+                                <img src={trip.departurePhotoFront} alt="Frente" className="w-full h-full object-cover" />
+                              </div>
+                            </div>
+                          )}
+                          {trip.departurePhotoBack && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[9px] text-gray-400 font-semibold text-center">Trás</span>
+                              <div
+                                onClick={() => setLightboxPhoto(trip.departurePhotoBack!)}
+                                className="h-12 rounded-xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 transition-all shadow-sm bg-gray-50 flex items-center justify-center"
+                              >
+                                <img src={trip.departurePhotoBack} alt="Trás" className="w-full h-full object-cover" />
+                              </div>
+                            </div>
+                          )}
+                          {trip.departurePhotoRight && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[9px] text-gray-400 font-semibold text-center">Dir.</span>
+                              <div
+                                onClick={() => setLightboxPhoto(trip.departurePhotoRight!)}
+                                className="h-12 rounded-xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 transition-all shadow-sm bg-gray-50 flex items-center justify-center"
+                              >
+                                <img src={trip.departurePhotoRight} alt="Direita" className="w-full h-full object-cover" />
+                              </div>
+                            </div>
+                          )}
+                          {trip.departurePhotoLeft && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[9px] text-gray-400 font-semibold text-center">Esq.</span>
+                              <div
+                                onClick={() => setLightboxPhoto(trip.departurePhotoLeft!)}
+                                className="h-12 rounded-xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 transition-all shadow-sm bg-gray-50 flex items-center justify-center"
+                              >
+                                <img src={trip.departurePhotoLeft} alt="Esquerda" className="w-full h-full object-cover" />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

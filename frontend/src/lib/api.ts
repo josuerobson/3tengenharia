@@ -109,6 +109,7 @@ export interface ApiVehicle {
   createdAt: string
   updatedAt: string
   trips?: { id: string }[]
+  _count?: { trips: number }
 }
 
 export interface ApiTrip {
@@ -126,6 +127,10 @@ export interface ApiTrip {
   departureGeolocation: string | null
   arrivalGeolocation: string | null
   arrivalOdometerPhoto: string | null
+  departurePhotoFront?: string | null
+  departurePhotoBack?: string | null
+  departurePhotoRight?: string | null
+  departurePhotoLeft?: string | null
   createdAt: string
   vehicle: {
     id: string
@@ -215,6 +220,10 @@ export const tripsApi = {
     driverEmployeeId?: string
     departureGeolocation?: string
     worksiteId?: string
+    departurePhotoFront?: string
+    departurePhotoBack?: string
+    departurePhotoRight?: string
+    departurePhotoLeft?: string
   }): Promise<{ message: string; trip: ApiTrip; maintenanceAlert?: unknown }> {
     return request('/vehicles/trips/start', { method: 'POST', body: JSON.stringify(data) })
   },

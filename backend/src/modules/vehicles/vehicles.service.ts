@@ -83,6 +83,16 @@ export class OnlySelfTripCreationAllowedError extends Error {
   }
 }
 
+export class VehiclePhotosRequiredError extends Error {
+  readonly statusCode = 400
+  constructor() {
+    super(
+      'A cada ciclo de 10 viagens, é obrigatório registrar 4 fotos do veículo (frente, trás, lado direito, lado esquerdo) antes de iniciar a nova viagem.'
+    )
+    this.name = 'VehiclePhotosRequiredError'
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
@@ -216,6 +226,22 @@ export const vehiclesService = {
       throw new InitialKmBelowCurrentError(body.initialKm, vehicle.currentKm)
     }
 
+    // ⚙️ REGRA DE NEGÓCIO: A cada ciclo de 10 viagens, exige registro de 4 fotos antes de iniciar a 11ª
+    const totalTrips = await prisma.vehicleTrip.count({
+      where: { vehicleId: body.vehicleId },
+    })
+    const requiresPhotos = totalTrips > 0 && totalTrips % 10 === 0
+    if (requiresPhotos) {
+      if (
+        !body.departurePhotoFront ||
+        !body.departurePhotoBack ||
+        !body.departurePhotoRight ||
+        !body.departurePhotoLeft
+      ) {
+        throw new VehiclePhotosRequiredError()
+      }
+    }
+
     // 4. Determina o motorista (body tem precedência; fallback para o do JWT)
     const resolvedDriverId = body.driverEmployeeId ?? jwtEmployeeId ?? undefined
 
@@ -278,6 +304,10 @@ export const vehiclesService = {
         maintenanceAlertActive,
         departureGeolocation: body.departureGeolocation ?? null,
         worksiteId: body.worksiteId ?? null,
+        departurePhotoFront: body.departurePhotoFront ?? null,
+        departurePhotoBack: body.departurePhotoBack ?? null,
+        departurePhotoRight: body.departurePhotoRight ?? null,
+        departurePhotoLeft: body.departurePhotoLeft ?? null,
       },
       include: {
         vehicle: { select: { id: true, licensePlate: true, model: true } },
@@ -491,6 +521,9 @@ export const vehiclesService = {
         trips: {
           where: { arrivalDateTime: null },
           select: { id: true },
+        },
+        _count: {
+          select: { trips: true },
         },
       },
     })

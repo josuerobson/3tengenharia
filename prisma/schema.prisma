@@ -287,6 +287,12 @@ model VehicleTrip {
   arrivalGeolocation   String? @map("arrival_geolocation")
   arrivalOdometerPhoto String? @map("arrival_odometer_photo")
 
+  // Fotos obrigatórias a cada ciclo de 10 viagens
+  departurePhotoFront String? @map("departure_photo_front")
+  departurePhotoBack  String? @map("departure_photo_back")
+  departurePhotoRight String? @map("departure_photo_right")
+  departurePhotoLeft  String? @map("departure_photo_left")
+
   // Indica se havia alerta de manutenção ativo no momento da saída
   maintenanceAlertActive Boolean @default(false) @map("maintenance_alert_active")
 

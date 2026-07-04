@@ -403,6 +403,17 @@ export default function TripStartPage() {
   const [purpose, setPurpose]                 = useState('')
   const [step1Errors, setStep1Errors]         = useState<Partial<Record<string, string>>>({})
 
+  // Fotos de saída para ciclos de 10 viagens
+  const [photoFront, setPhotoFront] = useState('')
+  const [photoBack, setPhotoBack] = useState('')
+  const [photoRight, setPhotoRight] = useState('')
+  const [photoLeft, setPhotoLeft] = useState('')
+
+  const photoFrontRef = useRef<HTMLInputElement>(null)
+  const photoBackRef = useRef<HTMLInputElement>(null)
+  const photoRightRef = useRef<HTMLInputElement>(null)
+  const photoLeftRef = useRef<HTMLInputElement>(null)
+
   // Auto-preenche o KM inicial com o odômetro atual do veículo selecionado
   useEffect(() => {
     if (selectedVehicle) {
@@ -440,6 +451,58 @@ export default function TripStartPage() {
     expiryDate.setHours(23, 59, 59, 999)
     return expiryDate < new Date()
   }, [selectedDriver, currentEmployeeProfile, currentUser])
+
+  const requiresPhotos = useMemo(() => {
+    const totalTrips = selectedVehicle?._count?.trips ?? 0
+    return totalTrips > 0 && totalTrips % 10 === 0
+  }, [selectedVehicle])
+
+  const allPhotosCaptured = useMemo(() => {
+    return !requiresPhotos || (!!photoFront && !!photoBack && !!photoRight && !!photoLeft)
+  }, [requiresPhotos, photoFront, photoBack, photoRight, photoLeft])
+
+  const handlePhotoUpload = useCallback((side: 'front' | 'back' | 'right' | 'left') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    const file = files[0]
+    if (!file.type.startsWith('image/')) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+        const maxDim = 1024
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width)
+            width = maxDim
+          } else {
+            width = Math.round((width * maxDim) / height)
+            height = maxDim
+          }
+        }
+
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height)
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7)
+          if (side === 'front') setPhotoFront(compressedBase64)
+          else if (side === 'back') setPhotoBack(compressedBase64)
+          else if (side === 'right') setPhotoRight(compressedBase64)
+          else if (side === 'left') setPhotoLeft(compressedBase64)
+        }
+      }
+      img.src = event.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  }, [])
 
   const vehicleMaintenanceAlert = useMemo(() => {
     if (!selectedVehicle) return null
@@ -667,6 +730,12 @@ export default function TripStartPage() {
         departureGeolocation: coords || undefined,
         worksiteId:  selectedWorksiteId || undefined,
         ...(isManagerOrAdmin && selectedDriverId ? { driverEmployeeId: selectedDriverId } : {}),
+        ...(requiresPhotos ? {
+          departurePhotoFront: photoFront || undefined,
+          departurePhotoBack:  photoBack || undefined,
+          departurePhotoRight: photoRight || undefined,
+          departurePhotoLeft:  photoLeft || undefined,
+        } : {}),
       })
       setActiveTripId(res.trip.id)
       setDepartureData({
@@ -684,7 +753,7 @@ export default function TripStartPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }, [validateStep1, selectedVehicle, initialKm, origin, destination, purpose, currentUser, selectedDriverId, selectedWorksiteId, worksitesList, vehicleMaintenanceAlert])
+  }, [validateStep1, selectedVehicle, initialKm, origin, destination, purpose, currentUser, selectedDriverId, selectedWorksiteId, worksitesList, vehicleMaintenanceAlert, requiresPhotos, photoFront, photoBack, photoRight, photoLeft])
 
   const handleStep2Submit = useCallback(async () => {
     if (!validateStep2() || !activeTripId) return
@@ -722,6 +791,10 @@ export default function TripStartPage() {
     setSelectedDriverId('')
     setSelectedWorksiteId('')
     setArrivalOdometerPhoto('')
+    setPhotoFront('')
+    setPhotoBack('')
+    setPhotoRight('')
+    setPhotoLeft('')
     void fetchData()
   }, [fetchData])
 
@@ -1042,6 +1115,57 @@ export default function TripStartPage() {
               />
             </div>
 
+            {/* Alerta de Registro Fotográfico Obrigatório (Ciclo de 10 viagens) */}
+            {requiresPhotos && (
+              <div className="flex flex-col gap-3.5 p-5 bg-amber-50 border border-amber-200 rounded-2xl animate-fade-in text-left">
+                <div className="flex items-start gap-3">
+                  <Camera className="text-amber-600 flex-shrink-0 mt-0.5 animate-pulse" size={20} />
+                  <div>
+                    <p className="text-sm font-bold text-amber-800">
+                      Registro Fotográfico Obrigatório (Fim de Ciclo de 10 Viagens)
+                    </p>
+                    <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                      Este veículo atingiu o ciclo de 10 viagens registradas. É obrigatório anexar 4 fotos nítidas dos 4 lados do veículo (frente, trás, lado direito e lado esquerdo), enquadrando o veículo por inteiro, antes de iniciar esta viagem.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 4 fotos em formato grid */}
+                <div className="grid grid-cols-2 gap-3 mt-1.5">
+                  <PhotoCaptureCard
+                    side="Frente"
+                    value={photoFront}
+                    onCapture={() => photoFrontRef.current?.click()}
+                    onDelete={() => setPhotoFront('')}
+                  />
+                  <PhotoCaptureCard
+                    side="Trás"
+                    value={photoBack}
+                    onCapture={() => photoBackRef.current?.click()}
+                    onDelete={() => setPhotoBack('')}
+                  />
+                  <PhotoCaptureCard
+                    side="Lado Direito"
+                    value={photoRight}
+                    onCapture={() => photoRightRef.current?.click()}
+                    onDelete={() => setPhotoRight('')}
+                  />
+                  <PhotoCaptureCard
+                    side="Lado Esquerdo"
+                    value={photoLeft}
+                    onCapture={() => photoLeftRef.current?.click()}
+                    onDelete={() => setPhotoLeft('')}
+                  />
+                </div>
+
+                {/* File inputs escondidos */}
+                <input ref={photoFrontRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload('front')} className="hidden" />
+                <input ref={photoBackRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload('back')} className="hidden" />
+                <input ref={photoRightRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload('right')} className="hidden" />
+                <input ref={photoLeftRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload('left')} className="hidden" />
+              </div>
+            )}
+
             {isCnhExpired && (
               <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl animate-fade-in mb-3">
                 <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
@@ -1072,10 +1196,21 @@ export default function TripStartPage() {
               size="lg"
               className="w-full mt-2"
               onClick={() => void handleStep1Submit()}
-              disabled={isSubmitting || isCnhExpired}
+              disabled={isSubmitting || isCnhExpired || !allPhotosCaptured}
             >
-              {isSubmitting ? 'Registrando...' : 'Registrar Saída'}
-              <ArrowRight size={18} />
+              {isSubmitting ? (
+                'Registrando...'
+              ) : !allPhotosCaptured ? (
+                <>
+                  <Camera size={18} />
+                  Registrar Fotos (Pendentes)
+                </>
+              ) : (
+                <>
+                  Registrar Saída
+                  <ArrowRight size={18} />
+                </>
+              )}
             </Button>
 
           </div>
@@ -1326,6 +1461,46 @@ function InfoRow({
         <p className="text-xs text-gray-400 leading-none">{label}</p>
         <p className="text-sm font-semibold text-gray-800 leading-snug mt-0.5">{value}</p>
       </div>
+    </div>
+  )
+}
+
+function PhotoCaptureCard({
+  side,
+  value,
+  onCapture,
+  onDelete,
+}: {
+  side: string
+  value: string
+  onCapture: () => void
+  onDelete: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] font-bold text-gray-500">{side} *</span>
+      {value ? (
+        <div className="relative rounded-xl border border-gray-200 overflow-hidden h-20 bg-gray-50 flex items-center justify-center group">
+          <img src={value} alt={`Foto ${side}`} className="w-full h-full object-cover" />
+          <button
+            type="button"
+            onClick={onDelete}
+            className="absolute bottom-1 right-1 p-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-md"
+            title="Excluir"
+          >
+            <Trash2 size={10} />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onCapture}
+          className="h-20 rounded-xl border-2 border-dashed border-gray-200 hover:border-brand-primary/50 hover:bg-white flex flex-col items-center justify-center text-gray-400 hover:text-brand-primary transition-all gap-1 p-1"
+        >
+          <Camera size={16} />
+          <span className="text-[9px] font-bold text-center">Tirar foto</span>
+        </button>
+      )}
     </div>
   )
 }
