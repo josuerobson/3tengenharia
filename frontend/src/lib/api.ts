@@ -286,6 +286,10 @@ export interface ApiMaintenanceAlert {
   currentKm: number
   lastServiceKm: number | null
   lastServiceDate: string | null
+  lastServiceProvider?: string | null
+  lastServiceWarranty?: string | null
+  lastServiceCost?: number | null
+  lastServiceNotes?: string | null
   intervalKm: number | null
   intervalDays: number | null
   kmRemaining: number | null
@@ -314,7 +318,14 @@ export const maintenanceApi = {
   completeService(
     vehicleId: string,
     maintenanceTypeId: string,
-    data: { serviceKm: number; serviceDate?: string }
+    data: {
+      serviceKm: number
+      serviceDate?: string
+      serviceProvider?: string | null
+      serviceWarranty?: string | null
+      serviceCost?: number | null
+      serviceNotes?: string | null
+    }
   ): Promise<unknown> {
     return request(`/vehicles/${vehicleId}/maintenance-types/${maintenanceTypeId}/complete`, {
       method: 'POST',

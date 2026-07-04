@@ -74,15 +74,28 @@ export const maintenanceTypesService = {
   },
 
   // ── Registrar conclusão de serviço ───────────────────────────────────────
-  async completeService(id: string, vehicleId: string, serviceKm: number, serviceDate?: string) {
+  async completeService(
+    id: string,
+    vehicleId: string,
+    serviceKm: number,
+    serviceDate?: string,
+    serviceProvider?: string,
+    serviceWarranty?: string,
+    serviceCost?: number,
+    serviceNotes?: string
+  ) {
     const existing = await prisma.vehicleMaintenanceType.findFirst({ where: { id, vehicleId } })
     if (!existing) return { notFound: true as const }
 
     const type = await prisma.vehicleMaintenanceType.update({
       where: { id },
       data: {
-        lastServiceKm:   serviceKm,
-        lastServiceDate: serviceDate ? new Date(serviceDate) : new Date(),
+        lastServiceKm:       serviceKm,
+        lastServiceDate:     serviceDate ? new Date(serviceDate) : new Date(),
+        lastServiceProvider: serviceProvider ?? null,
+        lastServiceWarranty: serviceWarranty ?? null,
+        lastServiceCost:     serviceCost != null ? serviceCost : null,
+        lastServiceNotes:    serviceNotes ?? null,
       },
     })
 
@@ -148,6 +161,10 @@ export const maintenanceTypesService = {
           currentKm:         vehicle.currentKm,
           lastServiceKm:     t.lastServiceKm,
           lastServiceDate:   t.lastServiceDate?.toISOString().split('T')[0] ?? null,
+          lastServiceProvider: t.lastServiceProvider,
+          lastServiceWarranty: t.lastServiceWarranty,
+          lastServiceCost:     t.lastServiceCost ? Number(t.lastServiceCost) : null,
+          lastServiceNotes:    t.lastServiceNotes,
           intervalKm:        t.intervalKm,
           intervalDays:      t.intervalDays,
           kmRemaining,

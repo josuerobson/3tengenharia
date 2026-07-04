@@ -184,16 +184,43 @@ export async function maintenanceTypeRoutes(app: FastifyInstance): Promise<void>
           type: 'object',
           required: ['serviceKm'],
           properties: {
-            serviceKm:   { type: 'integer', minimum: 0 },
-            serviceDate: { type: 'string', format: 'date' },
+            serviceKm:       { type: 'integer', minimum: 0 },
+            serviceDate:     { type: 'string', format: 'date' },
+            serviceProvider: { type: ['string', 'null'] },
+            serviceWarranty: { type: ['string', 'null'] },
+            serviceCost:     { type: ['number', 'null'] },
+            serviceNotes:    { type: ['string', 'null'] },
           },
         },
       },
     },
     async (request, reply) => {
       const { vehicleId, id } = request.params as { vehicleId: string; id: string }
-      const { serviceKm, serviceDate } = request.body as { serviceKm: number; serviceDate?: string }
-      const result = await svc.completeService(id, vehicleId, serviceKm, serviceDate)
+      const {
+        serviceKm,
+        serviceDate,
+        serviceProvider,
+        serviceWarranty,
+        serviceCost,
+        serviceNotes,
+      } = request.body as {
+        serviceKm: number
+        serviceDate?: string
+        serviceProvider?: string
+        serviceWarranty?: string
+        serviceCost?: number
+        serviceNotes?: string
+      }
+      const result = await svc.completeService(
+        id,
+        vehicleId,
+        serviceKm,
+        serviceDate,
+        serviceProvider,
+        serviceWarranty,
+        serviceCost,
+        serviceNotes
+      )
       if ('notFound' in result) return reply.status(404).send({ message: 'Tipo não encontrado.' })
       return reply.status(200).send(result.type)
     },

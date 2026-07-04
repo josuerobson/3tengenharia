@@ -19,6 +19,8 @@ import {
   CheckCheck,
   X,
   RefreshCw,
+  ShieldCheck,
+  DollarSign,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -68,11 +70,22 @@ function RegisterServiceModal({
 }: {
   alert: ApiMaintenanceAlert
   currentKm: number
-  onConfirm: (serviceKm: number, serviceDate: string) => void
+  onConfirm: (
+    serviceKm: number,
+    serviceDate: string,
+    serviceProvider: string,
+    serviceWarranty: string,
+    serviceCost: number | null,
+    serviceNotes: string
+  ) => void
   onClose: () => void
 }) {
   const [km, setKm] = useState(String(currentKm))
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [provider, setProvider] = useState('')
+  const [warranty, setWarranty] = useState('')
+  const [cost, setCost] = useState('')
+  const [notes, setNotes] = useState('')
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -88,9 +101,9 @@ function RegisterServiceModal({
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
           <div>
-            <label className="text-xs font-medium text-gray-500">KM do veículo no momento do serviço</label>
+            <label className="text-xs font-semibold text-gray-500">KM do veículo no momento do serviço *</label>
             <div className="relative mt-1">
               <Gauge size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -98,11 +111,12 @@ function RegisterServiceModal({
                 value={km}
                 onChange={e => setKm(e.target.value)}
                 className="w-full rounded-xl border border-gray-200 pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00475B]/30"
+                required
               />
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500">Data do serviço</label>
+            <label className="text-xs font-semibold text-gray-500">Data do serviço *</label>
             <div className="relative mt-1">
               <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -110,6 +124,59 @@ function RegisterServiceModal({
                 value={date}
                 onChange={e => setDate(e.target.value)}
                 className="w-full rounded-xl border border-gray-200 pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00475B]/30"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500">Nome do Fornecedor</label>
+            <div className="relative mt-1">
+              <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Ex: Auto Mecânica Silva"
+                value={provider}
+                onChange={e => setProvider(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00475B]/30"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500">Prazo de Garantia</label>
+            <div className="relative mt-1">
+              <ShieldCheck size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Ex: 90 dias / 6 meses"
+                value={warranty}
+                onChange={e => setWarranty(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00475B]/30"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500">Valor do Serviço (R$)</label>
+            <div className="relative mt-1">
+              <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Ex: 450,00"
+                value={cost}
+                onChange={e => setCost(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00475B]/30"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500">Detalhes Adicionais</label>
+            <div className="relative mt-1">
+              <textarea
+                placeholder="Observações adicionais..."
+                rows={2}
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00475B]/30 outline-none"
               />
             </div>
           </div>
@@ -117,7 +184,7 @@ function RegisterServiceModal({
 
         <div className="flex gap-2 pt-2">
           <button
-            onClick={() => onConfirm(Number(km), date)}
+            onClick={() => onConfirm(Number(km), date, provider, warranty, cost ? Number(cost) : null, notes)}
             className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#00475B] text-white py-2.5 text-sm font-semibold hover:bg-[#003d4f] transition-colors"
           >
             <CheckCheck size={16} /> Confirmar Serviço
@@ -230,12 +297,38 @@ function AlertCard({
 
       {/* Último serviço */}
       {(alert.lastServiceKm !== null || alert.lastServiceDate !== null) && (
-        <p className="text-[10px] text-gray-400 border-t border-gray-100 pt-2 mb-2 flex items-center gap-1">
-          <Wrench size={10} />
-          Último serviço:
-          {alert.lastServiceKm !== null && <span>{alert.lastServiceKm.toLocaleString('pt-BR')} km</span>}
-          {alert.lastServiceDate !== null && <span>· {formatDate(alert.lastServiceDate)}</span>}
-        </p>
+        <div className="border-t border-gray-100 pt-2 mb-2 text-left space-y-1">
+          <p className="text-[10px] text-gray-400 flex items-center gap-1">
+            <Wrench size={10} />
+            <span className="font-semibold">Último serviço:</span>
+            {alert.lastServiceKm !== null && <span>{alert.lastServiceKm.toLocaleString('pt-BR')} km</span>}
+            {alert.lastServiceDate !== null && <span>· {formatDate(alert.lastServiceDate)}</span>}
+          </p>
+          {(alert.lastServiceProvider || alert.lastServiceWarranty || alert.lastServiceCost !== null || alert.lastServiceNotes) && (
+            <div className="bg-slate-50/50 rounded-xl p-2 border border-slate-100 grid grid-cols-2 gap-1.5 text-[9px] text-gray-500 mt-1">
+              {alert.lastServiceProvider && (
+                <div className="col-span-2 sm:col-span-1">
+                  <span className="font-semibold text-gray-400">Fornecedor:</span> {alert.lastServiceProvider}
+                </div>
+              )}
+              {alert.lastServiceWarranty && (
+                <div className="col-span-2 sm:col-span-1">
+                  <span className="font-semibold text-gray-400">Garantia:</span> {alert.lastServiceWarranty}
+                </div>
+              )}
+              {alert.lastServiceCost !== null && alert.lastServiceCost !== undefined && (
+                <div className="col-span-2 sm:col-span-1">
+                  <span className="font-semibold text-gray-400">Valor:</span> R$ {Number(alert.lastServiceCost).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              )}
+              {alert.lastServiceNotes && (
+                <div className="col-span-2">
+                  <span className="font-semibold text-gray-400">Obs:</span> {alert.lastServiceNotes}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Botão registrar */}
@@ -390,7 +483,14 @@ export default function MaintenanceAlertsPage() {
   }, [trips, auditVehicleFilter])
 
   // Confirmar registro de serviço realizado
-  const handleRegisterService = useCallback(async (serviceKm: number, serviceDate: string) => {
+  const handleRegisterService = useCallback(async (
+    serviceKm: number,
+    serviceDate: string,
+    serviceProvider: string,
+    serviceWarranty: string,
+    serviceCost: number | null,
+    serviceNotes: string
+  ) => {
     if (!serviceModal) return
     setLoading(true)
     setError(null)
@@ -398,7 +498,14 @@ export default function MaintenanceAlertsPage() {
       await maintenanceApi.completeService(
         serviceModal.vehicleId,
         serviceModal.maintenanceTypeId,
-        { serviceKm, serviceDate }
+        {
+          serviceKm,
+          serviceDate,
+          serviceProvider: serviceProvider || null,
+          serviceWarranty: serviceWarranty || null,
+          serviceCost: serviceCost !== null ? serviceCost : null,
+          serviceNotes: serviceNotes || null,
+        }
       )
       setServiceModal(null)
       await fetchData()
