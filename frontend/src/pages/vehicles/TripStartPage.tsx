@@ -675,6 +675,14 @@ export default function TripStartPage() {
   const handleStep1Submit = useCallback(async () => {
     if (!validateStep1() || !selectedVehicle) return
     const initialKmValue = parseInt(initialKm.replace(/\D/g, ''), 10)
+
+    if (vehicleMaintenanceAlert) {
+      const confirmStart = window.confirm(
+        `ATENÇÃO: Este veículo está com a manutenção preventiva em estado crítico!\n\nDetalhes:\n${vehicleMaintenanceAlert.message}\n\nDeseja realmente iniciar a viagem com este veículo?`
+      )
+      if (!confirmStart) return
+    }
+
     setIsSubmitting(true)
     setApiError(null)
     try {
@@ -707,7 +715,7 @@ export default function TripStartPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }, [validateStep1, selectedVehicle, initialKm, origin, destination, purpose, currentUser, selectedDriverId, selectedWorksiteId, worksitesList])
+  }, [validateStep1, selectedVehicle, initialKm, origin, destination, purpose, currentUser, selectedDriverId, selectedWorksiteId, worksitesList, vehicleMaintenanceAlert])
 
   const handleStep2Submit = useCallback(async () => {
     if (!validateStep2() || !activeTripId) return
@@ -821,22 +829,32 @@ export default function TripStartPage() {
             Viagens em Andamento ({ongoingTrips.length})
           </h2>
           <div className="space-y-3">
-            {ongoingTrips.map((trip) => (
-              <div
-                key={trip.id}
-                className="bg-white rounded-2xl border border-amber-200 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all hover:shadow-md"
-              >
-                <div className="min-w-0 space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-sm text-gray-900">
-                      {trip.vehicle.licensePlate}
-                    </span>
-                    <span className="text-gray-300 text-xs">·</span>
-                    <span className="text-xs text-gray-500 font-medium truncate">
-                      {trip.vehicle.brand} {trip.vehicle.model}
-                    </span>
-                    <Badge variant="accent" dot>Em andamento</Badge>
-                  </div>
+            {ongoingTrips.map((trip) => {
+              const hasAlert = trip.maintenanceAlertActive
+              return (
+                <div
+                  key={trip.id}
+                  className={cn(
+                    "bg-white rounded-2xl shadow-sm p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all hover:shadow-md border",
+                    hasAlert ? "border-red-300 bg-red-50/10" : "border-amber-200"
+                  )}
+                >
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-gray-900">
+                        {trip.vehicle.licensePlate}
+                      </span>
+                      <span className="text-gray-300 text-xs">·</span>
+                      <span className="text-xs text-gray-500 font-medium truncate">
+                        {trip.vehicle.brand} {trip.vehicle.model}
+                      </span>
+                      <Badge variant="accent" dot>Em andamento</Badge>
+                      {hasAlert && (
+                        <Badge variant="critical" dot className="animate-pulse flex-shrink-0">
+                          Alerta Manutenção
+                        </Badge>
+                      )}
+                    </div>
                   <div className="flex flex-col gap-0.5 text-xs text-gray-400 mt-1">
                     <span className="flex items-center gap-1 text-gray-600 font-medium">
                       <User size={12} className="text-gray-400" />
@@ -871,7 +889,7 @@ export default function TripStartPage() {
                   </button>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}
@@ -1105,6 +1123,22 @@ export default function TripStartPage() {
                 <p className="text-xs text-gray-400">Preencha o odômetro de chegada</p>
               </div>
             </div>
+
+            {/* Alerta de Manutenção Crítica em Andamento */}
+            {vehicleMaintenanceAlert && (
+              <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl animate-pulse">
+                <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+                <div className="text-left">
+                  <p className="text-sm font-bold text-red-800">Atenção: Veículo com Manutenção Crítica!</p>
+                  <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                    Esta viagem está sendo realizada com o veículo em atraso de manutenção preventiva:
+                  </p>
+                  <p className="text-xs text-red-650 mt-1 font-semibold leading-relaxed">
+                    {vehicleMaintenanceAlert.message}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Resumo da saída */}
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2.5">

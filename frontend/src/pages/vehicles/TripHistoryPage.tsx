@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils'
 import { tripsApi, type ApiTrip, type ApiTripIncident } from '@/lib/api'
 import IncidentReportModal from '@/components/vehicles/IncidentReportModal'
+import { Badge } from '@/components/ui/badge'
 
 // ── Alias de tipo local para compatibilidade com o restante do componente ─────
 type Trip = ApiTrip
@@ -851,9 +852,9 @@ export default function TripHistoryPage() {
                 className={cn(
                   'rounded-2xl border bg-white shadow-sm overflow-hidden transition-all',
                   ongoing
-                    ? 'border-blue-200 ring-1 ring-blue-100'
+                    ? (trip.maintenanceAlertActive ? 'border-red-300 ring-1 ring-red-100 bg-red-50/5' : 'border-blue-200 ring-1 ring-blue-100')
                     : trip.maintenanceAlertActive
-                      ? 'border-red-200'
+                      ? 'border-red-200 bg-red-50/5'
                       : 'border-gray-200'
                 )}
               >
@@ -879,6 +880,11 @@ export default function TripHistoryPage() {
                         {trip.vehicle.brand} {trip.vehicle.model}
                       </span>
                       <TripStatusBadge trip={trip} />
+                      {trip.maintenanceAlertActive && (
+                        <Badge variant="critical" dot className="animate-pulse flex-shrink-0">
+                          Alerta Manutenção
+                        </Badge>
+                      )}
                     </div>
                     {/* Rota resumida */}
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 min-w-0">
