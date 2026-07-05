@@ -52,7 +52,7 @@ async function seed(): Promise<void> {
 
   const manager = await prisma.user.upsert({
     where: { email: MANAGER_EMAIL },
-    update: {},
+    update: { role: 'ADMIN' },
     create: {
       email: MANAGER_EMAIL,
       passwordHash: managerHash,
