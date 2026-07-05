@@ -65,4 +65,4 @@ USER app
 EXPOSE 3333
 
 # Aplica apenas as mudanças de schema necessárias (incremental, preserva dados)
-CMD ["sh", "-c", "npx --yes prisma@5.22.0 db push --schema=./prisma/schema.prisma && node dist/server.js"]
+CMD ["sh", "-c", "node prisma/pre-migrate.js && npx --yes prisma@5.22.0 db push --accept-data-loss --schema=./prisma/schema.prisma && node dist/server.js"]
