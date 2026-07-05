@@ -240,6 +240,26 @@ function TripDetailModal({
             </div>
           </div>
 
+          {/* Fotos de Saída (Ciclo de 10 Viagens) - Destaque */}
+          {(trip.departurePhotoFront || trip.departurePhotoBack || trip.departurePhotoRight || trip.departurePhotoLeft) && (
+            <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200">
+              <Camera size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="text-left">
+                <p className="text-xs font-bold text-amber-800">Ciclo de 10 Viagens (Fotos Obrigatórias)</p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  Esta viagem exigiu o registro fotográfico obrigatório de saída.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onZoomPhoto((trip.departurePhotoFront || trip.departurePhotoBack || trip.departurePhotoRight || trip.departurePhotoLeft)!)}
+                  className="text-xs font-bold text-amber-700 hover:text-amber-900 hover:underline flex items-center gap-1 mt-1.5"
+                >
+                  Visualizar Registros Fotográficos
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Geolocalizações */}
           {(trip.departureGeolocation || trip.arrivalGeolocation) && (
             <div className="rounded-2xl border border-gray-100 overflow-hidden">
@@ -900,6 +920,7 @@ export default function TripHistoryPage() {
             const dep = formatDateTime(trip.departureDateTime)
             const ongoing = isOngoing(trip)
             const isExpanded = expandedId === trip.id
+            const hasDeparturePhotos = !!(trip.departurePhotoFront || trip.departurePhotoBack || trip.departurePhotoRight || trip.departurePhotoLeft)
 
             return (
               <div
@@ -940,6 +961,11 @@ export default function TripHistoryPage() {
                           Alerta Manutenção
                         </Badge>
                       )}
+                      {hasDeparturePhotos && (
+                        <Badge variant="medium" className="flex items-center gap-1 flex-shrink-0">
+                          <Camera size={10} /> Fotos de Saída (Ciclo 10 Viagens)
+                        </Badge>
+                      )}
                     </div>
                     {/* Rota resumida */}
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 min-w-0">
@@ -977,6 +1003,15 @@ export default function TripHistoryPage() {
 
                   {/* Ações */}
                   <div className="flex items-center gap-1 flex-shrink-0 ml-1">
+                    {hasDeparturePhotos && (
+                      <button
+                        onClick={() => setLightboxPhoto(trip.departurePhotoFront || trip.departurePhotoBack || trip.departurePhotoRight || trip.departurePhotoLeft || null)}
+                        title="Ver fotos obrigatórias da saída"
+                        className="p-2 rounded-lg hover:bg-amber-50 text-amber-600 transition-colors"
+                      >
+                        <Camera size={15} />
+                      </button>
+                    )}
                     <button
                       onClick={() => setDetailTrip(trip)}
                       title="Ver detalhes"
