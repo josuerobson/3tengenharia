@@ -120,7 +120,7 @@ const MENU_ITEMS: MenuItem[] = [
       },
       {
         id: 'assets-loan',
-        label: 'Solicitar Empréstimo',
+        label: 'Solicitar bem',
         path: '/assets/loans/new',
         icon: ArrowLeftRight,
       },
