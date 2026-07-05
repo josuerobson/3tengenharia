@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronUp, X, Filter, Download,
   AlertTriangle, CheckCircle2, TrendingUp, Car,
   Navigation, Route, ArrowRight, Eye, RefreshCw,
-  ExternalLink, FileText, Camera,
+  ExternalLink, FileText, Camera, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { tripsApi, type ApiTrip, type ApiTripIncident } from '@/lib/api'
@@ -91,7 +91,7 @@ function TripDetailModal({
   trip: Trip
   onClose: () => void
   onSelectIncident: (inc: ApiTripIncident) => void
-  onZoomPhoto: (photoUrl: string) => void
+  onZoomPhoto: (photoUrl: string, gallery?: (string | null | undefined)[]) => void
 }) {
   const dep = formatDateTime(trip.departureDateTime)
   const arr = trip.arrivalDateTime ? formatDateTime(trip.arrivalDateTime) : null
@@ -251,7 +251,10 @@ function TripDetailModal({
                 </p>
                 <button
                   type="button"
-                  onClick={() => onZoomPhoto((trip.departurePhotoFront || trip.departurePhotoBack || trip.departurePhotoRight || trip.departurePhotoLeft)!)}
+                  onClick={() => onZoomPhoto(
+                    (trip.departurePhotoFront || trip.departurePhotoBack || trip.departurePhotoRight || trip.departurePhotoLeft)!,
+                    [trip.departurePhotoFront, trip.departurePhotoBack, trip.departurePhotoRight, trip.departurePhotoLeft]
+                  )}
                   className="text-xs font-bold text-amber-700 hover:text-amber-900 hover:underline flex items-center gap-1 mt-1.5"
                 >
                   Visualizar Registros Fotográficos
@@ -336,7 +339,7 @@ function TripDetailModal({
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-gray-400 font-semibold text-center">Frente</span>
                     <div
-                      onClick={() => onZoomPhoto(trip.departurePhotoFront!)}
+                      onClick={() => onZoomPhoto(trip.departurePhotoFront!, [trip.departurePhotoFront, trip.departurePhotoBack, trip.departurePhotoRight, trip.departurePhotoLeft])}
                       className="h-16 rounded-xl border border-gray-150 overflow-hidden bg-gray-50 flex items-center justify-center cursor-zoom-in hover:opacity-90 transition-all shadow-sm"
                     >
                       <img src={trip.departurePhotoFront} alt="Frente" className="w-full h-full object-cover" />
@@ -347,7 +350,7 @@ function TripDetailModal({
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-gray-400 font-semibold text-center">Trás</span>
                     <div
-                      onClick={() => onZoomPhoto(trip.departurePhotoBack!)}
+                      onClick={() => onZoomPhoto(trip.departurePhotoBack!, [trip.departurePhotoFront, trip.departurePhotoBack, trip.departurePhotoRight, trip.departurePhotoLeft])}
                       className="h-16 rounded-xl border border-gray-150 overflow-hidden bg-gray-50 flex items-center justify-center cursor-zoom-in hover:opacity-90 transition-all shadow-sm"
                     >
                       <img src={trip.departurePhotoBack} alt="Trás" className="w-full h-full object-cover" />
@@ -358,7 +361,7 @@ function TripDetailModal({
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-gray-400 font-semibold text-center">Dir.</span>
                     <div
-                      onClick={() => onZoomPhoto(trip.departurePhotoRight!)}
+                      onClick={() => onZoomPhoto(trip.departurePhotoRight!, [trip.departurePhotoFront, trip.departurePhotoBack, trip.departurePhotoRight, trip.departurePhotoLeft])}
                       className="h-16 rounded-xl border border-gray-150 overflow-hidden bg-gray-50 flex items-center justify-center cursor-zoom-in hover:opacity-90 transition-all shadow-sm"
                     >
                       <img src={trip.departurePhotoRight} alt="Direita" className="w-full h-full object-cover" />
@@ -369,7 +372,7 @@ function TripDetailModal({
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-gray-400 font-semibold text-center">Esq.</span>
                     <div
-                      onClick={() => onZoomPhoto(trip.departurePhotoLeft!)}
+                      onClick={() => onZoomPhoto(trip.departurePhotoLeft!, [trip.departurePhotoFront, trip.departurePhotoBack, trip.departurePhotoRight, trip.departurePhotoLeft])}
                       className="h-16 rounded-xl border border-gray-150 overflow-hidden bg-gray-50 flex items-center justify-center cursor-zoom-in hover:opacity-90 transition-all shadow-sm"
                     >
                       <img src={trip.departurePhotoLeft} alt="Esquerda" className="w-full h-full object-cover" />
@@ -580,7 +583,36 @@ export default function TripHistoryPage() {
   const [error, setError]       = useState<string | null>(null)
   const [incidentTrip, setIncidentTrip] = useState<Trip | null>(null)
   const [selectedIncident, setSelectedIncident] = useState<ApiTripIncident | null>(null)
-  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
+  const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([])
+  const [lightboxIndex, setLightboxIndex] = useState<number>(-1)
+
+  const handleZoomPhoto = (photoUrl: string, gallery?: (string | null | undefined)[]) => {
+    const cleanGallery = gallery
+      ? (gallery.filter(Boolean) as string[])
+      : [photoUrl]
+    setLightboxPhotos(cleanGallery)
+    const idx = cleanGallery.indexOf(photoUrl)
+    setLightboxIndex(idx >= 0 ? idx : 0)
+  }
+
+  // Keyboard navigation for Lightbox
+  useEffect(() => {
+    if (lightboxIndex < 0 || lightboxPhotos.length <= 1) return
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'ArrowLeft' && lightboxIndex > 0) {
+        setLightboxIndex((prev) => prev - 1)
+      } else if (e.key === 'ArrowRight' && lightboxIndex < lightboxPhotos.length - 1) {
+        setLightboxIndex((prev) => prev + 1)
+      } else if (e.key === 'Escape') {
+        setLightboxIndex(-1)
+        setLightboxPhotos([])
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [lightboxIndex, lightboxPhotos])
 
   const fetchData = async () => {
     setLoading(true)
@@ -1005,7 +1037,10 @@ export default function TripHistoryPage() {
                   <div className="flex items-center gap-1 flex-shrink-0 ml-1">
                     {hasDeparturePhotos && (
                       <button
-                        onClick={() => setLightboxPhoto(trip.departurePhotoFront || trip.departurePhotoBack || trip.departurePhotoRight || trip.departurePhotoLeft || null)}
+                        onClick={() => handleZoomPhoto(
+                          (trip.departurePhotoFront || trip.departurePhotoBack || trip.departurePhotoRight || trip.departurePhotoLeft)!,
+                          [trip.departurePhotoFront, trip.departurePhotoBack, trip.departurePhotoRight, trip.departurePhotoLeft]
+                        )}
                         title="Ver fotos obrigatórias da saída"
                         className="p-2 rounded-lg hover:bg-amber-50 text-amber-600 transition-colors"
                       >
@@ -1139,7 +1174,7 @@ export default function TripHistoryPage() {
                           <Camera size={11} /> Comprovante do Hodômetro (Chegada)
                         </p>
                         <div
-                          onClick={() => setLightboxPhoto(trip.arrivalOdometerPhoto)}
+                          onClick={() => handleZoomPhoto(trip.arrivalOdometerPhoto!)}
                           className="w-32 h-20 rounded-xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 active:scale-95 transition-all shadow-sm bg-gray-50 flex items-center justify-center"
                         >
                           <img src={trip.arrivalOdometerPhoto} alt="Hodômetro de Chegada" className="w-full h-full object-cover" />
@@ -1158,7 +1193,7 @@ export default function TripHistoryPage() {
                             <div className="flex flex-col gap-1">
                               <span className="text-[9px] text-gray-400 font-semibold text-center">Frente</span>
                               <div
-                                onClick={() => setLightboxPhoto(trip.departurePhotoFront!)}
+                                onClick={() => handleZoomPhoto(trip.departurePhotoFront!, [trip.departurePhotoFront, trip.departurePhotoBack, trip.departurePhotoRight, trip.departurePhotoLeft])}
                                 className="h-12 rounded-xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 transition-all shadow-sm bg-gray-50 flex items-center justify-center"
                               >
                                 <img src={trip.departurePhotoFront} alt="Frente" className="w-full h-full object-cover" />
@@ -1169,7 +1204,7 @@ export default function TripHistoryPage() {
                             <div className="flex flex-col gap-1">
                               <span className="text-[9px] text-gray-400 font-semibold text-center">Trás</span>
                               <div
-                                onClick={() => setLightboxPhoto(trip.departurePhotoBack!)}
+                                onClick={() => handleZoomPhoto(trip.departurePhotoBack!, [trip.departurePhotoFront, trip.departurePhotoBack, trip.departurePhotoRight, trip.departurePhotoLeft])}
                                 className="h-12 rounded-xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 transition-all shadow-sm bg-gray-50 flex items-center justify-center"
                               >
                                 <img src={trip.departurePhotoBack} alt="Trás" className="w-full h-full object-cover" />
@@ -1180,7 +1215,7 @@ export default function TripHistoryPage() {
                             <div className="flex flex-col gap-1">
                               <span className="text-[9px] text-gray-400 font-semibold text-center">Dir.</span>
                               <div
-                                onClick={() => setLightboxPhoto(trip.departurePhotoRight!)}
+                                onClick={() => handleZoomPhoto(trip.departurePhotoRight!, [trip.departurePhotoFront, trip.departurePhotoBack, trip.departurePhotoRight, trip.departurePhotoLeft])}
                                 className="h-12 rounded-xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 transition-all shadow-sm bg-gray-50 flex items-center justify-center"
                               >
                                 <img src={trip.departurePhotoRight} alt="Direita" className="w-full h-full object-cover" />
@@ -1191,7 +1226,7 @@ export default function TripHistoryPage() {
                             <div className="flex flex-col gap-1">
                               <span className="text-[9px] text-gray-400 font-semibold text-center">Esq.</span>
                               <div
-                                onClick={() => setLightboxPhoto(trip.departurePhotoLeft!)}
+                                onClick={() => handleZoomPhoto(trip.departurePhotoLeft!, [trip.departurePhotoFront, trip.departurePhotoBack, trip.departurePhotoRight, trip.departurePhotoLeft])}
                                 className="h-12 rounded-xl border border-gray-150 overflow-hidden cursor-zoom-in hover:opacity-90 transition-all shadow-sm bg-gray-50 flex items-center justify-center"
                               >
                                 <img src={trip.departurePhotoLeft} alt="Esquerda" className="w-full h-full object-cover" />
@@ -1229,7 +1264,7 @@ export default function TripHistoryPage() {
           trip={detailTrip}
           onClose={() => setDetailTrip(null)}
           onSelectIncident={setSelectedIncident}
-          onZoomPhoto={setLightboxPhoto}
+          onZoomPhoto={handleZoomPhoto}
         />
       )}
 
@@ -1255,24 +1290,72 @@ export default function TripHistoryPage() {
         />
       )}
 
-      {/* Lightbox Genérico para Fotos */}
-      {lightboxPhoto && (
+      {/* Lightbox Genérico para Fotos com Navegação de Galeria */}
+      {lightboxIndex >= 0 && lightboxPhotos.length > 0 && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
-          onClick={() => setLightboxPhoto(null)}
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md select-none"
+          onClick={() => {
+            setLightboxIndex(-1)
+            setLightboxPhotos([])
+          }}
         >
+          {/* Botão de Fechar */}
           <button
-            onClick={() => setLightboxPhoto(null)}
-            className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+            onClick={(e) => {
+              e.stopPropagation()
+              setLightboxIndex(-1)
+              setLightboxPhotos([])
+            }}
+            className="absolute top-4 right-4 p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors z-[80] shadow-lg active:scale-95"
+            title="Fechar"
           >
             <X size={20} />
           </button>
-          <img
-            src={lightboxPhoto}
-            alt="Visualização Ampliada"
-            className="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          />
+
+          {/* Navegação Anterior */}
+          {lightboxIndex > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setLightboxIndex((prev) => prev - 1)
+              }}
+              className="absolute left-4 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all z-[80] shadow-lg active:scale-95 hover:scale-105"
+              title="Anterior"
+            >
+              <ChevronLeft size={28} />
+            </button>
+          )}
+
+          {/* Imagem Principal */}
+          <div className="relative max-w-full max-h-[85vh] flex items-center justify-center pointer-events-none">
+            <img
+              src={lightboxPhotos[lightboxIndex]}
+              alt={`Foto Ampliada ${lightboxIndex + 1}`}
+              className="max-w-full max-h-[80vh] rounded-2xl object-contain shadow-2xl animate-scale-in pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+
+          {/* Navegação Próxima */}
+          {lightboxIndex < lightboxPhotos.length - 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setLightboxIndex((prev) => prev + 1)
+              }}
+              className="absolute right-4 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all z-[80] shadow-lg active:scale-95 hover:scale-105"
+              title="Próxima"
+            >
+              <ChevronRight size={28} />
+            </button>
+          )}
+
+          {/* Indicador de Índice */}
+          {lightboxPhotos.length > 1 && (
+            <div className="absolute bottom-6 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 text-white text-xs font-bold font-mono shadow-md">
+              {lightboxIndex + 1} / {lightboxPhotos.length}
+            </div>
+          )}
         </div>
       )}
     </div>
