@@ -466,6 +466,11 @@ export const vehiclesService = {
           notes:                 true,
           departureGeolocation:  true,
           arrivalGeolocation:    true,
+          arrivalOdometerPhoto:  true,
+          departurePhotoFront:   true,
+          departurePhotoBack:    true,
+          departurePhotoRight:   true,
+          departurePhotoLeft:    true,
           createdAt:             true,
           worksiteId:            true,
           worksite: {
