@@ -1,4 +1,5 @@
 // src/modules/time-logs/team-allocation.schema.ts
+// Nota: IDs usam z.string() genérico (em vez de .cuid()) para suportar IDs de teste/sementes customizados no banco.
 
 import { z } from 'zod'
 
