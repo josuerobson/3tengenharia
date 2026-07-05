@@ -19,6 +19,7 @@ import WarehousePage           from '@/pages/assets/WarehousePage'
 // ── Páginas reais (Etapa 6) ────────────────────────────────────────────────────
 import DailyLogPage from '@/pages/time-logs/DailyLogPage'
 import ReportPage from '@/pages/time-logs/ReportPage'
+import TeamAllocationPage from '@/pages/time-logs/TeamAllocationPage'
 
 // ── Páginas reais (Módulo 5S) ────────────────────────────────────────────────
 import DailyAuditForm5S        from '@/pages/fiveS/DailyAuditForm5S'
@@ -89,6 +90,7 @@ export default function App() {
                 {/* Módulo 3 — Horas */}
                 <Route path="time-logs/daily" element={<DailyLogPage />} />
                 <Route path="time-logs/report" element={<ReportPage />} />
+                <Route path="time-logs/team-allocation" element={<TeamAllocationPage />} />
 
                 {/* Módulo 5S — Auditorias de Organização */}
                 <Route path="5s/audit/new" element={<DailyAuditForm5S />} />

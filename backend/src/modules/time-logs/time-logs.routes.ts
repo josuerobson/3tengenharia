@@ -318,4 +318,125 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
     },
     controller.deleteTimeLog,
   )
+
+  // ── GET /time-logs/team-allocation ─────────────────────────────────────────
+  app.get(
+    '/team-allocation',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['TimeLogs'],
+        summary: 'Dados para alocação de equipes (obras, gestores e colaboradores)',
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              worksites: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    code: { type: 'string' },
+                    name: { type: 'string' },
+                  },
+                },
+              },
+              managers: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    email: { type: 'string' },
+                    employee: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        fullName: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              },
+              employees: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    fullName: { type: 'string' },
+                    registration: { type: 'string' },
+                    position: { type: 'string' },
+                    worksiteId: { type: 'string', nullable: true },
+                    managerId: { type: 'string', nullable: true },
+                    worksite: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        id: { type: 'string' },
+                        name: { type: 'string' },
+                      },
+                    },
+                    manager: {
+                      type: 'object',
+                      nullable: true,
+                      properties: {
+                        id: { type: 'string' },
+                        email: { type: 'string' },
+                        employee: {
+                          type: 'object',
+                          nullable: true,
+                          properties: {
+                            fullName: { type: 'string' },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    controller.listTeamAllocationData,
+  )
+
+  // ── POST /time-logs/team-allocation ────────────────────────────────────────
+  app.post(
+    '/team-allocation',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['TimeLogs'],
+        summary: 'Salvar alocação de equipe',
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['worksiteId', 'managerId', 'employeeIds'],
+          properties: {
+            worksiteId: { type: 'string' },
+            managerId: { type: 'string' },
+            employeeIds: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+            },
+          },
+        },
+      },
+    },
+    controller.updateTeamAllocation,
+  )
 }
+

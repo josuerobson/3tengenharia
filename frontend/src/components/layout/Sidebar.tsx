@@ -155,6 +155,12 @@ const MENU_ITEMS: MenuItem[] = [
         path: '/time-logs/report',
         icon: BarChart2,
       },
+      {
+        id: 'timelogs-allocation',
+        label: 'Alocar equipes',
+        path: '/time-logs/team-allocation',
+        icon: Users,
+      },
     ],
   },
   {

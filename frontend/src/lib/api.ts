@@ -679,6 +679,46 @@ export interface ApiBulkTimeLogResponse {
   }
 }
 
+export interface ApiAllocationWorksite {
+  id: string
+  code: string
+  name: string
+}
+
+export interface ApiAllocationManager {
+  id: string
+  email: string
+  employee?: {
+    fullName: string
+  } | null
+}
+
+export interface ApiAllocationEmployee {
+  id: string
+  fullName: string
+  registration: string
+  position: string
+  worksiteId?: string | null
+  managerId?: string | null
+  worksite?: {
+    id: string
+    name: string
+  } | null
+  manager?: {
+    id: string
+    email: string
+    employee?: {
+      fullName: string
+    } | null
+  } | null
+}
+
+export interface ApiTeamAllocationData {
+  worksites: ApiAllocationWorksite[]
+  managers: ApiAllocationManager[]
+  employees: ApiAllocationEmployee[]
+}
+
 export const timeLogsApi = {
   list(filters: {
     worksiteId?: string
@@ -731,6 +771,21 @@ export const timeLogsApi = {
   delete(id: string): Promise<void> {
     return request(`/time-logs/${id}`, {
       method: 'DELETE',
+    })
+  },
+
+  getTeamAllocationData(): Promise<ApiTeamAllocationData> {
+    return request('/time-logs/team-allocation')
+  },
+
+  saveTeamAllocation(data: {
+    worksiteId: string
+    managerId: string
+    employeeIds: string[]
+  }): Promise<{ success: boolean }> {
+    return request('/time-logs/team-allocation', {
+      method: 'POST',
+      body: JSON.stringify(data),
     })
   },
 }

@@ -452,4 +452,128 @@ export const timeLogsService = {
       where: { id },
     })
   },
+
+  async listTeamAllocationData(currentUser: JwtPayload) {
+    const isPrivileged =
+      isManager(currentUser.role) ||
+      currentUser.role === UserRole.ADMIN
+
+    if (!isPrivileged) {
+      throw new ForbiddenError('Apenas administradores e gestores podem acessar a alocação de equipes.')
+    }
+
+    const worksites = await prisma.worksite.findMany({
+      where: { isActive: true },
+      select: { id: true, code: true, name: true },
+      orderBy: { name: 'asc' },
+    })
+
+    const managers = await prisma.user.findMany({
+      where: { role: UserRole.MANAGER_WORKSITE, isActive: true },
+      select: {
+        id: true,
+        email: true,
+        employee: {
+          select: {
+            fullName: true,
+          },
+        },
+      },
+      orderBy: { email: 'asc' },
+    })
+
+    const employees = await prisma.employee.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        fullName: true,
+        registration: true,
+        position: true,
+        worksiteId: true,
+        managerId: true,
+        worksite: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        manager: {
+          select: {
+            id: true,
+            email: true,
+            employee: {
+              select: {
+                fullName: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { fullName: 'asc' },
+    })
+
+    return { worksites, managers, employees }
+  },
+
+  async updateTeamAllocation(body: { worksiteId: string; managerId: string; employeeIds: string[] }, currentUser: JwtPayload) {
+    const isPrivileged =
+      isManager(currentUser.role) ||
+      currentUser.role === UserRole.ADMIN
+
+    if (!isPrivileged) {
+      throw new ForbiddenError('Apenas administradores e gestores podem alterar a alocação de equipes.')
+    }
+
+    // Valida se a obra existe e está ativa
+    const worksiteExists = await prisma.worksite.findFirst({
+      where: { id: body.worksiteId, isActive: true },
+    })
+    if (!worksiteExists) {
+      throw new WorksiteNotFoundError(body.worksiteId)
+    }
+
+    // Valida se o gestor existe e é MANAGER_WORKSITE e ativo
+    const managerExists = await prisma.user.findFirst({
+      where: { id: body.managerId, role: UserRole.MANAGER_WORKSITE, isActive: true },
+    })
+    if (!managerExists) {
+      throw new ForbiddenError('Gestor de obra não encontrado ou inativo.')
+    }
+
+    // Executa a transação no banco de dados
+    await prisma.$transaction(async (tx) => {
+      // 1. Desvincula qualquer funcionário que estava alocado a essa obra e esse gestor,
+      // mas que não está no novo lote (employeeIds).
+      await tx.employee.updateMany({
+        where: {
+          worksiteId: body.worksiteId,
+          managerId: body.managerId,
+          id: { notIn: body.employeeIds },
+        },
+        data: {
+          worksiteId: null,
+          managerId: null,
+        },
+      })
+
+      // 2. Vincula todos os funcionários informados no lote à obra e ao gestor.
+      // Como managerId e worksiteId são campos únicos por Employee, isso automaticamente
+      // remove a alocação anterior caso eles estivessem em outra equipe.
+      if (body.employeeIds.length > 0) {
+        await tx.employee.updateMany({
+          where: {
+            id: { in: body.employeeIds },
+            isActive: true,
+          },
+          data: {
+            worksiteId: body.worksiteId,
+            managerId: body.managerId,
+          },
+        })
+      }
+    })
+
+    return { success: true }
+  },
 }
+

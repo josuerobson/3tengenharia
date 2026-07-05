@@ -7,6 +7,7 @@ import {
   validateTimeLogBodySchema,
   updateTimeLogBodySchema,
 } from './time-logs.schema.js'
+import { teamAllocationBodySchema } from './team-allocation.schema.js'
 import {
   timeLogsService,
   WorksiteNotFoundError,
@@ -131,5 +132,35 @@ export function timeLogsController(_app: FastifyInstance) {
 
       return reply.status(204).send()
     },
+
+    // ── GET /time-logs/team-allocation ────────────────────────────────────────
+    async listTeamAllocationData(request: FastifyRequest, reply: FastifyReply) {
+      const currentUser = request.currentUser
+
+      let result
+      try {
+        result = await timeLogsService.listTeamAllocationData(currentUser)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+
+      return reply.status(200).send(result)
+    },
+
+    // ── POST /time-logs/team-allocation ───────────────────────────────────────
+    async updateTeamAllocation(request: FastifyRequest, reply: FastifyReply) {
+      const body = teamAllocationBodySchema.parse(request.body)
+      const currentUser = request.currentUser
+
+      let result
+      try {
+        result = await timeLogsService.updateTeamAllocation(body, currentUser)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+
+      return reply.status(200).send(result)
+    },
   }
 }
+
