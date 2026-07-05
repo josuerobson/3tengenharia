@@ -20,8 +20,13 @@ async function main() {
     const updated = await prisma.$executeRawUnsafe(
       `UPDATE "users" SET "role" = 'MANAGER_WORKSITE' WHERE "role" = 'MANAGER';`
     )
+
+    // 4. Set gestor@3tengenharia.com.br role to ADMIN
+    await prisma.$executeRawUnsafe(
+      `UPDATE "users" SET "role" = 'ADMIN' WHERE "email" = 'gestor@3tengenharia.com.br';`
+    )
     
-    console.log(`Pre-migration: successfully updated ${updated} user(s) to MANAGER_WORKSITE.`)
+    console.log(`Pre-migration: successfully updated ${updated} user(s) to MANAGER_WORKSITE, and set gestor email to ADMIN.`)
   } catch (err) {
     console.warn('Pre-migration warning (possibly safe to ignore if tables do not exist yet):', err.message)
   } finally {

@@ -56,7 +56,7 @@ async function seed(): Promise<void> {
     create: {
       email: MANAGER_EMAIL,
       passwordHash: managerHash,
-      role: 'MANAGER_WORKSITE',
+      role: 'ADMIN',
       isActive: true,
       employee: {
         create: {
