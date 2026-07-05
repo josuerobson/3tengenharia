@@ -119,7 +119,7 @@ export interface DuplicateEmployeeDetail {
 // ── Query List Time Logs ──────────────────────────────────────────────────────
 
 export const listTimeLogsQuerySchema = z.object({
-  worksiteId: z.string().cuid().optional(),
+  worksiteId: z.string().optional(),
   startDate: z.string().date().optional(),
   endDate: z.string().date().optional(),
 })
