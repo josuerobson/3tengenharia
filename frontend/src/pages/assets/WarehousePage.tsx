@@ -80,7 +80,7 @@ type ActiveTab = 'inventory' | 'loans' | 'maintenance'
 export default function WarehousePage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const isManagerOrAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER'
+  const isManagerOrAdmin = user?.role === 'ADMIN' || user?.role?.startsWith('MANAGER')
 
   // ── Estados de Dados ───────────────────────────────────────────────────────
   const [assets, setAssets] = useState<Asset[]>([])

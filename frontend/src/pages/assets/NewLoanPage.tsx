@@ -28,7 +28,7 @@ import { type Asset } from '@/data/mockData'
 export default function NewLoanPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const isAuthorized = user?.role === 'ADMIN' || user?.role === 'MANAGER'
+  const isAuthorized = user?.role === 'ADMIN' || user?.role?.startsWith('MANAGER')
 
   // ── Estados de Dados ───────────────────────────────────────────────────────
   const [assets, setAssets] = useState<Asset[]>([])

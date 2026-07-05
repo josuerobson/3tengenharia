@@ -24,19 +24,23 @@ import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
 import { usersApi, assetsApi, type ApiUser, type ApiEmployee } from '@/lib/api'
 
-type RoleFilter = 'ALL' | 'ADMIN' | 'MANAGER' | 'COLLABORATOR'
+type RoleFilter = 'ALL' | 'ADMIN' | 'COLLABORATOR' | 'MANAGER_WORKSITE' | 'MANAGER_HR' | 'MANAGER_WAREHOUSE'
 type StatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE'
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Administrador',
-  MANAGER: 'Gestor',
   COLLABORATOR: 'Colaborador',
+  MANAGER_WORKSITE: 'Gestor de Obra',
+  MANAGER_HR: 'Gestor de RH',
+  MANAGER_WAREHOUSE: 'Gestor de Almoxarifado',
 }
 
 const ROLE_BADGE_VARIANTS: Record<string, 'default' | 'brand' | 'critical' | null> = {
   ADMIN: 'critical',
-  MANAGER: 'brand',
   COLLABORATOR: 'default',
+  MANAGER_WORKSITE: 'brand',
+  MANAGER_HR: 'brand',
+  MANAGER_WAREHOUSE: 'brand',
 }
 
 const formatCpf = (val: string) => {
@@ -50,7 +54,7 @@ const formatCpf = (val: string) => {
 export default function UsersPage() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
-  const isAuthorized = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+  const isAuthorized = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
 
   // ── Estados de Dados ───────────────────────────────────────────────────────
   const [users, setUsers] = useState<ApiUser[]>([])
@@ -69,7 +73,7 @@ export default function UsersPage() {
   
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<'ADMIN' | 'MANAGER' | 'COLLABORATOR'>('COLLABORATOR')
+  const [role, setRole] = useState<'ADMIN' | 'COLLABORATOR' | 'MANAGER_WORKSITE' | 'MANAGER_HR' | 'MANAGER_WAREHOUSE'>('COLLABORATOR')
   const [isActive, setIsActive] = useState(true)
   const [fullName, setFullName] = useState('')
   const [cpf, setCpf] = useState('')
@@ -377,7 +381,9 @@ export default function UsersPage() {
                   >
                     <option value="ALL">Todos os Perfis</option>
                     <option value="ADMIN">Administrador</option>
-                    <option value="MANAGER">Gestor</option>
+                    <option value="MANAGER_WORKSITE">Gestor de Obra</option>
+                    <option value="MANAGER_HR">Gestor de RH</option>
+                    <option value="MANAGER_WAREHOUSE">Gestor de Almoxarifado</option>
                     <option value="COLLABORATOR">Colaborador</option>
                   </select>
                 </div>
@@ -627,7 +633,9 @@ export default function UsersPage() {
                 required
               >
                 <option value="COLLABORATOR">Colaborador</option>
-                <option value="MANAGER">Gestor</option>
+                <option value="MANAGER_WORKSITE">Gestor de Obra</option>
+                <option value="MANAGER_HR">Gestor de RH</option>
+                <option value="MANAGER_WAREHOUSE">Gestor de Almoxarifado</option>
                 <option value="ADMIN">Administrador</option>
               </select>
             </div>

@@ -147,7 +147,7 @@ export async function fiveSRoutes(app: FastifyInstance): Promise<void> {
     '/audits/:id/validate',
     {
       onRequest: [app.authenticate],
-      preHandler: [app.requireRole([UserRole.MANAGER, UserRole.ADMIN])],
+      preHandler: [app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])],
       schema: {
         tags:        ['5S'],
         summary:     'Validar auditoria 5S (Qualidade)',
@@ -205,7 +205,7 @@ export async function fiveSRoutes(app: FastifyInstance): Promise<void> {
     '/reports',
     {
       onRequest: [app.authenticate],
-      preHandler: [app.requireRole([UserRole.MANAGER, UserRole.ADMIN])],
+      preHandler: [app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])],
       schema: {
         tags:        ['5S'],
         summary:     'Relatório de auditorias 5S',

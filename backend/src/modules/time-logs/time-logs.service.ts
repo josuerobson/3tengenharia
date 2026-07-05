@@ -14,6 +14,12 @@ import { UserRole } from '@prisma/client'
 import type { BulkTimeLogBody, DuplicateEmployeeDetail, ListTimeLogsQuery, ValidateTimeLogBody, UpdateTimeLogBody } from './time-logs.schema.js'
 import type { JwtPayload } from '../../types/fastify.js'
 
+const isManager = (role: UserRole) =>
+  role === UserRole.MANAGER_WORKSITE ||
+  role === UserRole.MANAGER_HR ||
+  role === UserRole.MANAGER_WAREHOUSE
+
+
 // ── Erros de domínio ──────────────────────────────────────────────────────────
 
 export class WorksiteNotFoundError extends Error {
@@ -137,7 +143,7 @@ export const timeLogsService = {
     // ⚙️ REGRA 1 — Isolamento por Obra (Tenant Isolation)
     // ════════════════════════════════════════════════════════════════════════
     const isPrivileged =
-      currentUser.role === UserRole.MANAGER ||
+      isManager(currentUser.role) ||
       currentUser.role === UserRole.ADMIN
 
     if (!isPrivileged) {
@@ -266,7 +272,7 @@ export const timeLogsService = {
 
   async list(filters: ListTimeLogsQuery, currentUser: JwtPayload) {
     const isPrivileged =
-      currentUser.role === UserRole.MANAGER ||
+      isManager(currentUser.role) ||
       currentUser.role === UserRole.ADMIN
 
     let allowedWorksiteId = filters.worksiteId
@@ -324,7 +330,7 @@ export const timeLogsService = {
   },
 
   async validate(id: string, body: ValidateTimeLogBody, currentUser: JwtPayload) {
-    if (currentUser.role !== UserRole.MANAGER && currentUser.role !== UserRole.ADMIN) {
+    if (!isManager(currentUser.role) && currentUser.role !== UserRole.ADMIN) {
       throw new ForbiddenError('Somente gestores ou administradores podem validar lançamentos.')
     }
 
@@ -358,7 +364,7 @@ export const timeLogsService = {
     if (!existing) throw new TimeLogNotFoundError(id)
 
     // Permissões
-    if (currentUser.role !== UserRole.MANAGER && currentUser.role !== UserRole.ADMIN) {
+    if (!isManager(currentUser.role) && currentUser.role !== UserRole.ADMIN) {
       if (existing.isValidated) {
         throw new ForbiddenError('Não é possível alterar um lançamento já validado.')
       }
@@ -403,7 +409,7 @@ export const timeLogsService = {
     if (body.shiftType !== undefined) updateData.shiftType = body.shiftType
     if (body.notes !== undefined) updateData.notes = body.notes
     if (body.isValidated !== undefined) {
-      if (currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.ADMIN) {
+      if (isManager(currentUser.role) || currentUser.role === UserRole.ADMIN) {
         updateData.isValidated = body.isValidated
         updateData.validatedAt = body.isValidated ? new Date() : null
         updateData.validatedByUserId = body.isValidated ? currentUser.sub : null
@@ -433,7 +439,7 @@ export const timeLogsService = {
     if (!existing) throw new TimeLogNotFoundError(id)
 
     // Permissões
-    if (currentUser.role !== UserRole.MANAGER && currentUser.role !== UserRole.ADMIN) {
+    if (!isManager(currentUser.role) && currentUser.role !== UserRole.ADMIN) {
       if (existing.isValidated) {
         throw new ForbiddenError('Não é possível excluir um lançamento já validado.')
       }

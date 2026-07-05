@@ -125,7 +125,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     {
       onRequest: [
         app.authenticate,
-        app.requireRole([UserRole.MANAGER, UserRole.ADMIN]),
+        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN]),
       ],
       schema: {
         tags: ['Assets'],
@@ -180,7 +180,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     {
       onRequest: [
         app.authenticate,
-        app.requireRole([UserRole.MANAGER, UserRole.ADMIN]),
+        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN]),
       ],
       schema: {
         tags: ['Assets'],
@@ -223,7 +223,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     {
       onRequest: [
         app.authenticate,
-        app.requireRole([UserRole.MANAGER, UserRole.ADMIN]),
+        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN]),
       ],
       schema: {
         tags: ['Assets'],

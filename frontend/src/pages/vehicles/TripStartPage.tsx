@@ -433,7 +433,7 @@ export default function TripStartPage() {
   const [currentEmployeeProfile, setCurrentEmployeeProfile] = useState<ApiEmployee | null>(null)
 
   const selectedDriver = useMemo(() => {
-    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
     if (isManagerOrAdmin) {
       return employeesList.find(e => e.id === selectedDriverId)
     }
@@ -441,7 +441,7 @@ export default function TripStartPage() {
   }, [employeesList, selectedDriverId, currentUser])
 
   const isCnhExpired = useMemo(() => {
-    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
     const expiryStr = isManagerOrAdmin
       ? selectedDriver?.cnhExpirationDate
       : currentEmployeeProfile?.cnhExpirationDate
@@ -533,7 +533,7 @@ export default function TripStartPage() {
     setLoadingVehicles(true)
     setApiError(null)
     try {
-      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
       const [vehRes, tripsRes, empRes, worksitesRes, meRes, alertsRes] = await Promise.all([
         vehiclesApi.list(),
         tripsApi.list({ limit: 100 }),
@@ -630,7 +630,7 @@ export default function TripStartPage() {
     if (!destination.trim()) errors.destination = 'Informe o destino.'
     if (!selectedWorksiteId) errors.worksite = 'Selecione a obra / centro de custo.'
 
-    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
     if (isManagerOrAdmin && !selectedDriverId) {
       errors.driver = 'Selecione o motorista responsável pela viagem.'
     } else if (isCnhExpired) {
@@ -718,7 +718,7 @@ export default function TripStartPage() {
     setIsSubmitting(true)
     setApiError(null)
     try {
-      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
       const coords = await getCurrentCoordinates()
       const selectedWorksite = worksitesList.find(w => w.id === selectedWorksiteId)
       const res = await tripsApi.start({
@@ -985,7 +985,7 @@ export default function TripStartPage() {
             </div>
 
             {/* Motorista */}
-            {currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER' ? (
+            {currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER') ? (
               <div>
                 <Label htmlFor="driver" required>
                   Motorista
@@ -1174,7 +1174,7 @@ export default function TripStartPage() {
                   <p className="text-xs text-red-700 mt-0.5">
                     O motorista selecionado está com a CNH vencida (vencimento em:{' '}
                     {(() => {
-                      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+                      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
                       const expiry = isManagerOrAdmin
                         ? selectedDriver?.cnhExpirationDate
                         : currentUser?.cnhExpirationDate

@@ -505,7 +505,7 @@ export interface ApiWorksite {
 export interface ApiUser {
   id: string
   email: string
-  role: 'ADMIN' | 'MANAGER' | 'COLLABORATOR'
+  role: 'ADMIN' | 'COLLABORATOR' | 'MANAGER_WORKSITE' | 'MANAGER_HR' | 'MANAGER_WAREHOUSE'
   isActive: boolean
   createdAt: string
   employee?: {
@@ -533,7 +533,7 @@ export const usersApi = {
   create(data: {
     email: string
     password?: string
-    role: 'ADMIN' | 'MANAGER' | 'COLLABORATOR'
+    role: 'ADMIN' | 'COLLABORATOR' | 'MANAGER_WORKSITE' | 'MANAGER_HR' | 'MANAGER_WAREHOUSE'
     fullName: string
     phone: string
     cpf: string
@@ -553,7 +553,7 @@ export const usersApi = {
     data: Partial<{
       email: string
       password?: string
-      role: 'ADMIN' | 'MANAGER' | 'COLLABORATOR'
+      role: 'ADMIN' | 'COLLABORATOR' | 'MANAGER_WORKSITE' | 'MANAGER_HR' | 'MANAGER_WAREHOUSE'
       fullName: string
       phone: string
       cpf: string

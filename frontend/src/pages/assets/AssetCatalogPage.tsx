@@ -836,7 +836,7 @@ type StatusFilter = 'ALL' | AssetStatus
 
 export default function AssetCatalogPage() {
   const { user } = useAuth()
-  const canCreate = user?.role === 'ADMIN' || user?.role === 'MANAGER'
+  const canCreate = user?.role === 'ADMIN' || user?.role?.startsWith('MANAGER')
 
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)

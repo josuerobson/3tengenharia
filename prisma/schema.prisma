@@ -21,8 +21,10 @@ datasource db {
 /// Perfis de acesso para RBAC
 enum UserRole {
   COLLABORATOR // Colaborador — acesso de leitura limitado
-  MANAGER // Gestor — gerencia obras, valida lançamentos
   ADMIN // Administrador — acesso total ao sistema
+  MANAGER_WORKSITE // Gestor de Obra
+  MANAGER_HR // Gestor de RH
+  MANAGER_WAREHOUSE // Gestor de Almoxarifado
 }
 
 // =============================================================================

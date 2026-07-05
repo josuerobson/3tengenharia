@@ -397,7 +397,7 @@ const validateTimes = (
 export default function ReportPage() {
   const { user: currentUser } = useAuth()
   const currentUserId = currentUser?.id
-  const isAuthorized = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+  const isAuthorized = currentUser?.role === 'ADMIN' || !!currentUser?.role?.startsWith('MANAGER')
 
   // ── Estados de Dados e Filtro ───────────────────────────────────────────
   const [logs, setLogs] = useState<ApiTimeLog[]>([])

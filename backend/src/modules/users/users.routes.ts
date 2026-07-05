@@ -12,7 +12,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     {
       onRequest: [
         app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER]),
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
       ],
       schema: {
         tags: ['Users'],
@@ -56,7 +56,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     {
       onRequest: [
         app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER]),
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
       ],
       schema: {
         tags: ['Users'],
@@ -68,7 +68,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
           properties: {
             email: { type: 'string', format: 'email' },
             password: { type: 'string', minLength: 8 },
-            role: { type: 'string', enum: ['COLLABORATOR', 'MANAGER', 'ADMIN'] },
+            role: { type: 'string', enum: ['COLLABORATOR', 'ADMIN', 'MANAGER_WORKSITE', 'MANAGER_HR', 'MANAGER_WAREHOUSE'] },
             fullName: { type: 'string' },
             phone: { type: 'string' },
             position: { type: 'string' },
@@ -112,7 +112,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     {
       onRequest: [
         app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER]),
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
       ],
       schema: {
         tags: ['Users'],
@@ -130,7 +130,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
           properties: {
             email: { type: 'string', format: 'email' },
             password: { type: 'string', minLength: 8 },
-            role: { type: 'string', enum: ['COLLABORATOR', 'MANAGER', 'ADMIN'] },
+            role: { type: 'string', enum: ['COLLABORATOR', 'ADMIN', 'MANAGER_WORKSITE', 'MANAGER_HR', 'MANAGER_WAREHOUSE'] },
             fullName: { type: 'string' },
             phone: { type: 'string' },
             position: { type: 'string' },
@@ -174,7 +174,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     {
       onRequest: [
         app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER]),
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
       ],
       schema: {
         tags: ['Users'],

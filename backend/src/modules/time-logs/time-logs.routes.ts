@@ -212,7 +212,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
     '/:id/validate',
     {
       onRequest: [app.authenticate],
-      preHandler: [app.requireRole([UserRole.MANAGER, UserRole.ADMIN])],
+      preHandler: [app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Validar/aprovar um lançamento de horas',

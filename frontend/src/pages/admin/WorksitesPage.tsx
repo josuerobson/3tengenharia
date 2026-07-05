@@ -44,7 +44,7 @@ function formatDateForInput(dateStr?: string | null) {
 export default function WorksitesPage() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
-  const isAuthorized = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER'
+  const isAuthorized = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
   const isDeleteAllowed = currentUser?.role === 'ADMIN'
 
   // ── Estados de Dados ───────────────────────────────────────────────────────
