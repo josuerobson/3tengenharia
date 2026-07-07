@@ -1,8 +1,8 @@
 // src/pages/time-logs/DailyLogPage.tsx
 // Diário de Classe — Preenchimento rápido de horas ao final do turno.
 // Layout mobile-first:
-//   • Topo: seletor de Obra (combobox filtrável)
-//   • Meio: lista de funcionários com checkboxes touch-friendly
+//   • Topo: seletor de Gestor (para admin/hr/warehouse) + Obra
+//   • Meio: lista de funcionários da equipe com checkboxes touch-friendly
 //   • Base: painel de horários coletivos fixo no mobile, sticky no desktop
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
@@ -20,6 +20,7 @@ import {
   Loader2,
   AlertCircle,
   Info,
+  UserCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -33,23 +34,25 @@ import {
   type ShiftType,
 } from '@/data/mockData'
 import {
-  assetsApi,
   timeLogsApi,
-  type ApiWorksite,
-  type ApiEmployee,
+  type ApiAllocationManager,
+  type ApiAllocationEmployee,
+  type ApiAllocationWorksite,
   type ApiBulkTimeLogParams,
 } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
 
 // ── Combobox de Obras ─────────────────────────────────────────────────────────
 
 interface WorksiteComboboxProps {
-  worksites: ApiWorksite[]
-  value: ApiWorksite | null
-  onChange: (w: ApiWorksite | null) => void
+  worksites: ApiAllocationWorksite[]
+  value: ApiAllocationWorksite | null
+  onChange: (w: ApiAllocationWorksite | null) => void
   error?: string
+  disabled?: boolean
 }
 
-function WorksiteCombobox({ worksites, value, onChange, error }: WorksiteComboboxProps) {
+function WorksiteCombobox({ worksites, value, onChange, error, disabled }: WorksiteComboboxProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -81,15 +84,18 @@ function WorksiteCombobox({ worksites, value, onChange, error }: WorksiteCombobo
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        onClick={() => setIsOpen((p) => !p)}
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen((p) => !p)}
         className={cn(
           'flex items-center justify-between w-full h-12 px-4 rounded-xl border bg-white text-sm',
           'transition-all duration-150 focus-visible:outline-none',
-          isOpen
-            ? 'border-brand-primary ring-2 ring-brand-primary/20'
-            : error
-              ? 'border-red-400'
-              : 'border-gray-200 hover:border-brand-primary/50',
+          disabled
+            ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50'
+            : isOpen
+              ? 'border-brand-primary ring-2 ring-brand-primary/20'
+              : error
+                ? 'border-red-400'
+                : 'border-gray-200 hover:border-brand-primary/50',
         )}
         aria-expanded={isOpen}
       >
@@ -104,7 +110,7 @@ function WorksiteCombobox({ worksites, value, onChange, error }: WorksiteCombobo
         ) : (
           <span className="text-gray-400 flex items-center gap-2">
             <Building2 size={16} />
-            Selecionar obra / centro de custo...
+            {disabled ? 'Selecione um gestor primeiro...' : 'Selecionar obra / centro de custo...'}
           </span>
         )}
         <ChevronDown
@@ -119,7 +125,7 @@ function WorksiteCombobox({ worksites, value, onChange, error }: WorksiteCombobo
         </p>
       )}
 
-      {isOpen && (
+      {isOpen && !disabled && (
         <div className="absolute top-full left-0 right-0 mt-1.5 z-30 bg-white rounded-xl border border-gray-200 shadow-dropdown overflow-hidden animate-slide-down">
           <div className="p-2 border-b border-gray-100">
             <div className="relative">
@@ -166,10 +172,48 @@ function WorksiteCombobox({ worksites, value, onChange, error }: WorksiteCombobo
   )
 }
 
+// ── Select de Gestor de Obra ──────────────────────────────────────────────────
+
+interface ManagerSelectProps {
+  managers: ApiAllocationManager[]
+  value: string
+  onChange: (id: string) => void
+  error?: string
+}
+
+function ManagerSelect({ managers, value, onChange, error }: ManagerSelectProps) {
+  return (
+    <div>
+      <select
+        id="manager-select"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          'flex h-12 w-full rounded-xl border bg-white px-3 text-sm font-medium text-gray-900',
+          'focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all',
+          error ? 'border-red-400' : 'border-gray-200',
+        )}
+      >
+        <option value="">Selecionar gestor de obra...</option>
+        {managers.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.employee?.fullName ?? m.email}
+          </option>
+        ))}
+      </select>
+      {error && (
+        <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+          <span className="font-semibold">⚠</span> {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ── Linha de Funcionário com Checkbox ─────────────────────────────────────────
 
 interface EmployeeRowProps {
-  employee: ApiEmployee
+  employee: ApiAllocationEmployee
   checked: boolean
   onToggle: (id: string) => void
 }
@@ -260,7 +304,7 @@ function TimeInput({ id, label, value, onChange, required }: TimeInputProps) {
           'text-sm font-semibold text-gray-900',
           'focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20',
           'outline-none transition-all duration-150',
-          '[color-scheme:light]', // Prevents dark mode time picker UI
+          '[color-scheme:light]',
         )}
       />
     </div>
@@ -295,14 +339,25 @@ type PageState = 'FORM' | 'SUBMITTING' | 'SUCCESS'
 // ── Página principal ─────────────────────────────────────────────────────────
 
 export default function DailyLogPage() {
-  // ── Obras e Funcionários do Servidor ──────────────────────────────────
-  const [worksites, setWorksites] = useState<ApiWorksite[]>([])
-  const [employees, setEmployees] = useState<ApiEmployee[]>([])
+  const { user: currentUser } = useAuth()
+  const isManagerWorksite = currentUser?.role === 'MANAGER_WORKSITE'
+  const isPrivilegedManager =
+    currentUser?.role === 'ADMIN' ||
+    currentUser?.role === 'MANAGER_HR' ||
+    currentUser?.role === 'MANAGER_WAREHOUSE'
+
+  // ── Dados carregados da API ────────────────────────────────────────────
+  const [allManagers, setAllManagers] = useState<ApiAllocationManager[]>([])
+  const [allEmployees, setAllEmployees] = useState<ApiAllocationEmployee[]>([])
+  const [allWorksites, setAllWorksites] = useState<ApiAllocationWorksite[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
 
   // ── Selecionados ───────────────────────────────────────────────────────
-  const [selectedWorksite, setSelectedWorksite] = useState<ApiWorksite | null>(null)
+  // Para ADMIN/HR/WAREHOUSE: o ID do gestor escolhido no select
+  // Para MANAGER_WORKSITE: sempre o ID do próprio usuário logado
+  const [selectedManagerId, setSelectedManagerId] = useState<string>('')
+  const [selectedWorksite, setSelectedWorksite] = useState<ApiAllocationWorksite | null>(null)
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set())
   const [employeeSearch, setEmployeeSearch] = useState('')
 
@@ -320,40 +375,96 @@ export default function DailyLogPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submittedPayload, setSubmittedPayload] = useState<BulkPayload | null>(null)
 
-  // ── Carregar Obras e Funcionários ──────────────────────────────────────
+  // ── Carregar dados via team-allocation ────────────────────────────────
   const loadInitialData = useCallback(async () => {
     try {
       setLoading(true)
       setFetchError(null)
-      const [wList, eList] = await Promise.all([
-        assetsApi.listWorksites(),
-        assetsApi.listEmployees(),
-      ])
-      setWorksites(wList)
-      setEmployees(eList)
+      const data = await timeLogsApi.getTeamAllocationData()
+      setAllManagers(data.managers)
+      setAllEmployees(data.employees)
+      setAllWorksites(data.worksites)
+
+      // Para MANAGER_WORKSITE: pré-seleciona o próprio usuário como gestor
+      if (isManagerWorksite && currentUser?.id) {
+        setSelectedManagerId(currentUser.id)
+      }
     } catch (err: any) {
       console.error(err)
       setFetchError(err?.message ?? 'Falha ao sincronizar com o banco de dados.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isManagerWorksite, currentUser?.id])
 
   useEffect(() => {
     loadInitialData()
   }, [loadInitialData])
 
-  // ── Funcionários filtrados ─────────────────────────────────────────────
+  // ── ID do gestor efetivo (próprio usuário se for MANAGER_WORKSITE) ─────
+  const effectiveManagerId = isManagerWorksite
+    ? currentUser?.id ?? ''
+    : selectedManagerId
+
+  // ── Obras disponíveis para o gestor selecionado ────────────────────────
+  // Obras onde o gestor selecionado tem pelo menos 1 colaborador alocado
+  const availableWorksites = useMemo<ApiAllocationWorksite[]>(() => {
+    if (!effectiveManagerId) return []
+
+    // IDs das obras onde o gestor tem colaboradores alocados
+    const worksiteIdsWithTeam = new Set(
+      allEmployees
+        .filter((e) => e.managerId === effectiveManagerId && e.worksiteId)
+        .map((e) => e.worksiteId as string),
+    )
+
+    // Filtra obras globais que estão nessa lista
+    return allWorksites.filter((w) => worksiteIdsWithTeam.has(w.id))
+  }, [effectiveManagerId, allEmployees, allWorksites])
+
+  // ── Auto-seleção de obra quando só há 1 disponível ────────────────────
+  useEffect(() => {
+    if (availableWorksites.length === 1) {
+      setSelectedWorksite(availableWorksites[0]!)
+    } else if (availableWorksites.length === 0) {
+      setSelectedWorksite(null)
+    }
+  }, [availableWorksites])
+
+  // ── Reset da obra ao mudar o gestor ──────────────────────────────────
+  const handleManagerChange = useCallback((managerId: string) => {
+    setSelectedManagerId(managerId)
+    setSelectedWorksite(null)
+    setSelectedEmployees(new Set())
+    setErrors({})
+  }, [])
+
+  // ── Reset de colaboradores ao mudar obra ─────────────────────────────
+  const handleWorksiteChange = useCallback((w: ApiAllocationWorksite | null) => {
+    setSelectedWorksite(w)
+    setSelectedEmployees(new Set())
+    setErrors({})
+  }, [])
+
+  // ── Colaboradores disponíveis (filtrados por gestor + obra) ───────────
+  const teamEmployees = useMemo<ApiAllocationEmployee[]>(() => {
+    if (!effectiveManagerId || !selectedWorksite) return []
+    return allEmployees.filter(
+      (e) => e.managerId === effectiveManagerId && e.worksiteId === selectedWorksite.id,
+    )
+  }, [effectiveManagerId, selectedWorksite, allEmployees])
+
+  // ── Busca dentro da lista da equipe ───────────────────────────────────
   const filteredEmployees = useMemo(() => {
     const q = employeeSearch.toLowerCase().trim()
-    return employees.filter(
+    return teamEmployees.filter(
       (e) =>
         !q ||
         e.fullName.toLowerCase().includes(q) ||
         e.registration.toLowerCase().includes(q) ||
         e.position.toLowerCase().includes(q),
     )
-  }, [employees, employeeSearch])
+  }, [teamEmployees, employeeSearch])
 
   // ── Cálculos em tempo real ─────────────────────────────────────────────
   const netHours = useMemo(
@@ -398,6 +509,8 @@ export default function DailyLogPage() {
   const handleSubmit = useCallback(async () => {
     const newErrors: Record<string, string> = {}
 
+    if (isPrivilegedManager && !selectedManagerId)
+      newErrors.manager = 'Selecione um gestor de obra.'
     if (!selectedWorksite) newErrors.worksite = 'Selecione uma obra.'
     if (selectedEmployees.size === 0) newErrors.employees = 'Selecione pelo menos um funcionário.'
     const timeError = validateTimes(entryTime, breakStart, breakEnd, exitTime)
@@ -423,7 +536,7 @@ export default function DailyLogPage() {
 
     try {
       await timeLogsApi.createBulk(payload)
-      
+
       setSubmittedPayload({
         worksiteId: selectedWorksite!.id,
         worksiteName: selectedWorksite!.name,
@@ -431,7 +544,7 @@ export default function DailyLogPage() {
         logDate,
         shiftType,
         entries: Array.from(selectedEmployees).map((empId) => {
-          const emp = employees.find((e) => e.id === empId)!
+          const emp = allEmployees.find((e) => e.id === empId)!
           return {
             employeeId: empId,
             employeeName: emp.fullName,
@@ -454,7 +567,11 @@ export default function DailyLogPage() {
       }))
       setPageState('FORM')
     }
-  }, [selectedWorksite, selectedEmployees, logDate, shiftType, entryTime, breakStart, breakEnd, exitTime, netHours, overtimeHours, employees])
+  }, [
+    isPrivilegedManager, selectedManagerId, selectedWorksite, selectedEmployees,
+    logDate, shiftType, entryTime, breakStart, breakEnd, exitTime,
+    netHours, overtimeHours, allEmployees,
+  ])
 
   const handleReset = useCallback(() => {
     setPageState('FORM')
@@ -540,6 +657,14 @@ export default function DailyLogPage() {
   // ── FORMULÁRIO PRINCIPAL ─────────────────────────────────────────────
   const selectedCount = selectedEmployees.size
 
+  // Mensagem de status para lista vazia
+  const emptyEmployeesMessage = (() => {
+    if (!effectiveManagerId) return 'Selecione um gestor de obra para ver a equipe.'
+    if (!selectedWorksite) return 'Selecione uma obra para ver a equipe.'
+    if (teamEmployees.length === 0) return 'Nenhum colaborador alocado nesta obra para este gestor.'
+    return 'Nenhum funcionário encontrado'
+  })()
+
   return (
     <div className="max-w-5xl mx-auto">
       {/* Cabeçalho */}
@@ -550,24 +675,80 @@ export default function DailyLogPage() {
 
       <div className="flex flex-col lg:flex-row gap-6">
 
-        {/* ══════ Coluna Esquerda — Obra + Funcionários ══════ */}
+        {/* ══════ Coluna Esquerda — Gestores + Obra + Funcionários ══════ */}
         <div className="flex-1 min-w-0 space-y-5">
 
-          {/* Seletor de Obra */}
-          <Card className="p-4 bg-white border border-gray-100 shadow-card">
-            <Label required>Obra / Centro de Custo</Label>
-            <WorksiteCombobox
-              worksites={worksites}
-              value={selectedWorksite}
-              onChange={setSelectedWorksite}
-              error={errors.worksite}
-            />
-            {selectedWorksite && (
-              <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
-                <MapPin size={12} />
-                Centro de Custo: {selectedWorksite.code} · {selectedWorksite.name}
+          {/* ── Card de Contexto (Gestor + Obra) ── */}
+          <Card className="p-4 bg-white border border-gray-100 shadow-card space-y-4">
+
+            {/* Seletor de Gestor — apenas para ADMIN/HR/WAREHOUSE */}
+            {isPrivilegedManager && (
+              <div>
+                <Label htmlFor="manager-select" required className="flex items-center gap-1.5">
+                  <UserCheck size={14} className="text-brand-primary" />
+                  Gestor de Obra
+                </Label>
+                <ManagerSelect
+                  managers={allManagers}
+                  value={selectedManagerId}
+                  onChange={handleManagerChange}
+                  error={errors.manager}
+                />
+                {selectedManagerId && availableWorksites.length === 0 && (
+                  <p className="mt-2 text-xs text-amber-600 flex items-center gap-1.5">
+                    <AlertCircle size={12} />
+                    Este gestor não possui equipes alocadas em nenhuma obra ativa.
+                  </p>
+                )}
               </div>
             )}
+
+            {/* Seletor de Obra */}
+            <div>
+              <Label required className="flex items-center gap-1.5">
+                <Building2 size={14} className="text-brand-primary" />
+                Obra / Centro de Custo
+                {availableWorksites.length === 1 && (
+                  <span className="ml-1 text-xs text-emerald-600 font-normal">(auto-selecionada)</span>
+                )}
+              </Label>
+
+              {/* Se houver mais de 1 obra disponível, mostra o combobox */}
+              {availableWorksites.length !== 1 ? (
+                <WorksiteCombobox
+                  worksites={availableWorksites}
+                  value={selectedWorksite}
+                  onChange={handleWorksiteChange}
+                  error={errors.worksite}
+                  disabled={!effectiveManagerId}
+                />
+              ) : (
+                /* Obra única: exibe em modo display (não editável) */
+                <div className={cn(
+                  'flex items-center gap-3 h-12 px-4 rounded-xl border bg-emerald-50 border-emerald-200',
+                )}>
+                  <Building2 size={16} className="text-emerald-600 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-900 text-sm truncate">{selectedWorksite?.name}</p>
+                    <p className="text-xs text-gray-400 truncate">Código: {selectedWorksite?.code}</p>
+                  </div>
+                  <CheckCircle2 size={16} className="text-emerald-500 flex-shrink-0 ml-auto" />
+                </div>
+              )}
+
+              {errors.worksite && availableWorksites.length !== 1 && (
+                <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                  <span className="font-semibold">⚠</span> {errors.worksite}
+                </p>
+              )}
+
+              {selectedWorksite && (
+                <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
+                  <MapPin size={12} />
+                  Centro de Custo: {selectedWorksite.code} · {selectedWorksite.name}
+                </div>
+              )}
+            </div>
           </Card>
 
           {/* Lista de Funcionários */}
@@ -581,7 +762,8 @@ export default function DailyLogPage() {
                     type="checkbox"
                     checked={allSelected}
                     onChange={handleSelectAll}
-                    className="w-5 h-5 rounded accent-brand-primary cursor-pointer"
+                    disabled={teamEmployees.length === 0}
+                    className="w-5 h-5 rounded accent-brand-primary cursor-pointer disabled:cursor-not-allowed"
                     aria-label="Selecionar todos os funcionários"
                   />
                   <span className="font-semibold text-sm text-gray-700">Selecionar todos</span>
@@ -592,7 +774,9 @@ export default function DailyLogPage() {
                   </Badge>
                 )}
               </div>
-              <span className="text-xs text-gray-400">{filteredEmployees.length} funcionários</span>
+              <span className="text-xs text-gray-400">
+                {selectedWorksite ? `${teamEmployees.length} na equipe` : '—'}
+              </span>
             </div>
 
             {/* Busca */}
@@ -604,8 +788,10 @@ export default function DailyLogPage() {
                   value={employeeSearch}
                   onChange={(e) => setEmployeeSearch(e.target.value)}
                   placeholder="Filtrar por nome ou matrícula..."
+                  disabled={teamEmployees.length === 0}
                   className="w-full h-9 pl-8 pr-3 text-sm border border-gray-200 rounded-xl
-                             focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/20"
+                             focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/20
+                             disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -621,8 +807,9 @@ export default function DailyLogPage() {
             {/* Lista */}
             <div className="p-3 space-y-2 max-h-[440px] overflow-y-auto scrollbar-thin">
               {filteredEmployees.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">
-                  Nenhum funcionário encontrado
+                <div className="text-center py-10 text-gray-400 text-sm space-y-2">
+                  <Users size={28} className="mx-auto text-gray-300" />
+                  <p>{emptyEmployeesMessage}</p>
                 </div>
               ) : (
                 filteredEmployees.map((emp) => (
