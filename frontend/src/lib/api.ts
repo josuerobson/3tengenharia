@@ -698,6 +698,7 @@ export interface ApiAllocationEmployee {
   fullName: string
   registration: string
   position: string
+  phone?: string | null
   worksiteId?: string | null
   managerId?: string | null
   worksite?: {

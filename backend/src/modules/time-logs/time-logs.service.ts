@@ -489,6 +489,7 @@ export const timeLogsService = {
         fullName: true,
         registration: true,
         position: true,
+        phone: true,
         worksiteId: true,
         managerId: true,
         worksite: {
