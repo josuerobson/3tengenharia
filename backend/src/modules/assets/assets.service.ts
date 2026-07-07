@@ -8,6 +8,12 @@ import type {
   CreateAssetBody,
   ReturnLoanBody,
   ResolveMaintenanceLogBody,
+  CreateCategoryBody,
+  EditCategoryBody,
+  CreateAssetLoanRequestBody,
+  AllocateAssetLoanRequestBody,
+  ReturnAssetLoanRequestBody,
+  ValidateReturnAssetLoanRequestBody,
 } from './assets.schema.js'
 
 // ── Erros de domínio ──────────────────────────────────────────────────────────
@@ -88,7 +94,8 @@ const assetBaseSelect = {
   id: true,
   assetTag: true,
   description: true,
-  category: true,
+  categoryId: true,
+  legacyCategory: true,
   currentStatus: true,
   location: true,
   photoUrl: true,
@@ -101,6 +108,7 @@ export const assetsService = {
   async list() {
     const assets = await prisma.asset.findMany({
       include: {
+        category: true,
         loans: {
           where: { isReturned: false },
           include: {
@@ -117,7 +125,8 @@ export const assetsService = {
       id: asset.id,
       assetTag: asset.assetTag,
       description: asset.description,
-      category: asset.category,
+      categoryId: asset.categoryId,
+      category: asset.category?.name ?? asset.legacyCategory ?? 'Outros',
       brand: asset.brand,
       model: asset.model,
       serialNumber: asset.serialNumber,
@@ -152,12 +161,20 @@ export const assetsService = {
       }
     }
 
-    // 3. Criar e persistir o bem patrimonial
+    // 3. Validar se a categoria existe
+    const category = await prisma.assetCategory.findUnique({
+      where: { id: body.categoryId }
+    })
+    if (!category) {
+      throw new Error(`Categoria informada não existe no banco de dados.`)
+    }
+
+    // 4. Criar e persistir o bem patrimonial
     return prisma.asset.create({
       data: {
         assetTag: body.assetTag,
         description: body.description,
-        category: body.category,
+        categoryId: body.categoryId,
         brand: body.brand || null,
         model: body.model || null,
         serialNumber: body.serialNumber || null,
@@ -167,11 +184,14 @@ export const assetsService = {
         notes: body.notes || null,
         photoUrl: body.photoUrl || null,
         currentStatus: 'AVAILABLE',
+      },
+      include: {
+        category: true
       }
     })
   },
 
-  // ── POST /assets/loans ────────────────────────────────────────────────────
+  // ── POST /assets/loans (legado) ───────────────────────────────────────────
   async createLoan(body: CreateLoanBody, createdByUserId: string | null) {
     // 1. Busca o bem patrimonial
     const asset = await prisma.asset.findUnique({
@@ -207,7 +227,9 @@ export const assetsService = {
         isReturned: false,
       },
       include: {
-        asset: { select: assetBaseSelect },
+        asset: {
+          include: { category: true }
+        },
         borrowerEmployee: {
           select: { id: true, fullName: true, registration: true },
         },
@@ -253,7 +275,9 @@ export const assetsService = {
         reportedAt: new Date(),
       },
       include: {
-        asset: { select: assetBaseSelect },
+        asset: {
+          include: { category: true }
+        },
       },
     })
 
@@ -270,7 +294,7 @@ export const assetsService = {
     }
   },
 
-  // ── POST /assets/loans/:id/return ──────────────────────────────────────────
+  // ── POST /assets/loans/:id/return (legado) ─────────────────────────────────
   async returnLoan(loanId: string, body: ReturnLoanBody) {
     // 1. Busca o empréstimo ativo
     const loan = await prisma.assetLoan.findUnique({
@@ -295,7 +319,9 @@ export const assetsService = {
         returnPhotoUrl: body.returnPhotoUrl ?? null,
       },
       include: {
-        asset: { select: assetBaseSelect },
+        asset: {
+          include: { category: true }
+        },
         borrowerEmployee: { select: { id: true, fullName: true, registration: true } },
       },
     })
@@ -371,7 +397,9 @@ export const assetsService = {
         resolvedAt: new Date(),
       },
       include: {
-        asset: { select: assetBaseSelect },
+        asset: {
+          include: { category: true }
+        },
       },
     })
 
@@ -384,4 +412,352 @@ export const assetsService = {
 
     return updatedLog
   },
+
+  // ── GERENCIAMENTO DE CATEGORIAS DINÂMICAS ───────────────────────────────────
+
+  async listCategories() {
+    return prisma.assetCategory.findMany({
+      orderBy: { name: 'asc' }
+    })
+  },
+
+  async createCategory(body: CreateCategoryBody) {
+    const name = body.name.trim()
+    const exists = await prisma.assetCategory.findFirst({
+      where: {
+        name: {
+          equals: name,
+          mode: 'insensitive'
+        }
+      }
+    })
+    if (exists) {
+      throw new Error(`Categoria "${name}" já cadastrada.`)
+    }
+    return prisma.assetCategory.create({
+      data: { name, isActive: true }
+    })
+  },
+
+  async updateCategory(id: string, body: EditCategoryBody) {
+    const category = await prisma.assetCategory.findUnique({
+      where: { id }
+    })
+    if (!category) {
+      throw new Error('Categoria não encontrada.')
+    }
+
+    if (body.name) {
+      const name = body.name.trim()
+      const exists = await prisma.assetCategory.findFirst({
+        where: {
+          name: {
+            equals: name,
+            mode: 'insensitive'
+          },
+          id: { not: id }
+        }
+      })
+      if (exists) {
+        throw new Error(`Categoria "${name}" já cadastrada.`)
+      }
+    }
+
+    const updateData: any = {}
+    if (body.name !== undefined) {
+      updateData.name = body.name.trim()
+    }
+    if (body.isActive !== undefined) {
+      updateData.isActive = body.isActive
+    }
+
+    return prisma.assetCategory.update({
+      where: { id },
+      data: updateData
+    })
+  },
+
+  // ── FLUXO DE SOLICITAÇÃO E DEVOLUÇÃO (NOVO) ─────────────────────────────────
+
+  async createLoanRequest(requesterUserId: string, body: CreateAssetLoanRequestBody) {
+    // 1. Encontra o colaborador associado ao usuário logado
+    const user = await prisma.user.findUnique({
+      where: { id: requesterUserId },
+      include: { employee: true }
+    })
+    if (!user?.employee) {
+      throw new Error('Somente usuários colaboradores vinculados podem abrir solicitações.')
+    }
+
+    // 2. Valida se a categoria existe e está ativa
+    const category = await prisma.assetCategory.findUnique({
+      where: { id: body.categoryId }
+    })
+    if (!category || !category.isActive) {
+      throw new Error('Categoria solicitada inválida ou inativa.')
+    }
+
+    // 3. Cria a solicitação pendente
+    return prisma.assetLoanRequest.create({
+      data: {
+        requesterEmployeeId: user.employee.id,
+        categoryId: body.categoryId,
+        destinationWorksiteId: body.destinationWorksiteId ?? null,
+        requestNotes: body.requestNotes ?? null,
+        status: 'PENDING'
+      },
+      include: {
+        category: true,
+        requesterEmployee: true,
+        destinationWorksite: true
+      }
+    })
+  },
+
+  async listLoanRequests(userId: string, role: string) {
+    // Se for colaborador comum, filtra apenas as dele
+    if (role === 'COLLABORATOR') {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { employee: true }
+      })
+      if (!user?.employee) return []
+
+      return prisma.assetLoanRequest.findMany({
+        where: { requesterEmployeeId: user.employee.id },
+        include: {
+          category: true,
+          requesterEmployee: true,
+          destinationWorksite: true,
+          allocatedAsset: {
+            include: { category: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+    }
+
+    // Admins e Gestores visualizam todas
+    return prisma.assetLoanRequest.findMany({
+      include: {
+        category: true,
+        requesterEmployee: true,
+        destinationWorksite: true,
+        allocatedAsset: {
+          include: { category: true }
+        },
+        checkoutByUser: { select: { email: true } },
+        validatedByUser: { select: { email: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+  },
+
+  async allocateLoanRequest(requestId: string, checkoutByUserId: string, body: AllocateAssetLoanRequestBody) {
+    // 1. Busca a solicitação
+    const request = await prisma.assetLoanRequest.findUnique({
+      where: { id: requestId }
+    })
+    if (!request) {
+      throw new Error('Solicitação de empréstimo não encontrada.')
+    }
+    if (request.status !== 'PENDING') {
+      throw new Error('Esta solicitação não está pendente para atendimento.')
+    }
+
+    // 2. Busca o bem físico e valida se está disponível
+    const asset = await prisma.asset.findUnique({
+      where: { id: body.allocatedAssetId }
+    })
+    if (!asset) {
+      throw new Error('Patrimônio físico não encontrado.')
+    }
+    if (asset.currentStatus !== 'AVAILABLE') {
+      throw new Error(`O patrimônio "${asset.assetTag}" não está disponível para envio. Status: ${asset.currentStatus}`)
+    }
+
+    // 3. Atualiza a solicitação com a alocação e as fotos do estado de envio
+    const updatedRequest = await prisma.assetLoanRequest.update({
+      where: { id: requestId },
+      data: {
+        status: 'LOANED',
+        allocatedAssetId: body.allocatedAssetId,
+        checkoutPhoto1: body.checkoutPhoto1 ?? null,
+        checkoutPhoto2: body.checkoutPhoto2 ?? null,
+        checkoutPhoto3: body.checkoutPhoto3 ?? null,
+        checkoutPhoto4: body.checkoutPhoto4 ?? null,
+        checkoutNotes: body.checkoutNotes ?? null,
+        checkoutAt: new Date(),
+        checkoutByUserId
+      },
+      include: {
+        category: true,
+        requesterEmployee: true,
+        destinationWorksite: true,
+        allocatedAsset: true
+      }
+    })
+
+    // 4. Atualiza o status do bem físico para LOANED
+    await prisma.asset.update({
+      where: { id: body.allocatedAssetId },
+      data: { currentStatus: 'LOANED' }
+    })
+
+    // 5. Cria registro legado de empréstimo (AssetLoan) para compatibilidade de histórico
+    await prisma.assetLoan.create({
+      data: {
+        assetId: body.allocatedAssetId,
+        borrowerEmployeeId: request.requesterEmployeeId,
+        destinationWorksiteId: request.destinationWorksiteId,
+        checkoutAt: new Date(),
+        checkoutNotes: body.checkoutNotes ?? `Vinculado via Solicitação: ${requestId}`,
+        createdByUserId: checkoutByUserId,
+        isReturned: false
+      }
+    })
+
+    return updatedRequest
+  },
+
+  async submitReturn(requestId: string, requesterUserId: string, body: ReturnAssetLoanRequestBody) {
+    // 1. Busca a solicitação
+    const request = await prisma.assetLoanRequest.findUnique({
+      where: { id: requestId },
+      include: { requesterEmployee: true }
+    })
+    if (!request) {
+      throw new Error('Solicitação de empréstimo não encontrada.')
+    }
+    if (request.status !== 'LOANED') {
+      throw new Error('Esta solicitação não está sob empréstimo ativo.')
+    }
+
+    // Valida se o solicitante é quem está devolvendo ou se é gestor/admin
+    const user = await prisma.user.findUnique({
+      where: { id: requesterUserId },
+      include: { employee: true }
+    })
+    const isRequester = user?.employee?.id === request.requesterEmployeeId
+    const isManagerOrAdmin = user?.role === 'ADMIN' || user?.role?.startsWith('MANAGER')
+    if (!isRequester && !isManagerOrAdmin) {
+      throw new Error('Somente o funcionário detentor do empréstimo ou um gestor pode devolvê-lo.')
+    }
+
+    if (!request.allocatedAssetId) {
+      throw new Error('Não há patrimônio alocado a esta solicitação.')
+    }
+
+    // 2. Registra o checklist e altera o status da solicitação para RETURNING (em trânsito)
+    const updatedRequest = await prisma.assetLoanRequest.update({
+      where: { id: requestId },
+      data: {
+        status: 'RETURNING',
+        returnNotes: body.returnNotes ?? null,
+        returnPhoto1: body.returnPhoto1,
+        returnPhoto2: body.returnPhoto2 ?? null,
+        returnPhoto3: body.returnPhoto3 ?? null,
+        returnPhoto4: body.returnPhoto4 ?? null,
+        isWorking: body.isWorking,
+        hasDamage: body.hasDamage,
+        returnedAt: new Date()
+      },
+      include: {
+        category: true,
+        requesterEmployee: true,
+        allocatedAsset: true
+      }
+    })
+
+    // 3. Atualiza o status do bem físico no inventário para RETURNING
+    await prisma.asset.update({
+      where: { id: request.allocatedAssetId },
+      data: { currentStatus: 'RETURNING' }
+    })
+
+    return updatedRequest
+  },
+
+  async validateReturn(requestId: string, validatedByUserId: string, body: ValidateReturnAssetLoanRequestBody) {
+    // 1. Busca a solicitação
+    const request = await prisma.assetLoanRequest.findUnique({
+      where: { id: requestId }
+    })
+    if (!request) {
+      throw new Error('Solicitação de empréstimo não encontrada.')
+    }
+    if (request.status !== 'RETURNING') {
+      throw new Error('Esta devolução não está em trânsito de retorno para ser validada.')
+    }
+
+    if (!request.allocatedAssetId) {
+      throw new Error('Não há patrimônio físico vinculado a esta solicitação.')
+    }
+
+    // 2. Atualiza a solicitação com a validação da devolução
+    const updatedRequest = await prisma.assetLoanRequest.update({
+      where: { id: requestId },
+      data: {
+        status: 'RETURNED',
+        validationNotes: body.validationNotes ?? null,
+        validatedAt: new Date(),
+        validatedByUserId,
+        validationStatus: body.validationStatus
+      },
+      include: {
+        category: true,
+        requesterEmployee: true,
+        allocatedAsset: true
+      }
+    })
+
+    // 3. Define o status do bem patrimonial
+    let nextStatus: 'AVAILABLE' | 'DAMAGED'
+    if (body.validationStatus === 'OK' || body.validationStatus === 'OK_WITH_DAMAGE') {
+      nextStatus = 'AVAILABLE'
+    } else {
+      nextStatus = 'DAMAGED'
+    }
+
+    await prisma.asset.update({
+      where: { id: request.allocatedAssetId },
+      data: { currentStatus: nextStatus }
+    })
+
+    // 4. Encerra o empréstimo legado correspondente
+    const activeLoan = await prisma.assetLoan.findFirst({
+      where: {
+        assetId: request.allocatedAssetId,
+        isReturned: false
+      }
+    })
+    if (activeLoan) {
+      await prisma.assetLoan.update({
+        where: { id: activeLoan.id },
+        data: {
+          isReturned: true,
+          returnedAt: new Date(),
+          returnNotes: body.validationNotes ?? `Validado via Solicitação: ${body.validationStatus}`,
+          returnPhotoUrl: request.returnPhoto1
+        }
+      })
+    }
+
+    // 5. Se houver avarias reportadas pelo gestor na devolução, registra histórico de avaria (legado)
+    if (body.validationStatus === 'DEFECTIVE' || body.validationStatus === 'OK_WITH_DAMAGE') {
+      await prisma.assetMaintenanceLog.create({
+        data: {
+          assetId: request.allocatedAssetId,
+          issueDescription: body.validationNotes ?? `Identificado no recebimento da devolução: ${body.validationStatus}`,
+          defectPhotoUrl: request.returnPhoto1 ?? null,
+          reportedByUserId: validatedByUserId,
+          reportedAt: new Date(),
+          maintenanceStatus: body.validationStatus === 'DEFECTIVE' ? 'OPEN' : 'RESOLVED',
+          resolutionNotes: body.validationStatus === 'OK_WITH_DAMAGE' ? 'Item recebido com avarias cosméticas/desgaste, mas funcionando.' : null
+        }
+      })
+    }
+
+    return updatedRequest
+  }
 }

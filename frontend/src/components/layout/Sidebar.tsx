@@ -42,6 +42,7 @@ import {
   CheckSquare,
   ListChecks,
   Settings2,
+  ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -120,9 +121,9 @@ const MENU_ITEMS: MenuItem[] = [
       },
       {
         id: 'assets-loan',
-        label: 'Solicitar bem',
-        path: '/assets/loans/new',
-        icon: ArrowLeftRight,
+        label: 'Minhas Solicitações',
+        path: '/assets/requests',
+        icon: ClipboardList,
       },
       {
         id: 'assets-defect',

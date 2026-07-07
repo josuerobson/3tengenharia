@@ -49,6 +49,7 @@ enum AssetStatus {
   MAINTENANCE // Aguardando ou em manutenção
   DAMAGED // Danificado — aguarda avaliação
   WRITTEN_OFF // Bem baixado/descartado após avaria
+  RETURNING // Em trânsito de devolução
 }
 
 /// Estado de resolução de um registro de manutenção/avaria
@@ -57,6 +58,22 @@ enum MaintenanceStatus {
   IN_PROGRESS // Em reparo / manutenção em andamento
   RESOLVED // Reparo concluído, bem reintegrado
   WRITTEN_OFF // Bem baixado/descartado após avaria
+}
+
+/// Status da solicitação de empréstimo
+enum LoanRequestStatus {
+  PENDING // Aguardando atendimento do gestor
+  LOANED // Equipamento entregue ao colaborador
+  RETURNING // Colaborador enviou a devolução, em trânsito
+  RETURNED // Devolução aprovada e concluída pelo gestor
+  REJECTED // Solicitação rejeitada
+}
+
+/// Opções de validação da devolução pelo gestor
+enum ReturnValidationStatus {
+  OK // Tudo certo, equipamento disponível
+  OK_WITH_DAMAGE // Funcionando mas com avarias (notifica colaborador)
+  DEFECTIVE // Com defeito/danificado (notifica colaborador e muda status do bem)
 }
 
 // =============================================================================
@@ -92,6 +109,12 @@ model User {
 
   // Empréstimos de patrimônio registrados por este usuário (Gestor/Admin)
   loansCreated AssetLoan[] @relation("LoanCreatedBy")
+
+  // Solicitações de empréstimo enviadas/alocadas por este gestor
+  requestsCheckedOut AssetLoanRequest[] @relation("RequestCheckoutBy")
+
+  // Solicitações de empréstimo validadas por este gestor
+  requestsValidated AssetLoanRequest[] @relation("RequestValidatedBy")
 
   // Lançamentos de horas registrados por este usuário (Coordenador/Gestor)
   timeLogsEntered TimeLog[] @relation("TimeLogEnteredBy")
@@ -138,6 +161,9 @@ model Worksite {
   // Empréstimos de patrimônio com destino a esta obra
   assetLoans AssetLoan[]
 
+  // Solicitações de empréstimo de patrimônio destinadas a esta obra
+  assetRequests AssetLoanRequest[]
+
   // Auditorias 5S realizadas nesta obra
   audits5S Audit5S[]
 
@@ -151,18 +177,18 @@ model Worksite {
 
 /// Funcionários / Colaboradores da empresa
 model Employee {
-  id              String    @id @default(cuid())
-  cpf             String    @unique @db.Char(11) // Apenas dígitos, sem formatação
-  registration    String    @unique @map("registration") // Matrícula interna
-  fullName        String    @map("full_name")
-  position        String // Cargo / função
-  phone           String?
-  isActive        Boolean   @default(true) @map("is_active")
-  hireDate        DateTime  @map("hire_date") @db.Date
-  terminationDate DateTime? @map("termination_date") @db.Date
+  id                String    @id @default(cuid())
+  cpf               String    @unique @db.Char(11) // Apenas dígitos, sem formatação
+  registration      String    @unique @map("registration") // Matrícula interna
+  fullName          String    @map("full_name")
+  position          String // Cargo / função
+  phone             String?
+  isActive          Boolean   @default(true) @map("is_active")
+  hireDate          DateTime  @map("hire_date") @db.Date
+  terminationDate   DateTime? @map("termination_date") @db.Date
   cnhExpirationDate DateTime? @map("cnh_expiration_date") @db.Date
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   // Relação 1-para-1 com User (acesso ao sistema)
   userId String? @unique @map("user_id")
@@ -174,14 +200,17 @@ model Employee {
   worksite   Worksite? @relation(fields: [worksiteId], references: [id], onDelete: SetNull)
 
   // Gestor de Obra ao qual o colaborador está vinculado
-  managerId   String?   @map("manager_id")
-  manager     User?     @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  managerId String? @map("manager_id")
+  manager   User?   @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
 
   // Histórico de viagens onde este funcionário foi o motorista
   tripsAsDriver VehicleTrip[] @relation("TripEmployeeDriver")
 
   // Empréstimos de patrimônio retirados por este funcionário
   assetLoans AssetLoan[] @relation("LoanBorrower")
+
+  // Solicitações de empréstimo criadas por este colaborador
+  assetRequests AssetLoanRequest[] @relation("RequestRequester")
 
   // Lançamentos de horas deste funcionário
   timeLogs TimeLog[]
@@ -224,11 +253,10 @@ model Vehicle {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Histórico completo de viagens
-  trips VehicleTrip[]
-
-  @@index([licensePlate])
+  trips            VehicleTrip[]
   maintenanceTypes VehicleMaintenanceType[]
 
+  @@index([licensePlate])
   @@index([status])
   @@map("vehicles")
 }
@@ -237,28 +265,28 @@ model Vehicle {
 /// Ex: "Troca de óleo do motor", "Correia dentada", "Óleo da caixa de câmbio"
 model VehicleMaintenanceType {
   id          String  @id @default(cuid())
-  name        String  @db.VarChar(120)       // Nome do tipo de manutenção
-  description String? @db.Text               // Descrição detalhada (opcional)
+  name        String  @db.VarChar(120) // Nome do tipo de manutenção
+  description String? @db.Text // Descrição detalhada (opcional)
   isActive    Boolean @default(true) @map("is_active")
 
   // Intervalos de manutenção preventiva (opcionais)
-  intervalKm   Int? @map("interval_km")   // Alerta a cada N km
+  intervalKm   Int? @map("interval_km") // Alerta a cada N km
   intervalDays Int? @map("interval_days") // Alerta a cada N dias
 
   // Histórico do último serviço realizado neste tipo específico
-  lastServiceKm       Int?      @map("last_service_km")              // KM do veículo quando o serviço foi feito
-  lastServiceDate     DateTime? @map("last_service_date") @db.Date   // Data em que o serviço foi realizado
+  lastServiceKm       Int?      @map("last_service_km") // KM do veículo quando o serviço foi feito
+  lastServiceDate     DateTime? @map("last_service_date") @db.Date // Data em que o serviço foi realizado
   lastServiceProvider String?   @map("last_service_provider") @db.VarChar(120) // Nome do fornecedor
-  lastServiceWarranty String?   @map("last_service_warranty") @db.VarChar(60)  // Prazo de garantia
-  lastServiceCost     Decimal?  @map("last_service_cost") @db.Decimal(10, 2)   // Valor do serviço
-  lastServiceNotes    String?   @map("last_service_notes") @db.Text            // Detalhes adicionais
+  lastServiceWarranty String?   @map("last_service_warranty") @db.VarChar(60) // Prazo de garantia
+  lastServiceCost     Decimal?  @map("last_service_cost") @db.Decimal(10, 2) // Valor do serviço
+  lastServiceNotes    String?   @map("last_service_notes") @db.Text // Detalhes adicionais
 
   // Vínculo com veículo — cada tipo pertence a um veículo específico
   vehicleId String  @map("vehicle_id")
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([vehicleId])
   @@index([vehicleId, isActive])
@@ -285,17 +313,17 @@ model VehicleTrip {
   incidents TripIncident[]
 
   // Dados da viagem
-  origin            String
-  destination       String
-  purpose           String?   @db.Text // Finalidade / descrição da viagem
-  departureDateTime DateTime  @map("departure_date_time")
-  arrivalDateTime   DateTime? @map("arrival_date_time")
-  initialKm         Int       @map("initial_km")
-  finalKm           Int?      @map("final_km")
-  distanceTraveled  Int?      @map("distance_traveled") // finalKm - initialKm (calculado pela app)
-  departureGeolocation String? @map("departure_geolocation")
-  arrivalGeolocation   String? @map("arrival_geolocation")
-  arrivalOdometerPhoto String? @map("arrival_odometer_photo")
+  origin               String
+  destination          String
+  purpose              String?   @db.Text // Finalidade / descrição da viagem
+  departureDateTime    DateTime  @map("departure_date_time")
+  arrivalDateTime      DateTime? @map("arrival_date_time")
+  initialKm            Int       @map("initial_km")
+  finalKm              Int?      @map("final_km")
+  distanceTraveled     Int?      @map("distance_traveled") // finalKm - initialKm (calculado pela app)
+  departureGeolocation String?   @map("departure_geolocation")
+  arrivalGeolocation   String?   @map("arrival_geolocation")
+  arrivalOdometerPhoto String?   @map("arrival_odometer_photo")
 
   // Fotos obrigatórias a cada ciclo de 10 viagens
   departurePhotoFront String? @map("departure_photo_front")
@@ -325,21 +353,23 @@ model VehicleTrip {
 
 /// Catálogo de bens patrimoniais da empresa
 model Asset {
-  id               String      @id @default(cuid())
-  assetTag         String      @unique @map("asset_tag") // Número de patrimônio (único)
+  id               String         @id @default(cuid())
+  assetTag         String         @unique @map("asset_tag") // Número de patrimônio (único)
   description      String
-  category         String? // Ex: Ferramenta, EPI, Equipamento Elétrico
+  legacyCategory   String?        @map("legacy_category") // Campo antigo legado
+  categoryId       String?        @map("category_id")
+  category         AssetCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   brand            String?
   model            String?
-  serialNumber     String?     @unique @map("serial_number") // Número de série do fabricante
-  acquisitionDate  DateTime?   @map("acquisition_date") @db.Date
-  acquisitionValue Decimal?    @map("acquisition_value") @db.Decimal(10, 2)
-  currentStatus    AssetStatus @default(AVAILABLE) @map("current_status")
+  serialNumber     String?        @unique @map("serial_number") // Número de série do fabricante
+  acquisitionDate  DateTime?      @map("acquisition_date") @db.Date
+  acquisitionValue Decimal?       @map("acquisition_value") @db.Decimal(10, 2)
+  currentStatus    AssetStatus    @default(AVAILABLE) @map("current_status")
   location         String? // Localização física atual
-  notes            String?     @db.Text
-  photoUrl         String?     @map("photo_url") @db.Text
-  createdAt        DateTime    @default(now()) @map("created_at")
-  updatedAt        DateTime    @updatedAt @map("updated_at")
+  notes            String?        @db.Text
+  photoUrl         String?        @map("photo_url") @db.Text
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
 
   // Histórico de empréstimos deste bem
   loans AssetLoan[]
@@ -347,9 +377,12 @@ model Asset {
   // Histórico de manutenções e avarias deste bem
   maintenanceLogs AssetMaintenanceLog[]
 
+  // Solicitações de empréstimo em que este bem foi alocado
+  requests AssetLoanRequest[]
+
   @@index([assetTag])
   @@index([currentStatus])
-  @@index([category])
+  @@index([categoryId])
   @@map("assets")
 }
 
@@ -576,15 +609,94 @@ model AuditPhoto5S {
 }
 
 model TripIncident {
-  id          String   @id @default(cuid())
-  tripId      String   @map("trip_id")
+  id          String      @id @default(cuid())
+  tripId      String      @map("trip_id")
   trip        VehicleTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  description String   @db.Text
-  location    String   @db.Text
-  photos      String[] @default([])
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  description String      @db.Text
+  location    String      @db.Text
+  photos      String[]    @default([])
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
 
   @@index([tripId])
   @@map("trip_incidents")
+}
+
+/// Categorias dinâmicas de bens patrimoniais
+model AssetCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  assets   Asset[]
+  requests AssetLoanRequest[]
+
+  @@map("asset_categories")
+}
+
+/// Solicitações e Devoluções de empréstimo de patrimônio
+model AssetLoanRequest {
+  id String @id @default(cuid())
+
+  // Quem solicitou
+  requesterEmployeeId String   @map("requester_employee_id")
+  requesterEmployee   Employee @relation("RequestRequester", fields: [requesterEmployeeId], references: [id], onDelete: Restrict)
+
+  // Categoria solicitada
+  categoryId String        @map("category_id")
+  category   AssetCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  // Status da solicitação
+  status LoanRequestStatus @default(PENDING)
+
+  // Obra de destino
+  destinationWorksiteId String?   @map("destination_worksite_id")
+  destinationWorksite   Worksite? @relation(fields: [destinationWorksiteId], references: [id], onDelete: SetNull)
+
+  // Notas de solicitação
+  requestNotes String? @map("request_notes") @db.Text
+
+  // Bem físico vinculado (quando a solicitação é aprovada/enviada)
+  allocatedAssetId String? @map("allocated_asset_id")
+  allocatedAsset   Asset?  @relation(fields: [allocatedAssetId], references: [id], onDelete: SetNull)
+
+  // Fotos de envio (registradas pelo gestor no momento da vinculação/envio)
+  checkoutPhoto1 String?   @map("checkout_photo_1") @db.Text // Base64 ou URL
+  checkoutPhoto2 String?   @map("checkout_photo_2") @db.Text
+  checkoutPhoto3 String?   @map("checkout_photo_3") @db.Text
+  checkoutPhoto4 String?   @map("checkout_photo_4") @db.Text
+  checkoutNotes  String?   @map("checkout_notes") @db.Text
+  checkoutAt     DateTime? @map("checkout_at")
+
+  // Gestor que atendeu e enviou
+  checkoutByUserId String? @map("checkout_by_user_id")
+  checkoutByUser   User?   @relation("RequestCheckoutBy", fields: [checkoutByUserId], references: [id], onDelete: SetNull)
+
+  // Checklist de devolução pelo funcionário
+  returnNotes  String?   @map("return_notes") @db.Text
+  returnPhoto1 String?   @map("return_photo_1") @db.Text
+  returnPhoto2 String?   @map("return_photo_2") @db.Text
+  returnPhoto3 String?   @map("return_photo_3") @db.Text
+  returnPhoto4 String?   @map("return_photo_4") @db.Text
+  isWorking    Boolean?  @map("is_working")
+  hasDamage    Boolean?  @map("has_damage")
+  returnedAt   DateTime? @map("returned_at")
+
+  // Validação da devolução pelo gestor
+  validationNotes   String?                 @map("validation_notes") @db.Text
+  validatedAt       DateTime?               @map("validated_at")
+  validatedByUserId String?                 @map("validated_by_user_id")
+  validatedByUser   User?                   @relation("RequestValidatedBy", fields: [validatedByUserId], references: [id], onDelete: SetNull)
+  validationStatus  ReturnValidationStatus? @map("validation_status")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([requesterEmployeeId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([allocatedAssetId])
+  @@map("asset_loan_requests")
 }

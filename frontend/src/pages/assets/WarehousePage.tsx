@@ -29,8 +29,8 @@ import { Card } from '@/components/ui/card'
 import { Badge, ASSET_STATUS_BADGE } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
 import { useAuth } from '@/contexts/AuthContext'
-import { assetsApi } from '@/lib/api'
-import { ASSET_CATEGORY_LABELS, type Asset } from '@/data/mockData'
+import { assetsApi, type AssetCategory, type AssetLoanRequest } from '@/lib/api'
+import { type Asset } from '@/data/mockData'
 
 function compressImage(file: File, maxWidth = 800, maxHeight = 800, quality = 0.6): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -75,7 +75,7 @@ function compressImage(file: File, maxWidth = 800, maxHeight = 800, quality = 0.
   })
 }
 
-type ActiveTab = 'inventory' | 'loans' | 'maintenance'
+type ActiveTab = 'inventory' | 'requests' | 'loans' | 'maintenance' | 'categories'
 
 export default function WarehousePage() {
   const navigate = useNavigate()
@@ -84,6 +84,8 @@ export default function WarehousePage() {
 
   // ── Estados de Dados ───────────────────────────────────────────────────────
   const [assets, setAssets] = useState<Asset[]>([])
+  const [categories, setCategories] = useState<AssetCategory[]>([])
+  const [requests, setRequests] = useState<AssetLoanRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -97,7 +99,7 @@ export default function WarehousePage() {
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [assetTag, setAssetTag] = useState('')
   const [description, setDescription] = useState('')
-  const [category, setCategory] = useState('POWER_TOOLS')
+  const [categoryId, setCategoryId] = useState('')
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
   const [serialNumber, setSerialNumber] = useState('')
@@ -108,14 +110,38 @@ export default function WarehousePage() {
   const [modalSubmitting, setModalSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
 
-  // Modal Devolução
+  // Modal de Categoria (Nova / Editar)
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<AssetCategory | null>(null)
+  const [categoryName, setCategoryName] = useState('')
+  const [categoryModalSubmitting, setCategoryModalSubmitting] = useState(false)
+  const [categoryModalError, setCategoryModalError] = useState<string | null>(null)
+
+  // Modal de Atendimento / Alocação
+  const [allocateModalOpen, setAllocateModalOpen] = useState(false)
+  const [selectedRequestForAllocation, setSelectedRequestForAllocation] = useState<AssetLoanRequest | null>(null)
+  const [selectedAssetId, setSelectedAssetId] = useState('')
+  const [allocationNotes, setAllocationNotes] = useState('')
+  const [allocationPhotos, setAllocationPhotos] = useState<string[]>([])
+  const [allocationSubmitting, setAllocationSubmitting] = useState(false)
+  const [allocationError, setAllocationError] = useState<string | null>(null)
+
+  // Modal de Validação de Devolução
+  const [validateModalOpen, setValidateModalOpen] = useState(false)
+  const [selectedRequestForValidation, setSelectedRequestForValidation] = useState<AssetLoanRequest | null>(null)
+  const [validationNotes, setValidationNotes] = useState('')
+  const [validationStatus, setValidationStatus] = useState<'OK' | 'OK_WITH_DAMAGE' | 'DEFECTIVE'>('OK')
+  const [validationSubmitting, setValidationSubmitting] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
+
+  // Modal Devolução (Legado)
   const [returnModalOpen, setReturnModalOpen] = useState(false)
   const [selectedAssetForReturn, setSelectedAssetForReturn] = useState<Asset | null>(null)
   const [returnNotes, setReturnNotes] = useState('')
   const [returnSubmitting, setReturnSubmitting] = useState(false)
   const [returnError, setReturnError] = useState<string | null>(null)
 
-  // Fotos de devolução
+  // Fotos de devolução (Legado)
   const [returnPhotoPreview, setReturnPhotoPreview] = useState<string | null>(null)
   const [returnPhotoBase64, setReturnPhotoBase64] = useState<string | null>(null)
 
@@ -137,10 +163,19 @@ export default function WarehousePage() {
     try {
       setLoading(true)
       setError(null)
-      const data = await assetsApi.list()
-      setAssets(data)
+      const [assetsData, categoriesData, requestsData] = await Promise.all([
+        assetsApi.list(),
+        assetsApi.listCategories(),
+        assetsApi.listLoanRequests()
+      ])
+      setAssets(assetsData)
+      setCategories(categoriesData)
+      setRequests(requestsData)
+      if (categoriesData.length > 0) {
+        setCategoryId(categoriesData[0].id)
+      }
     } catch (err: any) {
-      console.error('Erro ao buscar estoque:', err)
+      console.error('Erro ao buscar dados do almoxarifado:', err)
       setError(err?.message ?? 'Falha ao conectar com o servidor.')
     } finally {
       setLoading(false)
@@ -288,7 +323,7 @@ export default function WarehousePage() {
   const handleOpenNewModal = () => {
     setAssetTag('')
     setDescription('')
-    setCategory('POWER_TOOLS')
+    if (categories.length > 0) setCategoryId(categories[0].id)
     setBrand('')
     setModel('')
     setSerialNumber('')
@@ -333,7 +368,11 @@ export default function WarehousePage() {
       handleRemoveNewAssetPhoto()
       setAssetTag('')
       setDescription('')
-      setCategory('POWER_TOOLS')
+      if (categories.length > 0) {
+        setCategoryId(categories[0].id)
+      } else {
+        setCategoryId('')
+      }
       setBrand('')
       setModel('')
       setSerialNumber('')
@@ -343,7 +382,7 @@ export default function WarehousePage() {
       setNotes('')
       setModalError(null)
     }
-  }, [newModalOpen, handleRemoveNewAssetPhoto])
+  }, [newModalOpen, handleRemoveNewAssetPhoto, categories])
 
   const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -355,6 +394,10 @@ export default function WarehousePage() {
       setModalError('Descrição é obrigatória.')
       return
     }
+    if (!categoryId) {
+      setModalError('Categoria é obrigatória.')
+      return
+    }
 
     setModalSubmitting(true)
     setModalError(null)
@@ -363,7 +406,7 @@ export default function WarehousePage() {
       await assetsApi.create({
         assetTag: assetTag.trim(),
         description: description.trim(),
-        category,
+        categoryId,
         brand: brand.trim() || null,
         model: model.trim() || null,
         serialNumber: serialNumber.trim() || null,
@@ -380,6 +423,142 @@ export default function WarehousePage() {
       setModalError(err?.message ?? 'Ocorreu um erro ao salvar o item.')
     } finally {
       setModalSubmitting(false)
+    }
+  }
+
+  // ── Handlers de Categoria ──────────────────────────────────────────────────
+  const handleOpenCategoryModal = (cat: AssetCategory | null = null) => {
+    setEditingCategory(cat)
+    setCategoryName(cat ? cat.name : '')
+    setCategoryModalError(null)
+    setCategoryModalOpen(true)
+  }
+
+  const handleCreateOrUpdateCategory = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!categoryName.trim()) {
+      setCategoryModalError('Nome da categoria é obrigatório.')
+      return
+    }
+
+    setCategoryModalSubmitting(true)
+    setCategoryModalError(null)
+
+    try {
+      if (editingCategory) {
+        await assetsApi.updateCategory(editingCategory.id, { name: categoryName.trim() })
+      } else {
+        await assetsApi.createCategory({ name: categoryName.trim() })
+      }
+      setCategoryModalOpen(false)
+      loadAssets()
+    } catch (err: any) {
+      console.error('Erro ao salvar categoria:', err)
+      setCategoryModalError(err?.message ?? 'Ocorreu um erro ao salvar a categoria.')
+    } finally {
+      setCategoryModalSubmitting(false)
+    }
+  }
+
+  const handleToggleCategoryActive = async (cat: AssetCategory) => {
+    try {
+      await assetsApi.updateCategory(cat.id, { isActive: !cat.isActive })
+      loadAssets()
+    } catch (err: any) {
+      console.error('Erro ao alternar status da categoria:', err)
+      alert(err?.message ?? 'Ocorreu um erro.')
+    }
+  }
+
+  // ── Handlers de Atendimento (Alocação) ──────────────────────────────────────
+  const handleOpenAllocateModal = (req: AssetLoanRequest) => {
+    setSelectedRequestForAllocation(req)
+    setSelectedAssetId('')
+    setAllocationNotes('')
+    setAllocationPhotos([])
+    setAllocationError(null)
+    setAllocateModalOpen(true)
+  }
+
+  const handleAllocationPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const base64Photos: string[] = []
+    for (let i = 0; i < files.length; i++) {
+      if (base64Photos.length + allocationPhotos.length >= 4) break
+      try {
+        const compressed = await compressImage(files[i], 800, 800, 0.6)
+        base64Photos.push(compressed)
+      } catch (err) {
+        console.error('Erro ao comprimir foto de envio:', err)
+      }
+    }
+    setAllocationPhotos((prev) => [...prev, ...base64Photos].slice(0, 4))
+  }
+
+  const handleRemoveAllocationPhoto = (index: number) => {
+    setAllocationPhotos((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleAllocateRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedRequestForAllocation) return
+    if (!selectedAssetId) {
+      setAllocationError('Por favor, selecione um bem físico para alocar.')
+      return
+    }
+
+    setAllocationSubmitting(true)
+    setAllocationError(null)
+
+    try {
+      await assetsApi.allocateLoanRequest(selectedRequestForAllocation.id, {
+        allocatedAssetId: selectedAssetId,
+        checkoutPhoto1: allocationPhotos[0] || null,
+        checkoutPhoto2: allocationPhotos[1] || null,
+        checkoutPhoto3: allocationPhotos[2] || null,
+        checkoutPhoto4: allocationPhotos[3] || null,
+        checkoutNotes: allocationNotes.trim() || null
+      })
+      setAllocateModalOpen(false)
+      loadAssets()
+    } catch (err: any) {
+      console.error('Erro ao alocar solicitação:', err)
+      setAllocationError(err?.message ?? 'Ocorreu um erro ao realizar o envio.')
+    } finally {
+      setAllocationSubmitting(false)
+    }
+  }
+
+  // ── Handlers de Validação de Devolução ──────────────────────────────────────
+  const handleOpenValidateModal = (req: AssetLoanRequest) => {
+    setSelectedRequestForValidation(req)
+    setValidationNotes('')
+    setValidationStatus('OK')
+    setValidationError(null)
+    setValidateModalOpen(true)
+  }
+
+  const handleValidateReturn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedRequestForValidation) return
+
+    setValidationSubmitting(true)
+    setValidationError(null)
+
+    try {
+      await assetsApi.validateReturn(selectedRequestForValidation.id, {
+        validationStatus,
+        validationNotes: validationNotes.trim() || null
+      })
+      setValidateModalOpen(false)
+      loadAssets()
+    } catch (err: any) {
+      console.error('Erro ao validar devolução:', err)
+      setValidationError(err?.message ?? 'Ocorreu um erro ao validar.')
+    } finally {
+      setValidationSubmitting(false)
     }
   }
 
@@ -475,11 +654,11 @@ export default function WarehousePage() {
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-gray-200 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveTab('inventory')}
           className={cn(
-            'px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors relative',
+            'px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors relative shrink-0',
             activeTab === 'inventory'
               ? 'border-brand-primary text-brand-primary'
               : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -488,15 +667,31 @@ export default function WarehousePage() {
           Inventário Geral
         </button>
         <button
+          onClick={() => setActiveTab('requests')}
+          className={cn(
+            'px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors relative shrink-0',
+            activeTab === 'requests'
+              ? 'border-brand-primary text-brand-primary'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          )}
+        >
+          Solicitações & Devoluções
+          {requests.filter(r => r.status === 'PENDING' || r.status === 'RETURNING').length > 0 && (
+            <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-full">
+              {requests.filter(r => r.status === 'PENDING' || r.status === 'RETURNING').length}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab('loans')}
           className={cn(
-            'px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors relative',
+            'px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors relative shrink-0',
             activeTab === 'loans'
               ? 'border-brand-primary text-brand-primary'
               : 'border-transparent text-gray-400 hover:text-gray-600'
           )}
         >
-          Saídas / Empréstimos
+          Empréstimos Ativos
           {activeLoans.length > 0 && (
             <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-600 rounded-full">
               {activeLoans.length}
@@ -506,7 +701,7 @@ export default function WarehousePage() {
         <button
           onClick={() => setActiveTab('maintenance')}
           className={cn(
-            'px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors relative',
+            'px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors relative shrink-0',
             activeTab === 'maintenance'
               ? 'border-brand-primary text-brand-primary'
               : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -518,6 +713,17 @@ export default function WarehousePage() {
               {maintenanceAssets.length}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => setActiveTab('categories')}
+          className={cn(
+            'px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors relative shrink-0',
+            activeTab === 'categories'
+              ? 'border-brand-primary text-brand-primary'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          )}
+        >
+          Categorias
         </button>
       </div>
 
@@ -553,9 +759,9 @@ export default function WarehousePage() {
                     className="h-12 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary outline-none focus:ring-2 focus:ring-brand-primary/20"
                   >
                     <option value="ALL">Todas Categorias</option>
-                    {Object.entries(ASSET_CATEGORY_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
                       </option>
                     ))}
                   </select>
@@ -605,7 +811,7 @@ export default function WarehousePage() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="block font-bold text-gray-900">{asset.assetTag}</span>
                             <span className="block text-xs text-gray-400 font-medium mt-0.5">
-                              {ASSET_CATEGORY_LABELS[asset.category] ?? asset.category}
+                              {asset.categoryData?.name ?? asset.category}
                             </span>
                           </td>
                           <td className="px-6 py-4">
@@ -750,7 +956,224 @@ export default function WarehousePage() {
             </div>
           )}
 
-          {/* Tab 3: Manutenções / Avarias */}
+          {/* Tab Solicitações & Devoluções */}
+          {activeTab === 'requests' && (() => {
+            const pending = requests.filter(r => r.status === 'PENDING')
+            const returning = requests.filter(r => r.status === 'RETURNING')
+            const activeRequests = requests.filter(r => r.status === 'LOANED')
+
+            return (
+              <div className="divide-y divide-gray-100">
+                {/* Seção: Pendentes */}
+                <div className="p-4 bg-amber-50/60">
+                  <h3 className="text-sm font-bold text-amber-700 flex items-center gap-2 mb-3">
+                    <ClipboardList className="w-4 h-4" />
+                    Solicitações Pendentes ({pending.length})
+                  </h3>
+                  {pending.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-2">Nenhuma solicitação pendente.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {pending.map((req) => (
+                        <Card key={req.id} className="p-4 border-amber-200/60 bg-white shadow-sm">
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="min-w-0">
+                              <span className="block text-xs font-bold text-gray-400 uppercase tracking-wide">Solicitante</span>
+                              <span className="block text-sm font-bold text-gray-900 truncate">{req.requesterEmployee?.fullName}</span>
+                              <span className="block text-xs text-gray-500 mt-1 font-medium">
+                                Categoria: <span className="text-gray-700">{req.category?.name}</span>
+                              </span>
+                              {req.requestNotes && (
+                                <p className="text-xs text-gray-400 mt-1 italic">"{req.requestNotes}"</p>
+                              )}
+                            </div>
+                            <Badge variant="loaned" className="bg-amber-100 text-amber-700 border-amber-200 shrink-0">Pendente</Badge>
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
+                            <Button
+                              size="sm"
+                              onClick={() => handleOpenAllocateModal(req)}
+                              className="text-xs font-semibold flex items-center gap-1.5 h-9"
+                            >
+                              <Package size={13} />
+                              Alocar e Enviar
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Seção: Em Trânsito de Devolução */}
+                <div className="p-4 bg-orange-50/40">
+                  <h3 className="text-sm font-bold text-orange-700 flex items-center gap-2 mb-3">
+                    <ArrowLeftRight className="w-4 h-4" />
+                    Em Trânsito de Devolução ({returning.length})
+                  </h3>
+                  {returning.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-2">Nenhuma devolução pendente de validação.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {returning.map((req) => (
+                        <Card key={req.id} className="p-4 border-orange-200/60 bg-white shadow-sm">
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="min-w-0">
+                              <span className="block text-xs font-bold text-gray-400 uppercase tracking-wide">Devolvendo</span>
+                              <span className="block text-sm font-bold text-gray-900 truncate">{req.requesterEmployee?.fullName}</span>
+                              <span className="block text-xs text-gray-500 mt-1">
+                                Bem: <span className="font-medium text-gray-700">{req.allocatedAsset?.description ?? req.category?.name}</span>
+                              </span>
+                              {req.isWorking === false && (
+                                <span className="inline-block mt-1.5 text-[10px] font-bold text-red-700 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full">
+                                  ⚠ Relatou defeito
+                                </span>
+                              )}
+                              {req.hasDamage && (
+                                <span className="inline-block mt-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full ml-1">
+                                  ⚠ Relatou avaria
+                                </span>
+                              )}
+                              {req.returnNotes && (
+                                <p className="text-xs text-gray-400 mt-1 italic">"{req.returnNotes}"</p>
+                              )}
+                            </div>
+                            <Badge variant="critical" className="shrink-0">Retornando</Badge>
+                          </div>
+                          {/* Fotos de Devolução */}
+                          {(req.returnPhoto1 || req.returnPhoto2) && (
+                            <div className="flex gap-2 mt-3 flex-wrap">
+                              {[req.returnPhoto1, req.returnPhoto2, req.returnPhoto3, req.returnPhoto4].filter(Boolean).map((photo, idx) => (
+                                <img
+                                  key={idx}
+                                  src={photo!}
+                                  alt={`Foto de devolução ${idx + 1}`}
+                                  className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                />
+                              ))}
+                            </div>
+                          )}
+                          <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
+                            <Button
+                              size="sm"
+                              onClick={() => handleOpenValidateModal(req)}
+                              className="text-xs font-semibold flex items-center gap-1.5 h-9"
+                            >
+                              <CheckCircle2 size={13} />
+                              Validar Devolução
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Seção: Empréstimos Ativos (baseados em requests) */}
+                <div className="p-4">
+                  <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2 mb-3">
+                    <Package className="w-4 h-4" />
+                    Com o Colaborador ({activeRequests.length})
+                  </h3>
+                  {activeRequests.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-2">Nenhum item ativo com colaboradores.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {activeRequests.map((req) => (
+                        <Card key={req.id} className="p-4 border-blue-200/60 bg-white shadow-sm">
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="min-w-0">
+                              <span className="block text-xs font-bold text-gray-400 uppercase tracking-wide">Com</span>
+                              <span className="block text-sm font-bold text-gray-900 truncate">{req.requesterEmployee?.fullName}</span>
+                              <span className="block text-xs text-gray-500 mt-1">
+                                Bem: <span className="font-medium text-gray-700">{req.allocatedAsset?.description ?? req.category?.name}</span>
+                              </span>
+                              {req.checkoutAt && (
+                                <span className="block text-xs text-gray-400 mt-0.5">
+                                  Saiu em: {new Date(req.checkoutAt).toLocaleDateString('pt-BR')}
+                                </span>
+                              )}
+                            </div>
+                            <Badge variant="loaned" className="shrink-0">Ativo</Badge>
+                          </div>
+                          {/* Fotos de Envio */}
+                          {(req.checkoutPhoto1 || req.checkoutPhoto2) && (
+                            <div className="flex gap-2 mt-3 flex-wrap">
+                              {[req.checkoutPhoto1, req.checkoutPhoto2, req.checkoutPhoto3, req.checkoutPhoto4].filter(Boolean).map((photo, idx) => (
+                                <img
+                                  key={idx}
+                                  src={photo!}
+                                  alt={`Foto de envio ${idx + 1}`}
+                                  className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Tab Categorias */}
+          {activeTab === 'categories' && (
+            <div>
+              <div className="p-4 bg-gray-50/50 flex justify-between items-center border-b border-gray-100">
+                <span className="text-sm font-semibold text-gray-500">
+                  {categories.length} categoria(s) cadastrada(s)
+                </span>
+                <Button size="sm" onClick={() => handleOpenCategoryModal(null)} className="flex items-center gap-1.5">
+                  <Plus className="w-4 h-4" />
+                  Nova Categoria
+                </Button>
+              </div>
+              {categories.length === 0 ? (
+                <div className="p-12 text-center text-gray-400">
+                  <Package className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                  Nenhuma categoria cadastrada ainda.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {categories.map((cat) => (
+                    <div key={cat.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2.5 h-2.5 rounded-full ${cat.isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
+                        <div>
+                          <span className="font-semibold text-gray-800 text-sm">{cat.name}</span>
+                          {!cat.isActive && (
+                            <span className="ml-2 text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Inativa</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleOpenCategoryModal(cat)}
+                          className="text-xs text-gray-500 hover:text-gray-800 h-8"
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleToggleCategoryActive(cat)}
+                          className={`text-xs h-8 ${cat.isActive ? 'text-red-500 hover:text-red-700 hover:bg-red-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50'}`}
+                        >
+                          {cat.isActive ? 'Desativar' : 'Ativar'}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab Manutenções / Avarias */}
           {activeTab === 'maintenance' && (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -776,7 +1199,7 @@ export default function WarehousePage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="font-bold text-gray-900 block">{asset.assetTag}</span>
                           <span className="text-xs text-gray-400 mt-0.5">
-                            {ASSET_CATEGORY_LABELS[asset.category] ?? asset.category}
+                            {asset.categoryData?.name ?? asset.category}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -844,14 +1267,14 @@ export default function WarehousePage() {
               </Label>
               <select
                 id="modalCategory"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
                 className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
                 required
               >
-                {Object.entries(ASSET_CATEGORY_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
+                {categories.filter(c => c.isActive).map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
                   </option>
                 ))}
               </select>
@@ -1236,6 +1659,282 @@ export default function WarehousePage() {
                 </>
               ) : (
                 'Finalizar Manutenção'
+              )}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* ── Modal de Categoria ─────────────────────────────────────────────────── */}
+      <Dialog
+        open={categoryModalOpen}
+        onClose={() => setCategoryModalOpen(false)}
+        title={editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
+        description="Categorias são usadas para classificar os bens do almoxarifado e nas solicitações de empréstimo."
+      >
+        <form onSubmit={handleCreateOrUpdateCategory} className="space-y-4 pt-2">
+          {categoryModalError && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2.5 text-xs text-red-600">
+              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+              <p className="font-semibold">{categoryModalError}</p>
+            </div>
+          )}
+          <div>
+            <Label htmlFor="categoryName" required>Nome da Categoria</Label>
+            <Input
+              id="categoryName"
+              placeholder="Ex: Ferramentas Elétricas"
+              value={categoryName}
+              onChange={(e) => setCategoryName(e.target.value)}
+              className="mt-1.5 h-11"
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
+            <Button type="button" variant="ghost" onClick={() => setCategoryModalOpen(false)} disabled={categoryModalSubmitting}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={categoryModalSubmitting}>
+              {categoryModalSubmitting ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Salvando...</>
+              ) : (
+                editingCategory ? 'Salvar Alterações' : 'Criar Categoria'
+              )}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* ── Modal de Alocação (Atender Solicitação) ────────────────────────────── */}
+      <Dialog
+        open={allocateModalOpen}
+        onClose={() => setAllocateModalOpen(false)}
+        title="Alocar Bem e Enviar"
+        description={`Vincule um bem físico disponível para a solicitação de: ${selectedRequestForAllocation?.requesterEmployee?.fullName}`}
+      >
+        <form onSubmit={handleAllocateRequest} className="space-y-4 pt-2">
+          {allocationError && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2.5 text-xs text-red-600">
+              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+              <p className="font-semibold">{allocationError}</p>
+            </div>
+          )}
+
+          <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+            <p className="text-xs font-semibold text-amber-800">Categoria solicitada</p>
+            <p className="text-sm font-bold text-amber-900 mt-0.5">{selectedRequestForAllocation?.category?.name}</p>
+            {selectedRequestForAllocation?.requestNotes && (
+              <p className="text-xs text-amber-700 mt-1 italic">"{selectedRequestForAllocation.requestNotes}"</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="allocateAsset" required>Bem Físico a Enviar</Label>
+            <select
+              id="allocateAsset"
+              value={selectedAssetId}
+              onChange={(e) => setSelectedAssetId(e.target.value)}
+              className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+              required
+            >
+              <option value="">Selecione um bem disponível...</option>
+              {assets
+                .filter(a => a.currentStatus === 'AVAILABLE')
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.assetTag} — {a.description}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div>
+            <Label>Fotos do Estado de Envio (até 4)</Label>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {allocationPhotos.map((photo, idx) => (
+                <div key={idx} className="relative w-20 h-20 rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+                  <img src={photo} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAllocationPhoto(idx)}
+                    className="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {allocationPhotos.length < 4 && (
+                <label className="w-20 h-20 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
+                  <Camera className="w-5 h-5 text-gray-400 mb-1" />
+                  <span className="text-[10px] text-gray-400">Foto</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleAllocationPhotoChange}
+                  />
+                </label>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="allocationNotes">Observações do Envio (opcional)</Label>
+            <Textarea
+              id="allocationNotes"
+              placeholder="Ex: Equipamento em perfeito estado, com acessórios originais."
+              value={allocationNotes}
+              onChange={(e) => setAllocationNotes(e.target.value)}
+              className="min-h-[70px] mt-1.5"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
+            <Button type="button" variant="ghost" onClick={() => setAllocateModalOpen(false)} disabled={allocationSubmitting}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={allocationSubmitting}>
+              {allocationSubmitting ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Enviando...</>
+              ) : (
+                'Confirmar Envio'
+              )}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* ── Modal de Validação de Devolução ────────────────────────────────────── */}
+      <Dialog
+        open={validateModalOpen}
+        onClose={() => setValidateModalOpen(false)}
+        title="Validar Devolução"
+        description={`Confirme a recepção do bem devolvido por: ${selectedRequestForValidation?.requesterEmployee?.fullName}`}
+      >
+        <form onSubmit={handleValidateReturn} className="space-y-4 pt-2">
+          {validationError && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2.5 text-xs text-red-600">
+              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+              <p className="font-semibold">{validationError}</p>
+            </div>
+          )}
+
+          {/* Informações da devolução relatada pelo funcionário */}
+          {selectedRequestForValidation && (
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1.5">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Relatório do Funcionário</p>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Funcionando:</span>
+                <span className={`font-bold ${selectedRequestForValidation.isWorking === false ? 'text-red-600' : 'text-green-600'}`}>
+                  {selectedRequestForValidation.isWorking === false ? 'Não' : selectedRequestForValidation.isWorking === true ? 'Sim' : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Com Avaria:</span>
+                <span className={`font-bold ${selectedRequestForValidation.hasDamage ? 'text-amber-600' : 'text-green-600'}`}>
+                  {selectedRequestForValidation.hasDamage ? 'Sim' : 'Não'}
+                </span>
+              </div>
+              {selectedRequestForValidation.returnNotes && (
+                <p className="text-xs text-gray-500 italic pt-1 border-t border-gray-100">
+                  "{selectedRequestForValidation.returnNotes}"
+                </p>
+              )}
+              {(selectedRequestForValidation.returnPhoto1 || selectedRequestForValidation.returnPhoto2) && (
+                <div className="flex gap-2 pt-1 flex-wrap">
+                  {[selectedRequestForValidation.returnPhoto1, selectedRequestForValidation.returnPhoto2, selectedRequestForValidation.returnPhoto3, selectedRequestForValidation.returnPhoto4].filter(Boolean).map((photo, idx) => (
+                    <img
+                      key={idx}
+                      src={photo!}
+                      alt={`Foto de devolução ${idx + 1}`}
+                      className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div>
+            <Label>Resultado da Inspeção Física</Label>
+            <div className="space-y-2 mt-2">
+              <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${validationStatus === 'OK' ? 'border-green-400 bg-green-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <input
+                  type="radio"
+                  name="validationStatus"
+                  value="OK"
+                  checked={validationStatus === 'OK'}
+                  onChange={() => setValidationStatus('OK')}
+                  className="mt-0.5 w-4 h-4 text-green-600"
+                />
+                <div>
+                  <span className="text-sm font-bold text-gray-800">✅ Tudo certo</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Bem recebido em bom estado, volta a ficar disponível.</p>
+                </div>
+              </label>
+              <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${validationStatus === 'OK_WITH_DAMAGE' ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <input
+                  type="radio"
+                  name="validationStatus"
+                  value="OK_WITH_DAMAGE"
+                  checked={validationStatus === 'OK_WITH_DAMAGE'}
+                  onChange={() => setValidationStatus('OK_WITH_DAMAGE')}
+                  className="mt-0.5 w-4 h-4 text-amber-600"
+                />
+                <div>
+                  <span className="text-sm font-bold text-gray-800">⚠️ Tudo certo, mas com avaria</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Bem volta disponível, mas é registrada uma notificação de avaria.</p>
+                </div>
+              </label>
+              <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${validationStatus === 'DEFECTIVE' ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <input
+                  type="radio"
+                  name="validationStatus"
+                  value="DEFECTIVE"
+                  checked={validationStatus === 'DEFECTIVE'}
+                  onChange={() => setValidationStatus('DEFECTIVE')}
+                  className="mt-0.5 w-4 h-4 text-red-600"
+                />
+                <div>
+                  <span className="text-sm font-bold text-red-700">❌ Com defeito / Danificado</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Bem vai para manutenção (status DANIFICADO). Notificação enviada ao funcionário.</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {validationStatus !== 'OK' && (
+            <div>
+              <Label htmlFor="validationNotes">
+                {validationStatus === 'OK_WITH_DAMAGE' ? 'Descrição da Avaria' : 'Descrição do Defeito / Dano'}
+                <span className="text-red-500 ml-1">*</span>
+              </Label>
+              <Textarea
+                id="validationNotes"
+                placeholder={validationStatus === 'OK_WITH_DAMAGE' ? 'Descreva a avaria encontrada...' : 'Descreva o defeito ou dano encontrado...'}
+                value={validationNotes}
+                onChange={(e) => setValidationNotes(e.target.value)}
+                className="min-h-[80px] mt-1.5"
+                required={validationStatus === 'OK_WITH_DAMAGE' || validationStatus === 'DEFECTIVE'}
+              />
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
+            <Button type="button" variant="ghost" onClick={() => setValidateModalOpen(false)} disabled={validationSubmitting}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={validationSubmitting}
+              className={validationStatus === 'DEFECTIVE' ? 'bg-red-600 hover:bg-red-700' : validationStatus === 'OK_WITH_DAMAGE' ? 'bg-amber-600 hover:bg-amber-700' : ''}
+            >
+              {validationSubmitting ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Validando...</>
+              ) : (
+                'Confirmar Validação'
               )}
             </Button>
           </div>

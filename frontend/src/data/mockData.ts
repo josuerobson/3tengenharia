@@ -237,6 +237,8 @@ export interface Asset {
   assetTag: string
   description: string
   category: AssetCategory
+  categoryId?: string | null
+  categoryData?: { id: string; name: string; isActive: boolean } | null
   brand: string | null
   model: string | null
   serialNumber: string | null

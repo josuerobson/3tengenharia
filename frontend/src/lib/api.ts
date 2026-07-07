@@ -6,6 +6,66 @@
 import type { AuthUser } from '@/types/auth'
 import type { Asset } from '@/data/mockData'
 
+export interface AssetCategory {
+  id: string
+  name: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AssetLoanRequest {
+  id: string
+  requesterEmployeeId: string
+  requesterEmployee: {
+    id: string
+    fullName: string
+    registration: string
+  }
+  categoryId: string
+  category: AssetCategory
+  status: 'PENDING' | 'LOANED' | 'RETURNING' | 'RETURNED' | 'REJECTED'
+  destinationWorksiteId: string | null
+  destinationWorksite: {
+    id: string
+    code: string
+    name: string
+  } | null
+  requestNotes: string | null
+  allocatedAssetId: string | null
+  allocatedAsset: {
+    id: string
+    assetTag: string
+    description: string
+    category: {
+      name: string
+    } | null
+    legacyCategory: string | null
+  } | null
+  checkoutPhoto1: string | null
+  checkoutPhoto2: string | null
+  checkoutPhoto3: string | null
+  checkoutPhoto4: string | null
+  checkoutNotes: string | null
+  checkoutAt: string | null
+  checkoutByUserId: string | null
+  returnNotes: string | null
+  returnPhoto1: string | null
+  returnPhoto2: string | null
+  returnPhoto3: string | null
+  returnPhoto4: string | null
+  isWorking: boolean | null
+  hasDamage: boolean | null
+  returnedAt: string | null
+  validationNotes: string | null
+  validatedAt: string | null
+  validatedByUserId: string | null
+  validationStatus: 'OK' | 'OK_WITH_DAMAGE' | 'DEFECTIVE' | null
+  createdAt: string
+  updatedAt: string
+}
+
+
 let rawUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
   ?? 'https://3tbackend.j4sistemas.com.br/api/v1'
 
@@ -409,7 +469,7 @@ export const assetsApi = {
   create(data: {
     assetTag: string
     description: string
-    category: string
+    categoryId: string
     brand?: string | null
     model?: string | null
     serialNumber?: string | null
@@ -479,6 +539,91 @@ export const assetsApi = {
       body: JSON.stringify(data),
     })
   },
+
+  // ── CATEGORIAS DINÂMICAS ───────────────────────────────────────────────────
+
+  listCategories(): Promise<AssetCategory[]> {
+    return request('/assets/categories')
+  },
+
+  createCategory(data: { name: string }): Promise<AssetCategory> {
+    return request('/assets/categories', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    })
+  },
+
+  updateCategory(id: string, data: { name?: string; isActive?: boolean }): Promise<AssetCategory> {
+    return request(`/assets/categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    })
+  },
+
+  // ── SOLICITAÇÕES E DEVOLUÇÕES (LOAN REQUESTS) ──────────────────────────────
+
+  listLoanRequests(): Promise<AssetLoanRequest[]> {
+    return request('/assets/requests')
+  },
+
+  createLoanRequest(data: {
+    categoryId: string
+    destinationWorksiteId?: string | null
+    requestNotes?: string | null
+  }): Promise<AssetLoanRequest> {
+    return request('/assets/requests', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    })
+  },
+
+  allocateLoanRequest(
+    requestId: string,
+    data: {
+      allocatedAssetId: string
+      checkoutPhoto1?: string | null
+      checkoutPhoto2?: string | null
+      checkoutPhoto3?: string | null
+      checkoutPhoto4?: string | null
+      checkoutNotes?: string | null
+    }
+  ): Promise<{ message: string; loanRequest: AssetLoanRequest }> {
+    return request(`/assets/requests/${requestId}/allocate`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    })
+  },
+
+  submitReturn(
+    requestId: string,
+    data: {
+      returnPhoto1: string
+      returnPhoto2?: string | null
+      returnPhoto3?: string | null
+      returnPhoto4?: string | null
+      returnNotes?: string | null
+      isWorking: boolean
+      hasDamage: boolean
+    }
+  ): Promise<{ message: string; loanRequest: AssetLoanRequest }> {
+    return request(`/assets/requests/${requestId}/return`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    })
+  },
+
+  validateReturn(
+    requestId: string,
+    data: {
+      validationNotes?: string | null
+      validationStatus: 'OK' | 'OK_WITH_DAMAGE' | 'DEFECTIVE'
+    }
+  ): Promise<{ message: string; loanRequest: AssetLoanRequest }> {
+    return request(`/assets/requests/${requestId}/validate`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    })
+  }
 }
 
 export interface ApiEmployee {

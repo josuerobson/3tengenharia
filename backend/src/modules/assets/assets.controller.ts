@@ -7,6 +7,12 @@ import {
   createAssetBodySchema,
   returnLoanBodySchema,
   resolveMaintenanceLogBodySchema,
+  createCategoryBodySchema,
+  editCategoryBodySchema,
+  createAssetLoanRequestBodySchema,
+  allocateAssetLoanRequestBodySchema,
+  returnAssetLoanRequestBodySchema,
+  validateReturnAssetLoanRequestBodySchema,
 } from './assets.schema.js'
 import {
   assetsService,
@@ -58,7 +64,7 @@ export function assetsController(_app: FastifyInstance) {
       return reply.status(201).send(asset)
     },
 
-    // ── POST /assets/loans ───────────────────────────────────────────────────
+    // ── POST /assets/loans (legado) ──────────────────────────────────────────
     async createLoan(request: FastifyRequest, reply: FastifyReply) {
       const body = createLoanBodySchema.parse(request.body)
       const userId = request.currentUser.sub
@@ -76,7 +82,7 @@ export function assetsController(_app: FastifyInstance) {
       })
     },
 
-    // ── POST /assets/loans/:id/return ────────────────────────────────────────
+    // ── POST /assets/loans/:id/return (legado) ────────────────────────────────
     async returnLoan(request: FastifyRequest, reply: FastifyReply) {
       const params = request.params as { id: string }
       const body = returnLoanBodySchema.parse(request.body)
@@ -147,5 +153,104 @@ export function assetsController(_app: FastifyInstance) {
         maintenanceLog: result,
       })
     },
+
+    // ── CATEGORIAS DINÂMICAS ──────────────────────────────────────────────────
+
+    async listCategories(request: FastifyRequest, reply: FastifyReply) {
+      const categories = await assetsService.listCategories()
+      return reply.status(200).send(categories)
+    },
+
+    async createCategory(request: FastifyRequest, reply: FastifyReply) {
+      const body = createCategoryBodySchema.parse(request.body)
+      let category
+      try {
+        category = await assetsService.createCategory(body)
+      } catch (err: any) {
+        return reply.status(400).send({ message: err.message })
+      }
+      return reply.status(201).send(category)
+    },
+
+    async updateCategory(request: FastifyRequest, reply: FastifyReply) {
+      const params = request.params as { id: string }
+      const body = editCategoryBodySchema.parse(request.body)
+      let category
+      try {
+        category = await assetsService.updateCategory(params.id, body)
+      } catch (err: any) {
+        return reply.status(400).send({ message: err.message })
+      }
+      return reply.status(200).send(category)
+    },
+
+    // ── FLUXO DE SOLICITAÇÃO (LOAN REQUESTS) ──────────────────────────────────
+
+    async createLoanRequest(request: FastifyRequest, reply: FastifyReply) {
+      const body = createAssetLoanRequestBodySchema.parse(request.body)
+      const userId = request.currentUser.sub
+      let loanRequest
+      try {
+        loanRequest = await assetsService.createLoanRequest(userId, body)
+      } catch (err: any) {
+        return reply.status(400).send({ message: err.message })
+      }
+      return reply.status(201).send(loanRequest)
+    },
+
+    async listLoanRequests(request: FastifyRequest, reply: FastifyReply) {
+      const userId = request.currentUser.sub
+      const role = request.currentUser.role
+      const requests = await assetsService.listLoanRequests(userId, role)
+      return reply.status(200).send(requests)
+    },
+
+    async allocateLoanRequest(request: FastifyRequest, reply: FastifyReply) {
+      const params = request.params as { id: string }
+      const body = allocateAssetLoanRequestBodySchema.parse(request.body)
+      const userId = request.currentUser.sub
+      let loanRequest
+      try {
+        loanRequest = await assetsService.allocateLoanRequest(params.id, userId, body)
+      } catch (err: any) {
+        return reply.status(400).send({ message: err.message })
+      }
+      return reply.status(200).send({
+        message: 'Patrimônio físico alocado e enviado com sucesso.',
+        loanRequest
+      })
+    },
+
+    async submitReturn(request: FastifyRequest, reply: FastifyReply) {
+      const params = request.params as { id: string }
+      const body = returnAssetLoanRequestBodySchema.parse(request.body)
+      const userId = request.currentUser.sub
+      let loanRequest
+      try {
+        loanRequest = await assetsService.submitReturn(params.id, userId, body)
+      } catch (err: any) {
+        return reply.status(400).send({ message: err.message })
+      }
+      return reply.status(200).send({
+        message: 'Devolução registrada. O bem agora está em trânsito de retorno.',
+        loanRequest
+      })
+    },
+
+    async validateReturn(request: FastifyRequest, reply: FastifyReply) {
+      const params = request.params as { id: string }
+      const body = validateReturnAssetLoanRequestBodySchema.parse(request.body)
+      const userId = request.currentUser.sub
+      let loanRequest
+      try {
+        loanRequest = await assetsService.validateReturn(params.id, userId, body)
+      } catch (err: any) {
+        return reply.status(400).send({ message: err.message })
+      }
+      return reply.status(200).send({
+        message: `Devolução validada com sucesso como: ${body.validationStatus}.`,
+        loanRequest
+      })
+    }
   }
 }

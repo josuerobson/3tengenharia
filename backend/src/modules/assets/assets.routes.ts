@@ -391,4 +391,123 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     },
     controller.listWorksites,
   )
+
+  // ── CATEGORIAS DINÂMICAS ───────────────────────────────────────────────────
+  app.get(
+    '/categories',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Listar categorias de bens',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.listCategories
+  )
+
+  app.post(
+    '/categories',
+    {
+      onRequest: [
+        app.authenticate,
+        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])
+      ],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Criar categoria de bem',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.createCategory
+  )
+
+  app.patch(
+    '/categories/:id',
+    {
+      onRequest: [
+        app.authenticate,
+        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])
+      ],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Atualizar categoria de bem',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.updateCategory
+  )
+
+  // ── FLUXO DE SOLICITAÇÃO (LOAN REQUESTS) ──────────────────────────────────
+  app.get(
+    '/requests',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Listar solicitações de empréstimo',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.listLoanRequests
+  )
+
+  app.post(
+    '/requests',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Criar solicitação de empréstimo',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.createLoanRequest
+  )
+
+  app.post(
+    '/requests/:id/allocate',
+    {
+      onRequest: [
+        app.authenticate,
+        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])
+      ],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Vincular e enviar patrimônio físico para solicitação',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.allocateLoanRequest
+  )
+
+  app.post(
+    '/requests/:id/return',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Registrar intenção/checklist de devolução',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.submitReturn
+  )
+
+  app.post(
+    '/requests/:id/validate',
+    {
+      onRequest: [
+        app.authenticate,
+        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])
+      ],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Validar devolução e definir estado final do equipamento',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.validateReturn
+  )
 }
+
