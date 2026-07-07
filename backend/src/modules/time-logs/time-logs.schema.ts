@@ -25,15 +25,14 @@ export const bulkTimeLogBodySchema = z
     /** IDs dos funcionários que tiveram horas lançadas neste dia */
     employeeIds: z
       .array(
-        z.string().cuid('ID de funcionário inválido no array.'),
+        z.string(),
         { required_error: 'employeeIds é obrigatório.' },
       )
       .min(1, 'Ao menos um funcionário deve ser informado.')
       .max(100, 'Máximo de 100 funcionários por lote.'),
 
     worksiteId: z
-      .string({ required_error: 'worksiteId é obrigatório.' })
-      .cuid('ID da obra inválido.'),
+      .string({ required_error: 'worksiteId é obrigatório.' }),
 
     /** Data de referência no formato YYYY-MM-DD */
     workDate: z
