@@ -516,19 +516,6 @@ export const assetsApi = {
     return request('/assets/worksites')
   },
 
-  createLoan(data: {
-    assetId: string
-    borrowerEmployeeId: string
-    destinationWorksiteId?: string | null
-    expectedReturnAt?: string | null
-    checkoutNotes?: string | null
-  }): Promise<{ message: string; loan: any }> {
-    return request('/assets/loans', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  },
-
   returnLoan(loanId: string, data: {
     returnedAt?: string | null
     returnNotes?: string | null

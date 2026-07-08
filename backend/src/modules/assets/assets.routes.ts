@@ -175,50 +175,10 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     controller.createAsset,
   )
 
-  // ── POST /assets/loans ─────────────────────────────────────────────────────
-  // Requer: MANAGER ou ADMIN (apenas gestores autorizam saídas de patrimônio)
-  app.post(
-    '/loans',
-    {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN]),
-      ],
-      schema: {
-        tags: ['Assets'],
-        summary: 'Registrar saída/empréstimo de bem patrimonial',
-        description:
-          'Cria um registro de empréstimo e altera o status do bem para LOANED. ' +
-          'Rejeita a operação se o bem não estiver com status AVAILABLE.',
-        security: [{ bearerAuth: [] }],
-        body: {
-          type: 'object',
-          required: ['assetId', 'borrowerEmployeeId'],
-          properties: {
-            assetId: { type: 'string' },
-            borrowerEmployeeId: { type: 'string' },
-            destinationWorksiteId: { type: 'string' },
-            expectedReturnAt: { type: 'string', format: 'date-time' },
-            checkoutNotes: { type: 'string' },
-          },
-        },
-        response: {
-          201: {
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-              loan: loanResponseSchema,
-            },
-          },
-          404: { type: 'object', properties: { statusCode: { type: 'number' }, error: { type: 'string' }, message: { type: 'string' } } },
-          409: { type: 'object', properties: { statusCode: { type: 'number' }, error: { type: 'string' }, message: { type: 'string' } } },
-        },
-      },
-    },
-    controller.createLoan,
-  )
-
   // ── POST /assets/loans/:id/return ──────────────────────────────────────────
+  // Mantido apenas para encerrar empréstimos legados (AssetLoan) criados antes
+  // da migração para o fluxo de solicitações (AssetLoanRequest). Não há mais
+  // rota de criação — toda nova saída deve passar por /assets/requests/:id/allocate.
   // Requer: MANAGER ou ADMIN
   app.post(
     '/loans/:id/return',

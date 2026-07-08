@@ -21,33 +21,6 @@ export const editCategoryBodySchema = z.object({
 
 export type EditCategoryBody = z.infer<typeof editCategoryBodySchema>
 
-// ── Loan (empréstimo / saída de item - legado) ───────────────────────────────
-
-export const createLoanBodySchema = z.object({
-  assetId: z
-    .string({ required_error: 'assetId é obrigatório.' })
-    .cuid('ID do bem inválido.'),
-
-  borrowerEmployeeId: z
-    .string({ required_error: 'borrowerEmployeeId é obrigatório.' })
-    .cuid('ID do colaborador inválido.'),
-
-  destinationWorksiteId: z
-    .string()
-    .cuid('ID da obra de destino inválido.')
-    .optional(),
-
-  expectedReturnAt: z.coerce
-    .date()
-    .refine((d) => d > new Date(), {
-      message: 'Previsão de retorno deve ser uma data futura.',
-    })
-    .optional(),
-
-  checkoutNotes: z.string().trim().max(1000).optional(),
-})
-
-export type CreateLoanBody = z.infer<typeof createLoanBodySchema>
 
 // ── Maintenance Log (chamado de avaria / defeito) ─────────────────────────────
 

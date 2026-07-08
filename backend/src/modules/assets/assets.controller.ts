@@ -2,7 +2,6 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import {
-  createLoanBodySchema,
   createMaintenanceLogBodySchema,
   createAssetBodySchema,
   returnLoanBodySchema,
@@ -62,24 +61,6 @@ export function assetsController(_app: FastifyInstance) {
         rethrowDomain(err)
       }
       return reply.status(201).send(asset)
-    },
-
-    // ── POST /assets/loans (legado) ──────────────────────────────────────────
-    async createLoan(request: FastifyRequest, reply: FastifyReply) {
-      const body = createLoanBodySchema.parse(request.body)
-      const userId = request.currentUser.sub
-
-      let loan: Awaited<ReturnType<typeof assetsService.createLoan>>
-      try {
-        loan = await assetsService.createLoan(body, userId)
-      } catch (err) {
-        rethrowDomain(err)
-      }
-
-      return reply.status(201).send({
-        message: `Saída do bem "${loan.asset.assetTag}" registrada com sucesso. Status atualizado para LOANED.`,
-        loan,
-      })
     },
 
     // ── POST /assets/loans/:id/return (legado) ────────────────────────────────

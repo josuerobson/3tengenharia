@@ -582,10 +582,6 @@ export default function WarehousePage() {
               <Plus className="w-4 h-4 mr-2" />
               Novo Item
             </Button>
-            <Button onClick={() => navigate('/assets/loans/new')} variant="subtle" className="flex-1 sm:flex-none">
-              <ArrowLeftRight className="w-4 h-4 mr-2" />
-              Registrar Saída
-            </Button>
           </div>
         )}
       </div>
