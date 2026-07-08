@@ -15,6 +15,7 @@ import {
   MapPin,
   ClipboardList,
   ChevronRight,
+  Download,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,33 @@ import { Badge, ASSET_STATUS_BADGE } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
 import { assetsApi } from '@/lib/api'
 import { type Asset } from '@/data/mockData'
+
+// Import dinâmico: pdf-lib só é baixado quando o usuário realmente gera um PDF.
+const generateDefectReportPdf: typeof import('@/lib/defectReportPdf').generateDefectReportPdf = (input) =>
+  import('@/lib/defectReportPdf').then((mod) => mod.generateDefectReportPdf(input))
+
+function compressImage(file: File, maxWidth = 1000, maxHeight = 1000, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const canvas = document.createElement('canvas')
+      let { width, height } = img
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height)
+        width = Math.round(width * ratio)
+        height = Math.round(height * ratio)
+      }
+      canvas.width = width
+      canvas.height = height
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
 
 export default function NewDefectReportPage() {
   const navigate = useNavigate()
@@ -42,9 +70,10 @@ export default function NewDefectReportPage() {
   const [assetSearch, setAssetSearch] = useState('')
   const [showAssetDropdown, setShowAssetDropdown] = useState(false)
 
-  // Mock Photo States
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  // Estados da foto do defeito
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null)
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false)
 
   // Estados de Submissão
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -95,17 +124,29 @@ export default function NewDefectReportPage() {
   }, [assets, assetSearch])
 
   // ── Handlers de Foto ───────────────────────────────────────────────────────
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null
     if (photoPreview) URL.revokeObjectURL(photoPreview)
-    setPhotoFile(file)
     setPhotoPreview(file ? URL.createObjectURL(file) : null)
+    setPhotoBase64(null)
+
+    if (file) {
+      setIsCompressingPhoto(true)
+      try {
+        const compressed = await compressImage(file)
+        setPhotoBase64(compressed)
+      } catch (err) {
+        console.error('Erro ao comprimir foto do defeito:', err)
+      } finally {
+        setIsCompressingPhoto(false)
+      }
+    }
   };
 
   const handleRemovePhoto = () => {
     if (photoPreview) URL.revokeObjectURL(photoPreview)
-    setPhotoFile(null)
     setPhotoPreview(null)
+    setPhotoBase64(null)
   };
 
   // ── Handlers do Form ───────────────────────────────────────────────────────
@@ -129,16 +170,11 @@ export default function NewDefectReportPage() {
     setIsSubmitting(true)
     setSubmitError(null)
 
-    // Se houver arquivo de foto, geramos um URL mock para o backend (já que o backend recebe defectPhotoUrl como string)
-    const defectPhotoUrl = photoFile
-      ? `https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop`
-      : undefined
-
     try {
       const res = await assetsApi.reportDefect({
         assetId: selectedAsset.id,
         issueDescription: issueDescription.trim(),
-        defectPhotoUrl,
+        defectPhotoUrl: photoBase64 ?? undefined,
       })
       setSuccessLog({
         ...res.maintenanceLog,
@@ -193,12 +229,12 @@ export default function NewDefectReportPage() {
                 {successLog.issueDescription}
               </span>
             </div>
-            {photoPreview && (
+            {successLog.defectPhotoUrl && (
               <div>
                 <span className="block text-xs font-semibold text-gray-400 mb-1">FOTO DO DEFEITO ANEXADA</span>
                 <img
-                  src={photoPreview}
-                  alt="Pré-visualização do Defeito"
+                  src={successLog.defectPhotoUrl}
+                  alt="Foto do Defeito"
                   className="w-full h-32 object-cover rounded-lg border border-gray-200"
                 />
               </div>
@@ -206,13 +242,33 @@ export default function NewDefectReportPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={() =>
+                generateDefectReportPdf({
+                  assetTag: successLog.asset?.assetTag ?? '',
+                  description: successLog.asset?.description ?? '',
+                  brand: successLog.asset?.brand,
+                  model: successLog.asset?.model,
+                  serialNumber: successLog.asset?.serialNumber,
+                  location: successLog.asset?.location,
+                  issueDescription: successLog.issueDescription,
+                  reportedAt: successLog.reportedAt ?? new Date(),
+                  photoDataUrl: successLog.defectPhotoUrl,
+                }).catch((err) => console.error('Erro ao gerar PDF:', err))
+              }
+              variant="outline"
+              className="flex-1"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Gerar PDF
+            </Button>
             <Button onClick={handleResetSuccess} className="flex-1">
               Relatar Outro Defeito
             </Button>
-            <Button onClick={() => navigate('/assets/catalog')} variant="outline" className="flex-1">
-              Voltar ao Catálogo
-            </Button>
           </div>
+          <Button onClick={() => navigate('/assets/catalog')} variant="ghost" className="w-full mt-3">
+            Voltar ao Catálogo
+          </Button>
         </Card>
       </div>
     )
@@ -484,12 +540,17 @@ export default function NewDefectReportPage() {
               <Button
                 type="submit"
                 className="w-full mt-2"
-                disabled={!selectedAsset || issueDescription.trim().length < 10 || isSubmitting}
+                disabled={!selectedAsset || issueDescription.trim().length < 10 || isSubmitting || isCompressingPhoto}
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
                     Enviando Relato...
+                  </>
+                ) : isCompressingPhoto ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Processando foto...
                   </>
                 ) : (
                   'Abrir Chamado de Avaria'

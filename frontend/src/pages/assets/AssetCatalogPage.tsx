@@ -15,6 +15,7 @@ import {
   Tag,
   Loader2,
   Plus,
+  Download,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge, ASSET_STATUS_BADGE } from '@/components/ui/badge'
@@ -29,6 +30,10 @@ import {
   type Asset,
   type AssetStatus,
 } from '@/data/mockData'
+
+// Import dinâmico: pdf-lib só é baixado quando o usuário realmente gera um PDF.
+const generateDefectReportPdf: typeof import('@/lib/defectReportPdf').generateDefectReportPdf = (input) =>
+  import('@/lib/defectReportPdf').then((mod) => mod.generateDefectReportPdf(input))
 
 // ── Ícone por categoria ─────────────────────────────────────────────────────
 // Categorias agora são dinâmicas (cadastradas pelo gestor), então não há mais
@@ -45,13 +50,16 @@ const DEFAULT_CATEGORY_COLOR = 'bg-gray-100 text-gray-600'
 interface DefectReportModalProps {
   asset: Asset | null
   onClose: () => void
-  onSubmit: (assetId: string, description: string, photo: File | null) => Promise<void>
+  onSubmit: (assetId: string, description: string, photoDataUrl: string | null) => Promise<any>
 }
 
 function DefectReportModal({ asset, onClose, onSubmit }: DefectReportModalProps) {
   const [description, setDescription] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null)
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false)
+  const [createdLog, setCreatedLog] = useState<any | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -63,6 +71,8 @@ function DefectReportModal({ asset, onClose, onSubmit }: DefectReportModalProps)
       setDescription('')
       setPhotoFile(null)
       setPhotoPreview(null)
+      setPhotoBase64(null)
+      setCreatedLog(null)
       setError('')
       setSubmitted(false)
       setIsSubmitting(false)
@@ -77,11 +87,24 @@ function DefectReportModal({ asset, onClose, onSubmit }: DefectReportModalProps)
   }, [photoPreview])
 
   const handlePhotoChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0] ?? null
       if (photoPreview) URL.revokeObjectURL(photoPreview)
       setPhotoFile(file)
       setPhotoPreview(file ? URL.createObjectURL(file) : null)
+      setPhotoBase64(null)
+
+      if (file) {
+        setIsCompressingPhoto(true)
+        try {
+          const compressed = await compressImage(file, 1000, 1000, 0.7)
+          setPhotoBase64(compressed)
+        } catch (err) {
+          console.error('Erro ao comprimir foto do defeito:', err)
+        } finally {
+          setIsCompressingPhoto(false)
+        }
+      }
     },
     [photoPreview],
   )
@@ -90,6 +113,7 @@ function DefectReportModal({ asset, onClose, onSubmit }: DefectReportModalProps)
     if (photoPreview) URL.revokeObjectURL(photoPreview)
     setPhotoFile(null)
     setPhotoPreview(null)
+    setPhotoBase64(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }, [photoPreview])
 
@@ -102,7 +126,8 @@ function DefectReportModal({ asset, onClose, onSubmit }: DefectReportModalProps)
     setError('')
     setIsSubmitting(true)
     try {
-      await onSubmit(asset.id, description.trim(), photoFile)
+      const log = await onSubmit(asset.id, description.trim(), photoBase64)
+      setCreatedLog(log)
       setSubmitted(true)
     } catch {
       setError('Erro ao enviar o relato. Tente novamente.')
@@ -136,9 +161,32 @@ function DefectReportModal({ asset, onClose, onSubmit }: DefectReportModalProps)
           <p className="text-xs text-gray-400 mb-6">
             Um chamado foi aberto e o gestor responsável será notificado.
           </p>
-          <Button size="lg" className="w-full" onClick={onClose}>
-            Fechar
-          </Button>
+          <div className="flex flex-col gap-2.5">
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full"
+              onClick={() =>
+                generateDefectReportPdf({
+                  assetTag: asset.assetTag,
+                  description: asset.description,
+                  brand: asset.brand,
+                  model: asset.model,
+                  serialNumber: asset.serialNumber,
+                  location: asset.location,
+                  issueDescription: createdLog?.issueDescription ?? description,
+                  reportedAt: createdLog?.reportedAt ?? new Date(),
+                  photoDataUrl: createdLog?.defectPhotoUrl ?? photoBase64,
+                }).catch((err) => console.error('Erro ao gerar PDF:', err))
+              }
+            >
+              <Download size={18} />
+              Gerar PDF
+            </Button>
+            <Button size="lg" className="w-full" onClick={onClose}>
+              Fechar
+            </Button>
+          </div>
         </div>
       ) : (
         // ── Formulário ──
@@ -262,12 +310,17 @@ function DefectReportModal({ asset, onClose, onSubmit }: DefectReportModalProps)
             size="lg"
             className="w-full font-bold shadow-lg shadow-brand-accent/20"
             onClick={handleSubmit}
-            disabled={isSubmitting || description.trim().length < 10}
+            disabled={isSubmitting || isCompressingPhoto || description.trim().length < 10}
           >
             {isSubmitting ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
                 Enviando relato...
+              </>
+            ) : isCompressingPhoto ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Processando foto...
               </>
             ) : (
               <>
@@ -870,13 +923,15 @@ export default function AssetCatalogPage() {
   }, [assets, search, statusFilter])
 
   const handleDefectSubmit = useCallback(
-    async (assetId: string, description: string, _photo: File | null) => {
+    async (assetId: string, description: string, photoDataUrl: string | null) => {
       // Registrar a avaria real no banco
-      await assetsApi.reportDefect({
+      const res = await assetsApi.reportDefect({
         assetId,
         issueDescription: description,
+        defectPhotoUrl: photoDataUrl ?? undefined,
       })
       await fetchAssets()
+      return res.maintenanceLog
     },
     [fetchAssets],
   )

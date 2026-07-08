@@ -35,10 +35,10 @@ export const createMaintenanceLogBodySchema = z.object({
     .max(2000)
     .trim(),
 
-  /** URL ou path relativo gerado pelo serviço de upload (S3, Firebase Storage, etc.) */
+  /** Data URL (base64) da foto comprimida no navegador, mesmo padrão dos demais campos de foto do módulo. */
   defectPhotoUrl: z
     .string()
-    .url('defectPhotoUrl deve ser uma URL válida.')
+    .trim()
     .optional(),
 })
 
