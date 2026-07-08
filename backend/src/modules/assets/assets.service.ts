@@ -101,6 +101,45 @@ const assetBaseSelect = {
   photoUrl: true,
 } as const
 
+/** Achata o registro de bem patrimonial (com relação `category`/`loans` opcionais) para o formato exposto pela API. */
+function mapAssetToResponse(asset: {
+  id: string
+  assetTag: string
+  description: string
+  categoryId: string | null
+  category?: { name: string } | null
+  legacyCategory: string | null
+  brand: string | null
+  model: string | null
+  serialNumber: string | null
+  currentStatus: string
+  location: string | null
+  acquisitionDate: Date | null
+  acquisitionValue: unknown
+  notes: string | null
+  photoUrl: string | null
+  loans?: { id: string; borrowerEmployee?: { fullName: string } | null }[]
+}) {
+  return {
+    id: asset.id,
+    assetTag: asset.assetTag,
+    description: asset.description,
+    categoryId: asset.categoryId,
+    category: asset.category?.name ?? asset.legacyCategory ?? 'Outros',
+    brand: asset.brand,
+    model: asset.model,
+    serialNumber: asset.serialNumber,
+    currentStatus: asset.currentStatus,
+    location: asset.location,
+    acquisitionDate: asset.acquisitionDate ? asset.acquisitionDate.toISOString().split('T')[0] : null,
+    acquisitionValue: asset.acquisitionValue !== null && asset.acquisitionValue !== undefined ? Number(asset.acquisitionValue as number) : null,
+    notes: asset.notes,
+    photoUrl: asset.photoUrl,
+    currentBorrowee: asset.loans?.[0]?.borrowerEmployee?.fullName ?? null,
+    activeLoanId: asset.loans?.[0]?.id ?? null,
+  }
+}
+
 // ── Service ───────────────────────────────────────────────────────────────────
 
 export const assetsService = {
@@ -121,24 +160,7 @@ export const assetsService = {
       orderBy: { createdAt: 'desc' }
     })
 
-    return assets.map((asset) => ({
-      id: asset.id,
-      assetTag: asset.assetTag,
-      description: asset.description,
-      categoryId: asset.categoryId,
-      category: asset.category?.name ?? asset.legacyCategory ?? 'Outros',
-      brand: asset.brand,
-      model: asset.model,
-      serialNumber: asset.serialNumber,
-      currentStatus: asset.currentStatus,
-      location: asset.location,
-      acquisitionDate: asset.acquisitionDate ? asset.acquisitionDate.toISOString().split('T')[0] : null,
-      acquisitionValue: asset.acquisitionValue ? Number(asset.acquisitionValue) : null,
-      notes: asset.notes,
-      photoUrl: asset.photoUrl,
-      currentBorrowee: asset.loans[0]?.borrowerEmployee?.fullName ?? null,
-      activeLoanId: asset.loans[0]?.id ?? null,
-    }))
+    return assets.map(mapAssetToResponse)
   },
 
   // ── POST /assets ──────────────────────────────────────────────────────────
@@ -170,7 +192,7 @@ export const assetsService = {
     }
 
     // 4. Criar e persistir o bem patrimonial
-    return prisma.asset.create({
+    const created = await prisma.asset.create({
       data: {
         assetTag: body.assetTag,
         description: body.description,
@@ -189,6 +211,8 @@ export const assetsService = {
         category: true
       }
     })
+
+    return mapAssetToResponse(created)
   },
 
   // ── POST /assets/loans (legado) ───────────────────────────────────────────

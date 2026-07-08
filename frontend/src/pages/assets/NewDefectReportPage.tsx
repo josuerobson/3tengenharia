@@ -25,7 +25,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge, ASSET_STATUS_BADGE } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
 import { assetsApi } from '@/lib/api'
-import { ASSET_CATEGORY_LABELS, type Asset } from '@/data/mockData'
+import { type Asset } from '@/data/mockData'
 
 export default function NewDefectReportPage() {
   const navigate = useNavigate()
@@ -273,7 +273,7 @@ export default function NewDefectReportPage() {
                           <span className="text-sm font-bold text-gray-900">{selectedAsset.assetTag}</span>
                           <span className="text-xs text-gray-400">•</span>
                           <span className="text-xs font-semibold text-gray-500">
-                            {ASSET_CATEGORY_LABELS[selectedAsset.category] ?? selectedAsset.category}
+                            {selectedAsset.category}
                           </span>
                         </div>
                         <p className="text-sm text-gray-600 font-medium mt-0.5">{selectedAsset.description}</p>

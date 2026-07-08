@@ -7,12 +7,6 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import {
   Package,
   Search,
-  Wrench,
-  Zap,
-  Ruler,
-  Shield,
-  Wind,
-  BarChart2,
   AlertCircle,
   Camera,
   X,
@@ -30,41 +24,21 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
-import { assetsApi } from '@/lib/api'
+import { assetsApi, type AssetCategory as DynamicAssetCategory } from '@/lib/api'
 import {
-  ASSET_CATEGORY_LABELS,
   type Asset,
-  type AssetCategory,
   type AssetStatus,
 } from '@/data/mockData'
 
-// ── Ícone por categoria ───────────────────────────────────────────────────────
+// ── Ícone por categoria ─────────────────────────────────────────────────────
+// Categorias agora são dinâmicas (cadastradas pelo gestor), então não há mais
+// um mapeamento fixo código→ícone/cor. Usa-se um fallback genérico para todas.
 
-function CategoryIcon({ category, size = 20 }: { category: AssetCategory; size?: number }) {
-  const icons: Record<AssetCategory, React.ElementType> = {
-    POWER_TOOLS: Wrench,
-    HAND_TOOLS: Wrench,
-    MEASUREMENT: Ruler,
-    SAFETY: Shield,
-    PNEUMATIC: Wind,
-    LIFTING: BarChart2,
-    ELECTRICAL: Zap,
-    OTHER: Package,
-  }
-  const Icon = icons[category] ?? Package
-  return <Icon size={size} />
+function CategoryIcon({ size = 20 }: { category: string; size?: number }) {
+  return <Package size={size} />
 }
 
-const CATEGORY_COLORS: Record<AssetCategory, string> = {
-  POWER_TOOLS: 'bg-blue-100 text-blue-600',
-  HAND_TOOLS:  'bg-teal-100 text-teal-600',
-  MEASUREMENT: 'bg-purple-100 text-purple-600',
-  SAFETY:      'bg-emerald-100 text-emerald-600',
-  PNEUMATIC:   'bg-cyan-100 text-cyan-600',
-  LIFTING:     'bg-orange-100 text-orange-600',
-  ELECTRICAL:  'bg-yellow-100 text-yellow-600',
-  OTHER:       'bg-gray-100 text-gray-600',
-}
+const DEFAULT_CATEGORY_COLOR = 'bg-gray-100 text-gray-600'
 
 // ── Modal de Relato de Defeito ────────────────────────────────────────────────
 
@@ -174,7 +148,7 @@ function DefectReportModal({ asset, onClose, onSubmit }: DefectReportModalProps)
             <div
               className={cn(
                 'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
-                CATEGORY_COLORS[asset.category],
+                DEFAULT_CATEGORY_COLOR,
               )}
             >
               <CategoryIcon category={asset.category} size={18} />
@@ -316,7 +290,7 @@ interface NewAssetModalProps {
   onSubmit: (data: {
     assetTag: string
     description: string
-    category: string
+    categoryId: string
     brand?: string | null
     model?: string | null
     serialNumber?: string | null
@@ -374,7 +348,8 @@ function compressImage(file: File, maxWidth = 800, maxHeight = 800, quality = 0.
 function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
   const [assetTag, setAssetTag] = useState('')
   const [description, setDescription] = useState('')
-  const [category, setCategory] = useState<AssetCategory>('POWER_TOOLS')
+  const [categories, setCategories] = useState<DynamicAssetCategory[]>([])
+  const [categoryId, setCategoryId] = useState('')
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
   const [serialNumber, setSerialNumber] = useState('')
@@ -390,12 +365,12 @@ function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoBase64, setPhotoBase64] = useState<string | null>(null)
 
-  // Limpa state ao abrir/fechar
+  // Limpa state ao abrir/fechar e carrega categorias dinâmicas
   useEffect(() => {
     if (open) {
       setAssetTag('')
       setDescription('')
-      setCategory('POWER_TOOLS')
+      setCategoryId('')
       setBrand('')
       setModel('')
       setSerialNumber('')
@@ -407,6 +382,15 @@ function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
       setPhotoBase64(null)
       setError('')
       setIsSubmitting(false)
+
+      assetsApi
+        .listCategories()
+        .then((cats) => {
+          const active = cats.filter((c) => c.isActive)
+          setCategories(active)
+          setCategoryId((current) => current || active[0]?.id || '')
+        })
+        .catch((err) => console.error('Erro ao carregar categorias:', err))
     } else {
       if (photoPreview) URL.revokeObjectURL(photoPreview)
     }
@@ -450,7 +434,7 @@ function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
       setError('Descrição é obrigatória.')
       return
     }
-    if (!category) {
+    if (!categoryId) {
       setError('Categoria é obrigatória.')
       return
     }
@@ -461,7 +445,7 @@ function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
       await onSubmit({
         assetTag: assetTag.trim(),
         description: description.trim(),
-        category,
+        categoryId,
         brand: brand.trim() || null,
         model: model.trim() || null,
         serialNumber: serialNumber.trim() || null,
@@ -515,14 +499,15 @@ function NewAssetModal({ open, onClose, onSubmit }: NewAssetModalProps) {
             </Label>
             <select
               id="category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value as AssetCategory)}
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
               className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
               required
             >
-              {Object.entries(ASSET_CATEGORY_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
+              {categories.length === 0 && <option value="">Nenhuma categoria cadastrada</option>}
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
                 </option>
               ))}
             </select>
@@ -714,7 +699,7 @@ function AssetCard({ asset, onReportDefect }: AssetCardProps) {
           <div
             className={cn(
               'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
-              CATEGORY_COLORS[asset.category],
+              DEFAULT_CATEGORY_COLOR,
             )}
           >
             <CategoryIcon category={asset.category} size={18} />
@@ -727,7 +712,7 @@ function AssetCard({ asset, onReportDefect }: AssetCardProps) {
               </p>
             </div>
             <p className="text-xs text-gray-400 mt-0.5 truncate">
-              {ASSET_CATEGORY_LABELS[asset.category]}
+              {asset.category}
             </p>
           </div>
         </div>

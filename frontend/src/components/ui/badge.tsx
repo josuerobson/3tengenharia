@@ -72,6 +72,7 @@ export const ASSET_STATUS_BADGE: Record<
 > = {
   AVAILABLE:   { variant: 'available',   label: 'Disponível' },
   LOANED:      { variant: 'loaned',      label: 'Emprestado' },
+  RETURNING:   { variant: 'high',        label: 'Em Devolução' },
   MAINTENANCE: { variant: 'maintenance', label: 'Manutenção' },
   DAMAGED:     { variant: 'damaged',     label: 'Danificado' },
   WRITTEN_OFF: { variant: 'written-off', label: 'Baixado' },

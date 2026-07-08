@@ -2,7 +2,7 @@
 // Dados fictícios para desenvolvimento — substituir por chamadas à API real na Etapa 6.
 
 export type VehicleStatus = 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE'
-export type AssetStatus = 'AVAILABLE' | 'LOANED' | 'MAINTENANCE' | 'DAMAGED' | 'WRITTEN_OFF'
+export type AssetStatus = 'AVAILABLE' | 'LOANED' | 'RETURNING' | 'MAINTENANCE' | 'DAMAGED' | 'WRITTEN_OFF'
 export type ShiftType = 'REGULAR' | 'OVERTIME' | 'ON_CALL' | 'ABSENCE' | 'VACATION' | 'HOLIDAY'
 
 // ── Veículos ─────────────────────────────────────────────────────────────────
@@ -236,7 +236,8 @@ export interface Asset {
   id: string
   assetTag: string
   description: string
-  category: AssetCategory
+  /** Nome legível da categoria, resolvido pelo backend (categoria dinâmica ou legado) — não é mais o código estático `AssetCategory`. */
+  category: string
   categoryId?: string | null
   categoryData?: { id: string; name: string; isActive: boolean } | null
   brand: string | null
