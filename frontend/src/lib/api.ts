@@ -58,6 +58,10 @@ export interface AssetLoanRequest {
   hasDamage: boolean | null
   returnedAt: string | null
   validationNotes: string | null
+  validationPhoto1: string | null
+  validationPhoto2: string | null
+  validationPhoto3: string | null
+  validationPhoto4: string | null
   validatedAt: string | null
   validatedByUserId: string | null
   validationStatus: 'OK' | 'OK_WITH_DAMAGE' | 'DEFECTIVE' | null
@@ -603,6 +607,10 @@ export const assetsApi = {
     requestId: string,
     data: {
       validationNotes?: string | null
+      validationPhoto1?: string | null
+      validationPhoto2?: string | null
+      validationPhoto3?: string | null
+      validationPhoto4?: string | null
       validationStatus: 'OK' | 'OK_WITH_DAMAGE' | 'DEFECTIVE'
     }
   ): Promise<{ message: string; loanRequest: AssetLoanRequest }> {

@@ -668,6 +668,10 @@ export const assetsService = {
       data: {
         status: 'RETURNED',
         validationNotes: body.validationNotes ?? null,
+        validationPhoto1: body.validationPhoto1 ?? null,
+        validationPhoto2: body.validationPhoto2 ?? null,
+        validationPhoto3: body.validationPhoto3 ?? null,
+        validationPhoto4: body.validationPhoto4 ?? null,
         validatedAt: new Date(),
         validatedByUserId,
         validationStatus: body.validationStatus
@@ -706,7 +710,7 @@ export const assetsService = {
           isReturned: true,
           returnedAt: new Date(),
           returnNotes: body.validationNotes ?? `Validado via Solicitação: ${body.validationStatus}`,
-          returnPhotoUrl: request.returnPhoto1
+          returnPhotoUrl: body.validationPhoto1 ?? request.returnPhoto1
         }
       })
     }
@@ -717,7 +721,7 @@ export const assetsService = {
         data: {
           assetId: request.allocatedAssetId,
           issueDescription: body.validationNotes ?? `Identificado no recebimento da devolução: ${body.validationStatus}`,
-          defectPhotoUrl: request.returnPhoto1 ?? null,
+          defectPhotoUrl: body.validationPhoto1 ?? request.returnPhoto1 ?? null,
           reportedByUserId: validatedByUserId,
           reportedAt: new Date(),
           maintenanceStatus: body.validationStatus === 'DEFECTIVE' ? 'OPEN' : 'RESOLVED',

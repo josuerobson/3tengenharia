@@ -686,6 +686,10 @@ model AssetLoanRequest {
 
   // Validação da devolução pelo gestor
   validationNotes   String?                 @map("validation_notes") @db.Text
+  validationPhoto1  String?                 @map("validation_photo_1") @db.Text // Fotos do bem tiradas pelo gestor ao dar baixa
+  validationPhoto2  String?                 @map("validation_photo_2") @db.Text
+  validationPhoto3  String?                 @map("validation_photo_3") @db.Text
+  validationPhoto4  String?                 @map("validation_photo_4") @db.Text
   validatedAt       DateTime?               @map("validated_at")
   validatedByUserId String?                 @map("validated_by_user_id")
   validatedByUser   User?                   @relation("RequestValidatedBy", fields: [validatedByUserId], references: [id], onDelete: SetNull)

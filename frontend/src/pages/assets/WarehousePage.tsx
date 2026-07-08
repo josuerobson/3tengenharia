@@ -130,6 +130,7 @@ export default function WarehousePage() {
   const [validateModalOpen, setValidateModalOpen] = useState(false)
   const [selectedRequestForValidation, setSelectedRequestForValidation] = useState<AssetLoanRequest | null>(null)
   const [validationNotes, setValidationNotes] = useState('')
+  const [validationPhotos, setValidationPhotos] = useState<string[]>([])
   const [validationStatus, setValidationStatus] = useState<'OK' | 'OK_WITH_DAMAGE' | 'DEFECTIVE'>('OK')
   const [validationSubmitting, setValidationSubmitting] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
@@ -535,9 +536,31 @@ export default function WarehousePage() {
   const handleOpenValidateModal = (req: AssetLoanRequest) => {
     setSelectedRequestForValidation(req)
     setValidationNotes('')
+    setValidationPhotos([])
     setValidationStatus('OK')
     setValidationError(null)
     setValidateModalOpen(true)
+  }
+
+  const handleValidationPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const base64Photos: string[] = []
+    for (let i = 0; i < files.length; i++) {
+      if (base64Photos.length + validationPhotos.length >= 4) break
+      try {
+        const compressed = await compressImage(files[i], 800, 800, 0.6)
+        base64Photos.push(compressed)
+      } catch (err) {
+        console.error('Erro ao comprimir foto de baixa:', err)
+      }
+    }
+    setValidationPhotos((prev) => [...prev, ...base64Photos].slice(0, 4))
+  }
+
+  const handleRemoveValidationPhoto = (index: number) => {
+    setValidationPhotos((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleValidateReturn = async (e: React.FormEvent) => {
@@ -550,7 +573,11 @@ export default function WarehousePage() {
     try {
       await assetsApi.validateReturn(selectedRequestForValidation.id, {
         validationStatus,
-        validationNotes: validationNotes.trim() || null
+        validationNotes: validationNotes.trim() || null,
+        validationPhoto1: validationPhotos[0] || null,
+        validationPhoto2: validationPhotos[1] || null,
+        validationPhoto3: validationPhotos[2] || null,
+        validationPhoto4: validationPhotos[3] || null
       })
       setValidateModalOpen(false)
       loadAssets()
@@ -1852,6 +1879,41 @@ export default function WarehousePage() {
               )}
             </div>
           )}
+
+          <div>
+            <Label>Fotos do Bem na Baixa (até 4)</Label>
+            <p className="text-xs text-gray-400 mt-0.5 mb-1.5">
+              Fotos tiradas pelo almoxarifado no recebimento, para registrar o estado físico do bem.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {validationPhotos.map((photo, idx) => (
+                <div key={idx} className="relative w-20 h-20 rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+                  <img src={photo} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveValidationPhoto(idx)}
+                    className="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {validationPhotos.length < 4 && (
+                <label className="w-20 h-20 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
+                  <Camera className="w-5 h-5 text-gray-400 mb-1" />
+                  <span className="text-[10px] text-gray-400">Foto</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleValidationPhotoChange}
+                  />
+                </label>
+              )}
+            </div>
+          </div>
 
           <div>
             <Label>Resultado da Inspeção Física</Label>

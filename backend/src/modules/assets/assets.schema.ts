@@ -161,6 +161,10 @@ export type ReturnAssetLoanRequestBody = z.infer<
 
 export const validateReturnAssetLoanRequestBodySchema = z.object({
   validationNotes: z.string().trim().max(1000).optional().nullable(),
+  validationPhoto1: z.string().optional().nullable(),
+  validationPhoto2: z.string().optional().nullable(),
+  validationPhoto3: z.string().optional().nullable(),
+  validationPhoto4: z.string().optional().nullable(),
   validationStatus: z.enum(['OK', 'OK_WITH_DAMAGE', 'DEFECTIVE'], {
     required_error: 'Status de validação é obrigatório.',
   }),
