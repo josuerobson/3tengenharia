@@ -159,4 +159,28 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
     },
     controller.createIncident,
   )
+
+  // ── POST /vehicles/trips/:id/fuel-records ────────────────────────────────────
+  app.post(
+    '/trips/:id/fuel-records',
+    {
+      onRequest: [app.authenticate],
+      schema: schema({
+        tags: ['Vehicles'], summary: 'Registrar abastecimento na viagem', security: [{ bearerAuth: [] }],
+        params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+        body: {
+          type: 'object',
+          required: ['odometerKm', 'liters', 'totalAmount', 'odometerPhoto', 'receiptPhoto'],
+          properties: {
+            odometerKm:    { type: 'number' },
+            liters:        { type: 'number' },
+            totalAmount:   { type: 'number' },
+            odometerPhoto: { type: 'string' },
+            receiptPhoto:  { type: 'string' },
+          },
+        },
+      }),
+    },
+    controller.createFuelRecord,
+  )
 }

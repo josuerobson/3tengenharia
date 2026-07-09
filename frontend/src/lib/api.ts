@@ -217,6 +217,7 @@ export interface ApiTrip {
     name: string
   } | null
   incidents: ApiTripIncident[]
+  fuelRecords: ApiFuelRecord[]
 }
 
 export interface ApiTripIncident {
@@ -225,6 +226,17 @@ export interface ApiTripIncident {
   description: string
   location: string
   photos: string[]
+  createdAt: string
+}
+
+export interface ApiFuelRecord {
+  id: string
+  tripId: string
+  odometerKm: number
+  liters: number
+  totalAmount: number
+  odometerPhoto: string
+  receiptPhoto: string
   createdAt: string
 }
 
@@ -308,6 +320,16 @@ export const tripsApi = {
     photos?: string[]
   }): Promise<{ message: string; incident: ApiTripIncident }> {
     return request(`/vehicles/trips/${tripId}/incidents`, { method: 'POST', body: JSON.stringify(data) })
+  },
+
+  createFuelRecord(tripId: string, data: {
+    odometerKm: number
+    liters: number
+    totalAmount: number
+    odometerPhoto: string
+    receiptPhoto: string
+  }): Promise<{ message: string; fuelRecord: ApiFuelRecord }> {
+    return request(`/vehicles/trips/${tripId}/fuel-records`, { method: 'POST', body: JSON.stringify(data) })
   },
 }
 

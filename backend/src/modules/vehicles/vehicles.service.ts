@@ -8,6 +8,7 @@ import type {
   EndTripBody,
   MaintenanceAlert,
 } from './vehicles.schema.js'
+import type { CreateFuelRecordBody } from './fuelRecords.schema.js'
 
 // ── Erros de domínio tipados ──────────────────────────────────────────────────
 
@@ -490,6 +491,18 @@ export const vehiclesService = {
             },
             orderBy: { createdAt: 'desc' },
           },
+          fuelRecords: {
+            select: {
+              id:            true,
+              odometerKm:    true,
+              liters:        true,
+              totalAmount:   true,
+              odometerPhoto: true,
+              receiptPhoto:  true,
+              createdAt:     true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
           vehicle: {
             select: {
               id:           true,
@@ -511,7 +524,17 @@ export const vehiclesService = {
         },
       }),
     ])
-    return { trips, total }
+    return {
+      trips: trips.map((trip) => ({
+        ...trip,
+        fuelRecords: trip.fuelRecords.map((fr) => ({
+          ...fr,
+          liters: Number(fr.liters),
+          totalAmount: Number(fr.totalAmount),
+        })),
+      })),
+      total,
+    }
   },
 
   async listAll() {
@@ -609,5 +632,29 @@ export const vehiclesService = {
         photos: body.photos ?? [],
       },
     })
+  },
+
+  async createFuelRecord(tripId: string, body: CreateFuelRecordBody) {
+    const trip = await prisma.vehicleTrip.findUnique({
+      where: { id: tripId },
+    })
+    if (!trip) {
+      throw new TripNotFoundError(tripId)
+    }
+    const fuelRecord = await prisma.tripFuelRecord.create({
+      data: {
+        tripId,
+        odometerKm: body.odometerKm,
+        liters: body.liters,
+        totalAmount: body.totalAmount,
+        odometerPhoto: body.odometerPhoto,
+        receiptPhoto: body.receiptPhoto,
+      },
+    })
+    return {
+      ...fuelRecord,
+      liters: Number(fuelRecord.liters),
+      totalAmount: Number(fuelRecord.totalAmount),
+    }
   },
 }

@@ -7,6 +7,7 @@ import {
   endTripBodySchema,
 } from './vehicles.schema.js'
 import { createIncidentBodySchema } from './tripIncidents.schema.js'
+import { createFuelRecordBodySchema } from './fuelRecords.schema.js'
 import {
   vehiclesService,
   VehicleNotFoundError,
@@ -158,6 +159,21 @@ export function vehiclesController(_app: FastifyInstance) {
         return reply.status(201).send({
           message: 'Sinistro registrado com sucesso.',
           incident,
+        })
+      } catch (err) {
+        return rethrowDomain(err)
+      }
+    },
+
+    // ── POST /vehicles/trips/:id/fuel-records (createFuelRecord) ──────────────
+    async createFuelRecord(request: FastifyRequest, reply: FastifyReply) {
+      const { id: tripId } = request.params as { id: string }
+      try {
+        const body = createFuelRecordBodySchema.parse(request.body)
+        const fuelRecord = await vehiclesService.createFuelRecord(tripId, body)
+        return reply.status(201).send({
+          message: 'Abastecimento registrado com sucesso.',
+          fuelRecord,
         })
       } catch (err) {
         return rethrowDomain(err)

@@ -23,6 +23,7 @@ import {
   User,
   Camera,
   Trash2,
+  Fuel,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -37,6 +38,7 @@ import {
 } from '@/data/mockData'
 import { vehiclesApi, tripsApi, assetsApi, authApi, maintenanceApi, type ApiVehicle, type ApiTrip, type ApiEmployee, type ApiWorksite, type ApiMaintenanceAlert } from '@/lib/api'
 import IncidentReportModal from '@/components/vehicles/IncidentReportModal'
+import FuelRecordModal from '@/components/vehicles/FuelRecordModal'
 
 // Usa ApiVehicle como tipo Vehicle para este componente
 type Vehicle = ApiVehicle
@@ -385,6 +387,7 @@ export default function TripStartPage() {
   const [loadingVehicles, setLoadingVehicles] = useState(true)
   const [apiError, setApiError]               = useState<string | null>(null)
   const [incidentTrip, setIncidentTrip]       = useState<ApiTrip | null>(null)
+  const [fuelRecordTrip, setFuelRecordTrip]   = useState<ApiTrip | null>(null)
   const [allMaintenanceAlerts, setAllMaintenanceAlerts] = useState<ApiMaintenanceAlert[]>([])
 
   // ── Trip ID salvo após startTrip (para encerrar no passo 2) ────────────
@@ -912,7 +915,15 @@ export default function TripStartPage() {
                     Início: {new Date(trip.departureDateTime).toLocaleDateString('pt-BR')} às {new Date(trip.departureDateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
-                <div className="flex gap-2 sm:self-center">
+                <div className="flex flex-wrap gap-2 sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => setFuelRecordTrip(trip)}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-all shadow-sm flex-shrink-0"
+                  >
+                    <Fuel size={13} />
+                    Registro de Abastecimento
+                  </button>
                   <button
                     type="button"
                     onClick={() => setIncidentTrip(trip)}
@@ -1388,6 +1399,22 @@ export default function TripStartPage() {
                 type="button"
                 onClick={() => {
                   if (activeTripId && departureData) {
+                    setFuelRecordTrip({
+                      id: activeTripId,
+                      vehicle: departureData.vehicle,
+                    } as unknown as ApiTrip)
+                  }
+                }}
+                className="w-full h-12 border border-emerald-200 hover:bg-emerald-50 text-emerald-700 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.99]"
+              >
+                <Fuel size={15} />
+                Registro de Abastecimento
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeTripId && departureData) {
                     setIncidentTrip({
                       id: activeTripId,
                       vehicle: departureData.vehicle,
@@ -1435,6 +1462,19 @@ export default function TripStartPage() {
           onClose={() => setIncidentTrip(null)}
           onSuccess={() => {
             setIncidentTrip(null)
+            void fetchData()
+          }}
+        />
+      )}
+      {/* Modal de Registro de Abastecimento */}
+      {fuelRecordTrip && (
+        <FuelRecordModal
+          tripId={fuelRecordTrip.id}
+          vehiclePlate={fuelRecordTrip.vehicle.licensePlate}
+          vehicleModel={fuelRecordTrip.vehicle.model}
+          onClose={() => setFuelRecordTrip(null)}
+          onSuccess={() => {
+            setFuelRecordTrip(null)
             void fetchData()
           }}
         />
