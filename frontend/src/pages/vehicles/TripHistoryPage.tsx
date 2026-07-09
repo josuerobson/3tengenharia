@@ -9,6 +9,7 @@ import {
   AlertTriangle, CheckCircle2, TrendingUp, Car,
   Navigation, Route, ArrowRight, Eye, RefreshCw,
   ExternalLink, FileText, Camera, ChevronLeft, ChevronRight,
+  Fuel,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { tripsApi, type ApiTrip, type ApiTripIncident } from '@/lib/api'
@@ -433,6 +434,56 @@ function TripDetailModal({
                           ))}
                         </div>
                       )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Abastecimentos Registrados */}
+          {trip.fuelRecords && trip.fuelRecords.length > 0 && (
+            <div className="space-y-3 pt-1">
+              <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
+                <Fuel size={14} className="text-emerald-600" />
+                Abastecimentos Registrados ({trip.fuelRecords.length})
+              </p>
+              <div className="space-y-2.5">
+                {trip.fuelRecords.map((fr) => {
+                  const dt = formatDateTime(fr.createdAt)
+                  return (
+                    <div
+                      key={fr.id}
+                      className="p-3.5 bg-emerald-50/30 border border-emerald-100 rounded-2xl text-left space-y-2"
+                    >
+                      <div className="flex items-center justify-between text-xs text-emerald-700 font-semibold">
+                        <span className="flex items-center gap-1">
+                          <Gauge size={11} /> {fr.odometerKm.toLocaleString('pt-BR')} km
+                        </span>
+                        <span className="flex-shrink-0">{dt.date} às {dt.time}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-gray-700">
+                        <span>{fr.liters.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} L</span>
+                        <span className="font-bold text-gray-900">
+                          {fr.totalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => onZoomPhoto(fr.odometerPhoto, [fr.odometerPhoto, fr.receiptPhoto])}
+                          className="h-16 rounded-xl border border-emerald-150 overflow-hidden"
+                        >
+                          <img src={fr.odometerPhoto} alt="Foto do Hodômetro" className="w-full h-full object-cover" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onZoomPhoto(fr.receiptPhoto, [fr.odometerPhoto, fr.receiptPhoto])}
+                          className="h-16 rounded-xl border border-emerald-150 overflow-hidden"
+                        >
+                          <img src={fr.receiptPhoto} alt="Foto do Cupom Fiscal" className="w-full h-full object-cover" />
+                        </button>
+                      </div>
                     </div>
                   )
                 })}
@@ -1161,6 +1212,49 @@ export default function TripHistoryPage() {
                                   ))}
                                 </div>
                               )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Abastecimentos no expandido */}
+                    {trip.fuelRecords && trip.fuelRecords.length > 0 && (
+                      <div className="col-span-2 sm:col-span-4 border-t border-gray-100 pt-3 mt-1 space-y-2 text-left">
+                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1">
+                          <Fuel size={12} />
+                          Abastecimentos ({trip.fuelRecords.length})
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {trip.fuelRecords.map((fr) => (
+                            <div
+                              key={fr.id}
+                              className="p-3 bg-emerald-50/30 border border-emerald-100 rounded-xl space-y-1.5 text-left"
+                            >
+                              <div className="flex items-center justify-between text-[10px] text-emerald-700 font-bold">
+                                <span>{fr.odometerKm.toLocaleString('pt-BR')} km</span>
+                                <span>{formatDateTime(fr.createdAt).date}</span>
+                              </div>
+                              <p className="text-xs text-gray-750 leading-snug">
+                                {fr.liters.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} L ·{' '}
+                                <span className="font-bold">
+                                  {fr.totalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </span>
+                              </p>
+                              <div className="flex gap-1 pt-1">
+                                <div
+                                  onClick={() => handleZoomPhoto(fr.odometerPhoto, [fr.odometerPhoto, fr.receiptPhoto])}
+                                  className="w-10 h-10 rounded-lg overflow-hidden border border-emerald-100 flex-shrink-0 cursor-zoom-in"
+                                >
+                                  <img src={fr.odometerPhoto} alt="Hodômetro" className="w-full h-full object-cover" />
+                                </div>
+                                <div
+                                  onClick={() => handleZoomPhoto(fr.receiptPhoto, [fr.odometerPhoto, fr.receiptPhoto])}
+                                  className="w-10 h-10 rounded-lg overflow-hidden border border-emerald-100 flex-shrink-0 cursor-zoom-in"
+                                >
+                                  <img src={fr.receiptPhoto} alt="Cupom" className="w-full h-full object-cover" />
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
