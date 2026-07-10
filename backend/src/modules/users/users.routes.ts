@@ -1,6 +1,5 @@
 // src/modules/users/users.routes.ts
 import type { FastifyInstance } from 'fastify'
-import { UserRole } from '@prisma/client'
 import { usersController } from './users.controller.js'
 
 export async function userRoutes(app: FastifyInstance): Promise<void> {
@@ -10,10 +9,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.users', 'READ')],
       schema: {
         tags: ['Users'],
         summary: 'Listar todos os usuários',
@@ -29,6 +25,16 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
                 role: { type: 'string' },
                 isActive: { type: 'boolean' },
                 createdAt: { type: 'string' },
+                accessProfileId: { type: ['string', 'null'] },
+                accessProfile: {
+                  type: ['object', 'null'],
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    isMaster: { type: 'boolean' },
+                    isAdminType: { type: 'boolean' },
+                  },
+                },
                 employee: {
                   type: ['object', 'null'],
                   properties: {
@@ -54,10 +60,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.users', 'WRITE')],
       schema: {
         tags: ['Users'],
         summary: 'Criar um novo usuário',
@@ -86,6 +89,16 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
               email: { type: 'string' },
               role: { type: 'string' },
               isActive: { type: 'boolean' },
+              accessProfileId: { type: ['string', 'null'] },
+              accessProfile: {
+                type: ['object', 'null'],
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                  isMaster: { type: 'boolean' },
+                  isAdminType: { type: 'boolean' },
+                },
+              },
               employee: {
                 type: ['object', 'null'],
                 properties: {
@@ -110,10 +123,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.patch(
     '/:id',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.users', 'WRITE')],
       schema: {
         tags: ['Users'],
         summary: 'Atualizar dados de um usuário',
@@ -148,6 +158,16 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
               email: { type: 'string' },
               role: { type: 'string' },
               isActive: { type: 'boolean' },
+              accessProfileId: { type: ['string', 'null'] },
+              accessProfile: {
+                type: ['object', 'null'],
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                  isMaster: { type: 'boolean' },
+                  isAdminType: { type: 'boolean' },
+                },
+              },
               employee: {
                 type: ['object', 'null'],
                 properties: {
@@ -172,10 +192,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.delete(
     '/:id',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.users', 'WRITE')],
       schema: {
         tags: ['Users'],
         summary: 'Excluir um usuário',
@@ -201,10 +218,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/positions',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.users', 'READ')],
       schema: {
         tags: ['Users'],
         summary: 'Listar funções/cargos cadastrados',
@@ -217,10 +231,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/positions',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.users', 'WRITE')],
       schema: {
         tags: ['Users'],
         summary: 'Criar função/cargo',
@@ -233,10 +244,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.patch(
     '/positions/:id',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.users', 'WRITE')],
       schema: {
         tags: ['Users'],
         summary: 'Editar função/cargo (renomear e/ou ativar-desativar)',
@@ -249,10 +257,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.delete(
     '/positions/:id',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.users', 'WRITE')],
       schema: {
         tags: ['Users'],
         summary: 'Excluir função/cargo (bloqueado se houver funcionário vinculado)',

@@ -12,6 +12,7 @@ import {
   InvalidCredentialsError,
   InactiveUserError,
   InvalidCurrentPasswordError,
+  resolveAccessPermissions,
 } from './auth.service.js'
 import { env } from '../../lib/env.js'
 
@@ -39,11 +40,15 @@ export function authController(app: FastifyInstance) {
         throw err
       }
 
-      // 3. Assina o JWT com o payload RBAC
+      // 3. Assina o JWT com o payload RBAC (role legado + perfil de acesso dinâmico)
+      const { isAdminType, permissions } = resolveAccessPermissions(user.accessProfile)
       const accessToken = app.jwt.sign({
         sub: user.id,
         role: user.role,
         employeeId: user.employee?.id ?? null,
+        accessProfileId: user.accessProfileId ?? null,
+        isAdminType,
+        permissions,
       })
 
       // 4. Retorna o token e os dados públicos do usuário

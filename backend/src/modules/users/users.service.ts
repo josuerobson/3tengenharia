@@ -77,6 +77,23 @@ export class JobFunctionInUseError extends Error {
 
 const SALT_ROUNDS = 12
 
+/** Mapeia o role legado para o perfil de acesso de sistema correspondente, usado
+ * como fallback quando accessProfileId não é informado explicitamente. */
+const ROLE_TO_SYSTEM_PROFILE_ID: Record<string, string> = {
+  ADMIN: 'profile_admin_master',
+  COLLABORATOR: 'profile_collaborator',
+  MANAGER_WORKSITE: 'profile_manager_worksite',
+  MANAGER_HR: 'profile_manager_hr',
+  MANAGER_WAREHOUSE: 'profile_manager_warehouse',
+}
+
+const userAccessProfileSelect = {
+  id: true,
+  name: true,
+  isMaster: true,
+  isAdminType: true,
+} as const
+
 export const usersService = {
   async list() {
     return prisma.user.findMany({
@@ -92,6 +109,7 @@ export const usersService = {
             cnhExpirationDate: true,
           },
         },
+        accessProfile: { select: userAccessProfileSelect },
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -124,6 +142,7 @@ export const usersService = {
         passwordHash,
         role: body.role,
         isActive: body.isActive ?? true,
+        accessProfileId: body.accessProfileId ?? ROLE_TO_SYSTEM_PROFILE_ID[body.role] ?? null,
       },
     })
 
@@ -164,6 +183,7 @@ export const usersService = {
             cnhExpirationDate: true,
           },
         },
+        accessProfile: { select: userAccessProfileSelect },
       },
     })
   },
@@ -216,6 +236,7 @@ export const usersService = {
     }
     if (body.role) updateData.role = body.role
     if (body.isActive !== undefined) updateData.isActive = body.isActive
+    if (body.accessProfileId !== undefined) updateData.accessProfileId = body.accessProfileId
 
     // 5. Salvar atualizações do User
     await prisma.user.update({
@@ -276,6 +297,7 @@ export const usersService = {
             cnhExpirationDate: true,
           },
         },
+        accessProfile: { select: userAccessProfileSelect },
       },
     })
   },

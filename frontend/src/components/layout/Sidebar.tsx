@@ -45,6 +45,7 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/contexts/AuthContext'
 
 // ── Definição de menus ────────────────────────────────────────────────────────
 
@@ -53,6 +54,8 @@ interface SubMenuItem {
   label: string
   path: string
   icon: React.ElementType
+  /** Chave(s) de página que controlam a visibilidade deste item. Precisa de acesso de leitura a pelo menos uma. */
+  pageKeys: string[]
 }
 
 interface MenuItem {
@@ -61,6 +64,7 @@ interface MenuItem {
   icon: React.ElementType
   /** Quando definido, é um link direto sem accordion. */
   path?: string
+  pageKeys?: string[]
   subItems?: SubMenuItem[]
 }
 
@@ -70,6 +74,7 @@ const MENU_ITEMS: MenuItem[] = [
     label: 'Dashboard',
     icon: LayoutDashboard,
     path: '/dashboard',
+    pageKeys: ['dashboard'],
   },
   {
     id: 'vehicles',
@@ -81,30 +86,35 @@ const MENU_ITEMS: MenuItem[] = [
         label: 'Nova Viagem',
         path: '/vehicles/trips/new',
         icon: Plus,
+        pageKeys: ['vehicles.trips.new'],
       },
       {
         id: 'vehicles-history',
         label: 'Histórico de Viagens',
         path: '/vehicles/trips',
         icon: History,
+        pageKeys: ['vehicles.trips.history'],
       },
       {
         id: 'vehicles-fleet',
         label: 'Cadastro de Veículos',
         path: '/vehicles/fleet',
         icon: Truck,
+        pageKeys: ['vehicles.fleet'],
       },
       {
         id: 'vehicles-maintenance',
         label: 'Alertas de Manutenção',
         path: '/vehicles/maintenance',
         icon: AlertTriangle,
+        pageKeys: ['vehicles.maintenance.alerts'],
       },
       {
         id: 'vehicles-maintenance-types',
         label: 'Tipos de Manutenção',
         path: '/vehicles/maintenance-types',
         icon: Settings2,
+        pageKeys: ['vehicles.maintenance.types'],
       },
     ],
   },
@@ -118,24 +128,28 @@ const MENU_ITEMS: MenuItem[] = [
         label: 'Catálogo de Itens',
         path: '/assets/catalog',
         icon: Package,
+        pageKeys: ['assets.catalog'],
       },
       {
         id: 'assets-loan',
         label: 'Minhas Solicitações',
         path: '/assets/requests',
         icon: ClipboardList,
+        pageKeys: ['assets.requests'],
       },
       {
         id: 'assets-defect',
         label: 'Relatar Defeito',
         path: '/assets/maintenance/new',
         icon: AlertCircle,
+        pageKeys: ['assets.defect.new'],
       },
       {
         id: 'assets-warehouse',
         label: 'Almoxarifado',
         path: '/assets/warehouse',
         icon: Warehouse,
+        pageKeys: ['assets.warehouse.inventory', 'assets.warehouse.fulfillment', 'assets.warehouse.activeLoans'],
       },
     ],
   },
@@ -149,24 +163,28 @@ const MENU_ITEMS: MenuItem[] = [
         label: 'Registro Diário',
         path: '/time-logs/daily',
         icon: BookOpen,
+        pageKeys: ['timelogs.daily'],
       },
       {
         id: 'timelogs-report',
         label: 'Relatório por C.C.',
         path: '/time-logs/report',
         icon: BarChart2,
+        pageKeys: ['timelogs.report'],
       },
       {
         id: 'timelogs-allocation',
         label: 'Alocar equipes',
         path: '/time-logs/team-allocation',
         icon: ArrowLeftRight,
+        pageKeys: ['timelogs.allocation'],
       },
       {
         id: 'timelogs-teams',
         label: 'Equipes',
         path: '/time-logs/teams',
         icon: Users,
+        pageKeys: ['timelogs.teams'],
       },
     ],
   },
@@ -180,12 +198,14 @@ const MENU_ITEMS: MenuItem[] = [
         label: 'Nova Auditoria',
         path: '/5s/audit/new',
         icon: CheckSquare,
+        pageKeys: ['fiveS.audit.new'],
       },
       {
         id: 'fiveS-panel',
         label: 'Painel de Qualidade',
         path: '/5s/panel',
         icon: ListChecks,
+        pageKeys: ['fiveS.panel'],
       },
     ],
   },
@@ -199,12 +219,21 @@ const MENU_ITEMS: MenuItem[] = [
         label: 'Usuários',
         path: '/admin/users',
         icon: Users,
+        pageKeys: ['admin.users'],
       },
       {
         id: 'admin-worksites',
         label: 'Cadastro de Obras',
         path: '/admin/worksites',
         icon: Building2,
+        pageKeys: ['admin.worksites'],
+      },
+      {
+        id: 'admin-access-control',
+        label: 'Controle de Acesso',
+        path: '/admin/access-control',
+        icon: Settings2,
+        pageKeys: ['admin.accessControl'],
       },
     ],
   },
@@ -424,9 +453,22 @@ function SidebarContent({
   onCollapsedChange,
   onMobileClose,
 }: SidebarContentProps) {
+  const { canReadAny } = useAuth()
   const [openMenuIds, setOpenMenuIds] = useState<Set<string>>(new Set())
   // Ref para enfileirar abertura de accordion após expandir a sidebar
   const pendingOpenRef = useRef<string | null>(null)
+
+  // Filtra itens de menu com base nas permissões do usuário logado —
+  // um item com submenus só aparece se pelo menos um filho for visível.
+  const visibleMenuItems = MENU_ITEMS.reduce<MenuItem[]>((acc, item) => {
+    if (item.subItems) {
+      const visibleSubItems = item.subItems.filter((sub) => canReadAny(sub.pageKeys))
+      if (visibleSubItems.length > 0) acc.push({ ...item, subItems: visibleSubItems })
+    } else if (item.pageKeys && canReadAny(item.pageKeys)) {
+      acc.push(item)
+    }
+    return acc
+  }, [])
 
   // Fecha todos os accordions quando a sidebar é colapsada
   useEffect(() => {
@@ -528,7 +570,7 @@ function SidebarContent({
         className="flex-1 overflow-y-auto scrollbar-thin py-3 px-2.5 space-y-0.5"
         aria-label="Navegação principal"
       >
-        {MENU_ITEMS.map((item) => (
+        {visibleMenuItems.map((item) => (
           <MenuItemComponent
             key={item.id}
             item={item}

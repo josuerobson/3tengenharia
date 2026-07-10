@@ -1,10 +1,9 @@
 // src/modules/fiveS/fiveS.routes.ts
 // Rotas do Módulo 5S — registradas sob o prefixo /api/v1/5s (via app.ts).
-// Segue o mesmo padrão dos demais módulos: { onRequest } para autenticação,
-// { preHandler } com requireRole para autorização baseada em RBAC.
+// Segue o mesmo padrão dos demais módulos: { onRequest } com requirePermission
+// para autorização baseada nos perfis de acesso dinâmicos.
 
 import type { FastifyInstance } from 'fastify'
-import { UserRole } from '@prisma/client'
 import { fiveSController } from './fiveS.controller.js'
 
 /** Schema de erro padrão — reutilizado em todos os responses de erro */
@@ -80,7 +79,7 @@ export async function fiveSRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/audits',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('fiveS.audit.new', 'WRITE')],
       schema: {
         tags:        ['5S'],
         summary:     'Registrar auditoria 5S',
@@ -146,8 +145,7 @@ export async function fiveSRoutes(app: FastifyInstance): Promise<void> {
   app.patch(
     '/audits/:id/validate',
     {
-      onRequest: [app.authenticate],
-      preHandler: [app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])],
+      onRequest: [app.authenticate, app.requirePermission('fiveS.panel', 'WRITE')],
       schema: {
         tags:        ['5S'],
         summary:     'Validar auditoria 5S (Qualidade)',
@@ -204,8 +202,7 @@ export async function fiveSRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/reports',
     {
-      onRequest: [app.authenticate],
-      preHandler: [app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])],
+      onRequest: [app.authenticate, app.requirePermission('fiveS.panel', 'READ')],
       schema: {
         tags:        ['5S'],
         summary:     'Relatório de auditorias 5S',

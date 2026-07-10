@@ -1,7 +1,6 @@
 // src/modules/assets/assets.routes.ts
 
 import type { FastifyInstance } from 'fastify'
-import { UserRole } from '@prisma/client'
 import { assetsController } from './assets.controller.js'
 
 const loanResponseSchema = {
@@ -84,7 +83,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('assets.catalog', 'READ')],
       schema: {
         tags: ['Assets'],
         summary: 'Listar todos os bens patrimoniais',
@@ -124,10 +123,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('assets.warehouse.inventory', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Criar um novo bem patrimonial',
@@ -183,10 +179,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/loans/:id/return',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('assets.warehouse.activeLoans', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Registrar devolução de bem patrimonial emprestado',
@@ -228,7 +221,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/maintenance',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('assets.defect.new', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Abrir chamado de avaria/manutenção',
@@ -265,7 +258,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/maintenance/resolve',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('assets.warehouse.inventory', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Registrar reparo/resolução de manutenção',
@@ -371,10 +364,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/categories',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])
-      ],
+      onRequest: [app.authenticate, app.requirePermission('assets.warehouse.inventory', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Criar categoria de bem',
@@ -387,10 +377,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.patch(
     '/categories/:id',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])
-      ],
+      onRequest: [app.authenticate, app.requirePermission('assets.warehouse.inventory', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Atualizar categoria de bem',
@@ -404,7 +391,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/requests',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('assets.requests', 'READ')],
       schema: {
         tags: ['Assets'],
         summary: 'Listar solicitações de empréstimo',
@@ -417,7 +404,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/requests',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('assets.requests', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Criar solicitação de empréstimo',
@@ -430,7 +417,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/requests/batch',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('assets.requests', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Criar solicitação com múltiplos equipamentos/quantidades em um único pedido',
@@ -443,10 +430,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/requests/:id/allocate',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])
-      ],
+      onRequest: [app.authenticate, app.requirePermission('assets.warehouse.fulfillment', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Vincular e enviar patrimônio físico para solicitação',
@@ -459,10 +443,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/requests/batch/allocate',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])
-      ],
+      onRequest: [app.authenticate, app.requirePermission('assets.warehouse.fulfillment', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Vincular e enviar bens físicos para todas as unidades de um pedido em lote',
@@ -475,7 +456,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/requests/:id/return',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('assets.requests', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Registrar intenção/checklist de devolução',
@@ -488,10 +469,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/requests/:id/validate',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])
-      ],
+      onRequest: [app.authenticate, app.requirePermission('assets.warehouse.fulfillment', 'WRITE')],
       schema: {
         tags: ['Assets'],
         summary: 'Validar devolução e definir estado final do equipamento',

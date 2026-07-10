@@ -40,10 +40,11 @@ export function timeLogsController(_app: FastifyInstance) {
     async createBulk(request: FastifyRequest, reply: FastifyReply) {
       const body = bulkTimeLogBodySchema.parse(request.body)
       const currentUser = request.currentUser
+      const isOwnScoped = request.accessScope?.isOwnScoped ?? false
 
       let result: Awaited<ReturnType<typeof timeLogsService.createBulk>>
       try {
-        result = await timeLogsService.createBulk(body, currentUser)
+        result = await timeLogsService.createBulk(body, currentUser, isOwnScoped)
       } catch (err) {
         // DuplicateTimeLogError enriquece o response com a lista de conflitos
         if (err instanceof DuplicateTimeLogError) {
@@ -70,10 +71,11 @@ export function timeLogsController(_app: FastifyInstance) {
     async listTimeLogs(request: FastifyRequest, reply: FastifyReply) {
       const query = listTimeLogsQuerySchema.parse(request.query)
       const currentUser = request.currentUser
+      const isOwnScoped = request.accessScope?.isOwnScoped ?? false
 
       let result: Awaited<ReturnType<typeof timeLogsService.list>>
       try {
-        result = await timeLogsService.list(query, currentUser)
+        result = await timeLogsService.list(query, currentUser, isOwnScoped)
       } catch (err) {
         rethrowDomain(err)
       }
@@ -86,10 +88,11 @@ export function timeLogsController(_app: FastifyInstance) {
       const { id } = request.params as { id: string }
       const body = validateTimeLogBodySchema.parse(request.body)
       const currentUser = request.currentUser
+      const isOwnScoped = request.accessScope?.isOwnScoped ?? false
 
       let result
       try {
-        result = await timeLogsService.validate(id, body, currentUser)
+        result = await timeLogsService.validate(id, body, currentUser, isOwnScoped)
       } catch (err) {
         rethrowDomain(err)
       }
@@ -105,10 +108,11 @@ export function timeLogsController(_app: FastifyInstance) {
       const { id } = request.params as { id: string }
       const body = updateTimeLogBodySchema.parse(request.body)
       const currentUser = request.currentUser
+      const isOwnScoped = request.accessScope?.isOwnScoped ?? false
 
       let result
       try {
-        result = await timeLogsService.update(id, body, currentUser)
+        result = await timeLogsService.update(id, body, currentUser, isOwnScoped)
       } catch (err) {
         rethrowDomain(err)
       }
@@ -123,9 +127,10 @@ export function timeLogsController(_app: FastifyInstance) {
     async deleteTimeLog(request: FastifyRequest, reply: FastifyReply) {
       const { id } = request.params as { id: string }
       const currentUser = request.currentUser
+      const isOwnScoped = request.accessScope?.isOwnScoped ?? false
 
       try {
-        await timeLogsService.delete(id, currentUser)
+        await timeLogsService.delete(id, currentUser, isOwnScoped)
       } catch (err) {
         rethrowDomain(err)
       }

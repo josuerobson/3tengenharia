@@ -19,6 +19,7 @@ import {
   VehicleAlreadyInTripError,
   OnlySelfTripCreationAllowedError,
   VehiclePhotosRequiredError,
+  TripAccessDeniedError,
 } from './vehicles.service.js'
 
 /** Erros de domínio deste módulo — re-lançados para o error-handler global */
@@ -32,6 +33,7 @@ const DOMAIN_ERRORS = [
   VehicleAlreadyInTripError,
   OnlySelfTripCreationAllowedError,
   VehiclePhotosRequiredError,
+  TripAccessDeniedError,
 ]
 
 function rethrowDomain(err: unknown): never {
@@ -49,11 +51,11 @@ export function vehiclesController(_app: FastifyInstance) {
 
       // O employeeId do JWT é usado como fallback para o motorista
       const jwtEmployeeId = request.currentUser.employeeId
-      const userRole = request.currentUser.role
+      const isOwnScoped = request.accessScope?.isOwnScoped ?? false
 
       let result: Awaited<ReturnType<typeof vehiclesService.startTrip>>
       try {
-        result = await vehiclesService.startTrip(body, jwtEmployeeId, userRole)
+        result = await vehiclesService.startTrip(body, jwtEmployeeId, isOwnScoped)
       } catch (err) {
         rethrowDomain(err)
       }
@@ -74,10 +76,11 @@ export function vehiclesController(_app: FastifyInstance) {
     async endTrip(request: FastifyRequest, reply: FastifyReply) {
       const { id } = endTripParamsSchema.parse(request.params)
       const body = endTripBodySchema.parse(request.body)
+      const ownerEmployeeId = request.accessScope?.isOwnScoped ? request.currentUser.employeeId : undefined
 
       let result: Awaited<ReturnType<typeof vehiclesService.endTrip>>
       try {
-        result = await vehiclesService.endTrip(id, body)
+        result = await vehiclesService.endTrip(id, body, ownerEmployeeId)
       } catch (err) {
         rethrowDomain(err)
       }
@@ -106,10 +109,14 @@ export function vehiclesController(_app: FastifyInstance) {
       const q = request.query as { vehicleId?: string; limit?: string; offset?: string }
       const limitVal  = q.limit  ? parseInt(q.limit,  10) : undefined
       const offsetVal = q.offset ? parseInt(q.offset, 10) : undefined
+      const driverEmployeeId = request.accessScope?.isOwnScoped
+        ? (request.currentUser.employeeId ?? undefined)
+        : undefined
       const result = await vehiclesService.listTrips({
         ...(q.vehicleId !== undefined && { vehicleId: q.vehicleId }),
         ...(limitVal  !== undefined  && { limit:  limitVal  }),
         ...(offsetVal !== undefined  && { offset: offsetVal }),
+        ...(driverEmployeeId !== undefined && { driverEmployeeId }),
       })
       return reply.status(200).send(result)
     },
@@ -153,9 +160,10 @@ export function vehiclesController(_app: FastifyInstance) {
     // ── POST /vehicles/trips/:id/incidents (createIncident) ───────────────────
     async createIncident(request: FastifyRequest, reply: FastifyReply) {
       const { id: tripId } = request.params as { id: string }
+      const ownerEmployeeId = request.accessScope?.isOwnScoped ? request.currentUser.employeeId : undefined
       try {
         const body = createIncidentBodySchema.parse(request.body)
-        const incident = await vehiclesService.createIncident(tripId, body)
+        const incident = await vehiclesService.createIncident(tripId, body, ownerEmployeeId)
         return reply.status(201).send({
           message: 'Sinistro registrado com sucesso.',
           incident,
@@ -168,9 +176,10 @@ export function vehiclesController(_app: FastifyInstance) {
     // ── POST /vehicles/trips/:id/fuel-records (createFuelRecord) ──────────────
     async createFuelRecord(request: FastifyRequest, reply: FastifyReply) {
       const { id: tripId } = request.params as { id: string }
+      const ownerEmployeeId = request.accessScope?.isOwnScoped ? request.currentUser.employeeId : undefined
       try {
         const body = createFuelRecordBodySchema.parse(request.body)
-        const fuelRecord = await vehiclesService.createFuelRecord(tripId, body)
+        const fuelRecord = await vehiclesService.createFuelRecord(tripId, body, ownerEmployeeId)
         return reply.status(201).send({
           message: 'Abastecimento registrado com sucesso.',
           fuelRecord,

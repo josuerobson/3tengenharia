@@ -1,30 +1,58 @@
 // src/contexts/AuthContext.tsx
-// Contexto de autenticação — armazena o usuário atual e o token JWT.
-// Em produção, o token vem da resposta de POST /api/v1/auth/login.
+// Contexto de autenticação — armazena o usuário atual, o token JWT e as
+// permissões resolvidas do perfil de acesso (decodificadas do próprio JWT).
 
 import {
   createContext,
   useContext,
   useState,
   useCallback,
+  useMemo,
   type ReactNode,
 } from 'react'
 import type { AuthUser } from '@/types/auth'
+import { decodeJwtPayload } from '@/lib/jwt'
+import { canRead, canWrite, isOwnScoped, type AccessLevel } from '@/lib/accessControl'
 
 // ── Tipos do contexto ─────────────────────────────────────────────────────────
+
+interface JwtPayload {
+  sub: string
+  role: string
+  employeeId: string | null
+  accessProfileId: string | null
+  isAdminType: boolean
+  permissions: Record<string, AccessLevel>
+}
 
 interface AuthContextValue {
   user: AuthUser | null
   token: string | null
   isAuthenticated: boolean
+  isAdminType: boolean
+  permissions: Record<string, AccessLevel>
   login: (user: AuthUser, token: string) => void
   logout: () => void
+  /** Tem acesso de leitura (qualquer nível) à página. */
+  canReadPage: (pageKey: string) => boolean
+  /** Tem acesso de escrita (qualquer nível) à página. */
+  canWritePage: (pageKey: string) => boolean
+  /** Acesso restrito aos próprios registros nesta página. */
+  isOwnScopedPage: (pageKey: string) => boolean
+  /** Tem acesso de leitura a pelo menos uma das páginas informadas. */
+  canReadAny: (pageKeys: string[]) => boolean
 }
 
 // ── Contexto ──────────────────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+function decodePermissions(token: string | null): { isAdminType: boolean; permissions: Record<string, AccessLevel> } {
+  if (!token) return { isAdminType: false, permissions: {} }
+  const payload = decodeJwtPayload<JwtPayload>(token)
+  if (!payload) return { isAdminType: false, permissions: {} }
+  return { isAdminType: payload.isAdminType ?? false, permissions: payload.permissions ?? {} }
+}
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
@@ -45,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem('3t:token')
   })
 
+  const { isAdminType, permissions } = useMemo(() => decodePermissions(token), [token])
+
   const login = useCallback((newUser: AuthUser, newToken: string) => {
     setUser(newUser)
     setToken(newToken)
@@ -60,9 +90,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Redirecionar para login (React Router) na Etapa 5
   }, [])
 
+  const canReadPage = useCallback(
+    (pageKey: string) => isAdminType || canRead(permissions[pageKey] ?? 'NONE'),
+    [isAdminType, permissions],
+  )
+  const canWritePage = useCallback(
+    (pageKey: string) => isAdminType || canWrite(permissions[pageKey] ?? 'NONE'),
+    [isAdminType, permissions],
+  )
+  const isOwnScopedPage = useCallback(
+    (pageKey: string) => !isAdminType && isOwnScoped(permissions[pageKey] ?? 'NONE'),
+    [isAdminType, permissions],
+  )
+  const canReadAny = useCallback(
+    (pageKeys: string[]) => isAdminType || pageKeys.some((k) => canRead(permissions[k] ?? 'NONE')),
+    [isAdminType, permissions],
+  )
+
   return (
     <AuthContext.Provider
-      value={{ user, token, isAuthenticated: user !== null, login, logout }}
+      value={{
+        user,
+        token,
+        isAuthenticated: user !== null,
+        isAdminType,
+        permissions,
+        login,
+        logout,
+        canReadPage,
+        canWritePage,
+        isOwnScopedPage,
+        canReadAny,
+      }}
     >
       {children}
     </AuthContext.Provider>

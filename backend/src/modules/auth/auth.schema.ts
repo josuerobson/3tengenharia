@@ -41,6 +41,19 @@ export const userPublicSchema = z.object({
   isActive: z.boolean(),
   createdAt: z.date(),
 
+  // Perfil de acesso dinâmico
+  accessProfileId: z.string().nullable().optional(),
+  accessProfile: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      isMaster: z.boolean(),
+      isAdminType: z.boolean(),
+      permissions: z.array(z.object({ pageKey: z.string(), level: z.string() })),
+    })
+    .nullable()
+    .optional(),
+
   // Dados do colaborador vinculado (opcional)
   employee: z
     .object({

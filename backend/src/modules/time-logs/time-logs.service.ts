@@ -14,12 +14,6 @@ import { UserRole } from '@prisma/client'
 import type { BulkTimeLogBody, DuplicateEmployeeDetail, ListTimeLogsQuery, ValidateTimeLogBody, UpdateTimeLogBody } from './time-logs.schema.js'
 import type { JwtPayload } from '../../types/fastify.js'
 
-const isManager = (role: UserRole) =>
-  role === UserRole.MANAGER_WORKSITE ||
-  role === UserRole.MANAGER_HR ||
-  role === UserRole.MANAGER_WAREHOUSE
-
-
 // ── Erros de domínio ──────────────────────────────────────────────────────────
 
 export class WorksiteNotFoundError extends Error {
@@ -138,13 +132,11 @@ function calcTotalMinutes(
 
 export const timeLogsService = {
   // ── POST /time-logs/bulk ───────────────────────────────────────────────────
-  async createBulk(body: BulkTimeLogBody, currentUser: JwtPayload) {
+  async createBulk(body: BulkTimeLogBody, currentUser: JwtPayload, isOwnScoped: boolean) {
     // ════════════════════════════════════════════════════════════════════════
     // ⚙️ REGRA 1 — Isolamento por Obra (Tenant Isolation)
     // ════════════════════════════════════════════════════════════════════════
-    const isPrivileged =
-      isManager(currentUser.role) ||
-      currentUser.role === UserRole.ADMIN
+    const isPrivileged = !isOwnScoped
 
     if (!isPrivileged) {
       // Colaborador deve ter vínculo com um Employee
@@ -270,10 +262,8 @@ export const timeLogsService = {
     }
   },
 
-  async list(filters: ListTimeLogsQuery, currentUser: JwtPayload) {
-    const isPrivileged =
-      isManager(currentUser.role) ||
-      currentUser.role === UserRole.ADMIN
+  async list(filters: ListTimeLogsQuery, currentUser: JwtPayload, isOwnScoped: boolean) {
+    const isPrivileged = !isOwnScoped
 
     let allowedWorksiteId = filters.worksiteId
 
@@ -329,8 +319,8 @@ export const timeLogsService = {
     })
   },
 
-  async validate(id: string, body: ValidateTimeLogBody, currentUser: JwtPayload) {
-    if (!isManager(currentUser.role) && currentUser.role !== UserRole.ADMIN) {
+  async validate(id: string, body: ValidateTimeLogBody, currentUser: JwtPayload, isOwnScoped: boolean) {
+    if (isOwnScoped) {
       throw new ForbiddenError('Somente gestores ou administradores podem validar lançamentos.')
     }
 
@@ -357,14 +347,14 @@ export const timeLogsService = {
     })
   },
 
-  async update(id: string, body: UpdateTimeLogBody, currentUser: JwtPayload) {
+  async update(id: string, body: UpdateTimeLogBody, currentUser: JwtPayload, isOwnScoped: boolean) {
     const existing = await prisma.timeLog.findUnique({
       where: { id },
     })
     if (!existing) throw new TimeLogNotFoundError(id)
 
     // Permissões
-    if (!isManager(currentUser.role) && currentUser.role !== UserRole.ADMIN) {
+    if (isOwnScoped) {
       if (existing.isValidated) {
         throw new ForbiddenError('Não é possível alterar um lançamento já validado.')
       }
@@ -409,7 +399,7 @@ export const timeLogsService = {
     if (body.shiftType !== undefined) updateData.shiftType = body.shiftType
     if (body.notes !== undefined) updateData.notes = body.notes
     if (body.isValidated !== undefined) {
-      if (isManager(currentUser.role) || currentUser.role === UserRole.ADMIN) {
+      if (!isOwnScoped) {
         updateData.isValidated = body.isValidated
         updateData.validatedAt = body.isValidated ? new Date() : null
         updateData.validatedByUserId = body.isValidated ? currentUser.sub : null
@@ -432,14 +422,14 @@ export const timeLogsService = {
     })
   },
 
-  async delete(id: string, currentUser: JwtPayload) {
+  async delete(id: string, currentUser: JwtPayload, isOwnScoped: boolean) {
     const existing = await prisma.timeLog.findUnique({
       where: { id },
     })
     if (!existing) throw new TimeLogNotFoundError(id)
 
     // Permissões
-    if (!isManager(currentUser.role) && currentUser.role !== UserRole.ADMIN) {
+    if (isOwnScoped) {
       if (existing.isValidated) {
         throw new ForbiddenError('Não é possível excluir um lançamento já validado.')
       }
@@ -454,14 +444,6 @@ export const timeLogsService = {
   },
 
   async listTeamAllocationData(currentUser: JwtPayload) {
-    const isPrivileged =
-      isManager(currentUser.role) ||
-      currentUser.role === UserRole.ADMIN
-
-    if (!isPrivileged) {
-      throw new ForbiddenError('Apenas administradores e gestores podem acessar a alocação de equipes.')
-    }
-
     const worksites = await prisma.worksite.findMany({
       where: { isActive: true },
       select: { id: true, code: true, name: true },
@@ -524,14 +506,6 @@ export const timeLogsService = {
   },
 
   async updateTeamAllocation(body: { worksiteId: string; managerId: string; employeeIds: string[] }, currentUser: JwtPayload) {
-    const isPrivileged =
-      isManager(currentUser.role) ||
-      currentUser.role === UserRole.ADMIN
-
-    if (!isPrivileged) {
-      throw new ForbiddenError('Apenas administradores e gestores podem alterar a alocação de equipes.')
-    }
-
     // Valida se a obra existe e está ativa
     const worksiteExists = await prisma.worksite.findFirst({
       where: { id: body.worksiteId, isActive: true },

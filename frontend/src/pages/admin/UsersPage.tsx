@@ -22,7 +22,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
-import { usersApi, type ApiUser, type ApiJobFunction } from '@/lib/api'
+import { usersApi, accessProfilesApi, type ApiUser, type ApiJobFunction, type ApiAccessProfile } from '@/lib/api'
 
 type RoleFilter = 'ALL' | 'ADMIN' | 'COLLABORATOR' | 'MANAGER_WORKSITE' | 'MANAGER_HR' | 'MANAGER_WAREHOUSE'
 type StatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE'
@@ -53,12 +53,14 @@ const formatCpf = (val: string) => {
 
 export default function UsersPage() {
   const navigate = useNavigate()
-  const { user: currentUser } = useAuth()
-  const isAuthorized = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
+  const { user: currentUser, canReadPage, canWritePage } = useAuth()
+  const isAuthorized = canReadPage('admin.users')
+  const canManage = canWritePage('admin.users')
 
   // ── Estados de Dados ───────────────────────────────────────────────────────
   const [users, setUsers] = useState<ApiUser[]>([])
   const [jobFunctions, setJobFunctions] = useState<ApiJobFunction[]>([])
+  const [accessProfiles, setAccessProfiles] = useState<ApiAccessProfile[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
 
@@ -74,6 +76,7 @@ export default function UsersPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<'ADMIN' | 'COLLABORATOR' | 'MANAGER_WORKSITE' | 'MANAGER_HR' | 'MANAGER_WAREHOUSE'>('COLLABORATOR')
+  const [accessProfileId, setAccessProfileId] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [fullName, setFullName] = useState('')
   const [cpf, setCpf] = useState('')
@@ -118,12 +121,14 @@ export default function UsersPage() {
     try {
       setLoadingData(true)
       setFetchError(null)
-      const [usersData, jobFunctionsData] = await Promise.all([
+      const [usersData, jobFunctionsData, accessProfilesData] = await Promise.all([
         usersApi.list(),
         usersApi.listJobFunctions(),
+        accessProfilesApi.list(),
       ])
       setUsers(usersData)
       setJobFunctions(jobFunctionsData)
+      setAccessProfiles(accessProfilesData)
     } catch (err: any) {
       console.error('Erro ao carregar dados de usuários:', err)
       setFetchError(err?.message ?? 'Falha ao conectar com o servidor.')
@@ -246,6 +251,7 @@ export default function UsersPage() {
     setEmail('')
     setPassword('')
     setRole('COLLABORATOR')
+    setAccessProfileId('')
     setIsActive(true)
     setFullName('')
     setPhone('')
@@ -264,6 +270,7 @@ export default function UsersPage() {
     setEmail(user.email)
     setPassword('') // Senha vazia significa que não será alterada
     setRole(user.role)
+    setAccessProfileId(user.accessProfileId ?? '')
     setIsActive(user.isActive)
     setFullName(user.employee?.fullName ?? '')
     setPhone(user.employee?.phone ?? '')
@@ -337,6 +344,7 @@ export default function UsersPage() {
         await usersApi.update(editingUser.id, {
           email: email.trim(),
           role,
+          accessProfileId: accessProfileId || null,
           isActive,
           fullName: fullName.trim(),
           phone: phone.trim(),
@@ -352,6 +360,7 @@ export default function UsersPage() {
           email: email.trim(),
           password,
           role,
+          accessProfileId: accessProfileId || null,
           isActive,
           fullName: fullName.trim(),
           phone: phone.trim(),
@@ -429,10 +438,12 @@ export default function UsersPage() {
             {loadingData ? 'Buscando contas de acesso...' : `Administre as ${users.length} contas de acesso cadastradas`}
           </p>
         </div>
-        <Button size="md" className="flex-shrink-0" onClick={handleOpenNewForm}>
-          <Plus size={16} />
-          Novo Usuário
-        </Button>
+        {canManage && (
+          <Button size="md" className="flex-shrink-0" onClick={handleOpenNewForm}>
+            <Plus size={16} />
+            Novo Usuário
+          </Button>
+        )}
       </div>
 
       {fetchError && (
@@ -582,6 +593,7 @@ export default function UsersPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                          {canManage && (
                           <button
                             onClick={() => handleOpenEditForm(u)}
                             className="p-2 text-gray-400 hover:text-brand-primary hover:bg-slate-50 rounded-lg transition-colors"
@@ -589,7 +601,8 @@ export default function UsersPage() {
                           >
                             <Edit2 size={15} />
                           </button>
-                          {!isCurrent && (
+                          )}
+                          {canManage && !isCurrent && (
                             <button
                               onClick={() => handleOpenDelete(u)}
                               className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -720,7 +733,7 @@ export default function UsersPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="role" required>
-                Perfil de Acesso
+                Papel (legado)
               </Label>
               <select
                 id="role"
@@ -749,6 +762,25 @@ export default function UsersPage() {
                 className="mt-1.5 h-11"
               />
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="accessProfileId">
+              Perfil de Acesso <span className="text-[10px] text-gray-400 font-normal">(controla as permissões reais do usuário — se vazio, usa o padrão do papel legado)</span>
+            </Label>
+            <select
+              id="accessProfileId"
+              value={accessProfileId}
+              onChange={(e) => setAccessProfileId(e.target.value)}
+              className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+            >
+              <option value="">Usar padrão do papel legado</option>
+              {accessProfiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

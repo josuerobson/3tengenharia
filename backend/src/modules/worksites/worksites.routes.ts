@@ -1,6 +1,5 @@
 // src/modules/worksites/worksites.routes.ts
 import type { FastifyInstance } from 'fastify'
-import { UserRole } from '@prisma/client'
 import { worksitesController } from './worksites.controller.js'
 
 export async function worksiteRoutes(app: FastifyInstance): Promise<void> {
@@ -10,10 +9,7 @@ export async function worksiteRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.worksites', 'READ')],
       schema: {
         tags: ['Worksites'],
         summary: 'Listar todas as obras / centros de custo',
@@ -47,10 +43,7 @@ export async function worksiteRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.worksites', 'WRITE')],
       schema: {
         tags: ['Worksites'],
         summary: 'Criar uma nova obra',
@@ -94,10 +87,7 @@ export async function worksiteRoutes(app: FastifyInstance): Promise<void> {
   app.patch(
     '/:id',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.worksites', 'WRITE')],
       schema: {
         tags: ['Worksites'],
         summary: 'Atualizar uma obra',
@@ -140,10 +130,7 @@ export async function worksiteRoutes(app: FastifyInstance): Promise<void> {
   app.delete(
     '/:id',
     {
-      onRequest: [
-        app.authenticate,
-        app.requireRole([UserRole.ADMIN]),
-      ],
+      onRequest: [app.authenticate, app.requirePermission('admin.worksites', 'WRITE')],
       schema: {
         tags: ['Worksites'],
         summary: 'Excluir uma obra',

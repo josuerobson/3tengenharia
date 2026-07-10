@@ -15,7 +15,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   // ── GET /vehicles ────────────────────────────────────────────────────────────
   app.get(
     '/',
-    { onRequest: [app.authenticate], schema: schema({ tags: ['Vehicles'], summary: 'Lista todos os veículos', security: [{ bearerAuth: [] }] }) },
+    { onRequest: [app.authenticate, app.requirePermission('vehicles.fleet', 'READ')], schema: schema({ tags: ['Vehicles'], summary: 'Lista todos os veículos', security: [{ bearerAuth: [] }] }) },
     controller.listAll,
   )
 
@@ -23,7 +23,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.fleet', 'WRITE')],
       schema: schema({
         tags: ['Vehicles'], summary: 'Cadastra novo veículo', security: [{ bearerAuth: [] }],
         body: {
@@ -50,21 +50,21 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   // ── GET /vehicles/:id ────────────────────────────────────────────────────────
   app.get(
     '/:id',
-    { onRequest: [app.authenticate], schema: schema({ tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } }) },
+    { onRequest: [app.authenticate, app.requirePermission('vehicles.fleet', 'READ')], schema: schema({ tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } }) },
     controller.getById,
   )
 
   // ── PATCH /vehicles/:id ──────────────────────────────────────────────────────
   app.patch(
     '/:id',
-    { onRequest: [app.authenticate], schema: schema({ tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } }) },
+    { onRequest: [app.authenticate, app.requirePermission('vehicles.fleet', 'WRITE')], schema: schema({ tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } }) },
     controller.updateVehicle,
   )
 
   // ── DELETE /vehicles/:id ─────────────────────────────────────────────────────
   app.delete(
     '/:id',
-    { onRequest: [app.authenticate], schema: schema({ tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } }) },
+    { onRequest: [app.authenticate, app.requirePermission('vehicles.fleet', 'WRITE')], schema: schema({ tags: ['Vehicles'], security: [{ bearerAuth: [] }], params: { type: 'object', properties: { id: { type: 'string' } } } }) },
     controller.deleteVehicle,
   )
 
@@ -72,7 +72,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/trips',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.trips.history', 'READ')],
       schema: schema({
         tags: ['Vehicles'], summary: 'Lista histórico de viagens', security: [{ bearerAuth: [] }],
         querystring: {
@@ -92,7 +92,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/trips/start',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.trips.new', 'WRITE')],
       schema: schema({
         tags: ['Vehicles'], summary: 'Iniciar uma viagem', security: [{ bearerAuth: [] }],
         body: {
@@ -118,7 +118,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/trips/:id/end',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.trips.new', 'WRITE')],
       schema: schema({
         tags: ['Vehicles'], summary: 'Encerrar uma viagem', security: [{ bearerAuth: [] }],
         params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
@@ -142,7 +142,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/trips/:id/incidents',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.trips.new', 'WRITE')],
       schema: schema({
         tags: ['Vehicles'], summary: 'Registrar sinistro na viagem', security: [{ bearerAuth: [] }],
         params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
@@ -164,7 +164,7 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/trips/:id/fuel-records',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.trips.new', 'WRITE')],
       schema: schema({
         tags: ['Vehicles'], summary: 'Registrar abastecimento na viagem', security: [{ bearerAuth: [] }],
         params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },

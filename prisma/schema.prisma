@@ -18,13 +18,24 @@ datasource db {
 // ENUMS GLOBAIS
 // =============================================================================
 
-/// Perfis de acesso para RBAC
+/// Perfis de acesso para RBAC (legado — mantido para compatibilidade durante a
+/// transição para o sistema dinâmico de AccessProfile; não remover.)
 enum UserRole {
   COLLABORATOR // Colaborador — acesso de leitura limitado
   ADMIN // Administrador — acesso total ao sistema
   MANAGER_WORKSITE // Gestor de Obra
   MANAGER_HR // Gestor de RH
   MANAGER_WAREHOUSE // Gestor de Almoxarifado
+}
+
+/// Nível de acesso concedido a um perfil dinâmico para uma página específica.
+/// OWN = escopo restrito aos próprios registros do usuário; ALL = todos os registros.
+enum AccessLevel {
+  NONE
+  READ_OWN
+  READ_ALL
+  WRITE_OWN
+  WRITE_ALL
 }
 
 // =============================================================================
@@ -104,6 +115,10 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  // Perfil de acesso dinâmico (substitui `role` como fonte de autorização real)
+  accessProfileId String?        @map("access_profile_id")
+  accessProfile   AccessProfile? @relation(fields: [accessProfileId], references: [id], onDelete: SetNull)
+
   // Relação 1-para-1 com Employee (usuário que é também colaborador registrado)
   employee Employee?
 
@@ -130,7 +145,44 @@ model User {
 
   @@index([email])
   @@index([role])
+  @@index([accessProfileId])
   @@map("users")
+}
+
+/// Perfil de acesso dinâmico — criado livremente pelo gestor via tela de
+/// Controle de Acesso. `isMaster` marca o único perfil administrador raiz do
+/// sistema (imutável, indeletável). `isAdminType` marca esse ou qualquer outro
+/// perfil com acesso total irrestrito (bypass de todas as permissões) — só
+/// pode ser atribuído por quem já possui `isAdminType = true`.
+model AccessProfile {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  isMaster    Boolean  @default(false) @map("is_master")
+  isAdminType Boolean  @default(false) @map("is_admin_type")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  permissions AccessProfilePermission[]
+  users       User[]
+
+  @@map("access_profiles")
+}
+
+/// Nível de acesso de um perfil para uma página específica do sistema.
+/// `pageKey` é uma chave fixa definida em código (ex: "vehicles.trips.new"),
+/// não um texto livre — a lista de páginas válidas vive no backend.
+model AccessProfilePermission {
+  id        String        @id @default(cuid())
+  profileId String        @map("profile_id")
+  profile   AccessProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  pageKey   String        @map("page_key")
+  level     AccessLevel   @default(NONE)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  @@unique([profileId, pageKey])
+  @@index([profileId])
+  @@map("access_profile_permissions")
 }
 
 // =============================================================================

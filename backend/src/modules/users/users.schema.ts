@@ -45,6 +45,9 @@ export const createUserBodySchema = z.object({
 
   isActive: z.boolean().optional().default(true),
   cnhExpirationDate: z.coerce.date().optional().nullable(),
+
+  /** Perfil de acesso dinâmico. Se omitido, é inferido a partir de `role`. */
+  accessProfileId: z.string().optional().nullable(),
 })
 
 export type CreateUserBody = z.infer<typeof createUserBodySchema>
@@ -77,6 +80,8 @@ export const updateUserBodySchema = z.object({
 
   isActive: z.boolean().optional(),
   cnhExpirationDate: z.coerce.date().optional().nullable(),
+
+  accessProfileId: z.string().optional().nullable(),
 })
 
 export type UpdateUserBody = z.infer<typeof updateUserBodySchema>

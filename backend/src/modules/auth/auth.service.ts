@@ -3,6 +3,7 @@
 // Pode ser testada unitariamente sem levantar o servidor.
 
 import bcrypt from 'bcryptjs'
+import type { AccessLevel } from '@prisma/client'
 import { prisma } from '../../lib/prisma.js'
 import { env } from '../../lib/env.js'
 import type { LoginBody, UserPublic, ChangePasswordBody } from './auth.schema.js'
@@ -43,6 +44,18 @@ const userPublicSelect = {
   role: true,
   isActive: true,
   createdAt: true,
+  accessProfileId: true,
+  accessProfile: {
+    select: {
+      id: true,
+      name: true,
+      isMaster: true,
+      isAdminType: true,
+      permissions: {
+        select: { pageKey: true, level: true },
+      },
+    },
+  },
   employee: {
     select: {
       id: true,
@@ -61,6 +74,23 @@ const userPublicSelect = {
     },
   },
 } as const
+
+/** Resolve o mapa pageKey → nível de acesso de um usuário, pronto para embutir no JWT. */
+export function resolveAccessPermissions(
+  accessProfile:
+    | { isAdminType: boolean; permissions: { pageKey: string; level: string }[] }
+    | null
+    | undefined,
+): { isAdminType: boolean; permissions: Record<string, AccessLevel> } {
+  if (!accessProfile) {
+    return { isAdminType: false, permissions: {} }
+  }
+  const permissions: Record<string, AccessLevel> = {}
+  for (const p of accessProfile.permissions) {
+    permissions[p.pageKey] = p.level as AccessLevel
+  }
+  return { isAdminType: accessProfile.isAdminType, permissions }
+}
 
 // ── Service ───────────────────────────────────────────────────────────────────
 

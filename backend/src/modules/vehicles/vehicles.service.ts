@@ -79,8 +79,16 @@ export class FinalKmBelowInitialError extends Error {
 export class OnlySelfTripCreationAllowedError extends Error {
   readonly statusCode = 403
   constructor() {
-    super('Usuários com perfil Colaborador só podem registrar viagens para si mesmos.')
+    super('Seu perfil de acesso só permite registrar viagens para você mesmo.')
     this.name = 'OnlySelfTripCreationAllowedError'
+  }
+}
+
+export class TripAccessDeniedError extends Error {
+  readonly statusCode = 403
+  constructor() {
+    super('Seu perfil de acesso só permite atuar em viagens onde você é o motorista.')
+    this.name = 'TripAccessDeniedError'
   }
 }
 
@@ -174,10 +182,11 @@ export const vehiclesService = {
     body: StartTripBody,
     /** employeeId extraído do JWT (pode ser null se o usuário não tem employee) */
     jwtEmployeeId: string | null,
-    userRole: string,
+    /** true quando o perfil de acesso do usuário só permite ações no que é seu */
+    isOwnScoped: boolean,
   ) {
-    // ⚙️ REGRA DE NEGÓCIO: Colaboradores só podem criar viagem para si mesmos
-    if (userRole === 'COLLABORATOR') {
+    // ⚙️ Perfis com escopo pessoal só podem criar viagem para si mesmos
+    if (isOwnScoped) {
       if (!jwtEmployeeId) {
         throw new OnlySelfTripCreationAllowedError()
       }
@@ -321,7 +330,7 @@ export const vehiclesService = {
   },
 
   // ── POST /vehicles/trips/:id/end ───────────────────────────────────────────
-  async endTrip(tripId: string, body: EndTripBody) {
+  async endTrip(tripId: string, body: EndTripBody, ownerEmployeeId?: string | null) {
     // 1. Busca a viagem com os dados do veículo
     const trip = await prisma.vehicleTrip.findUnique({
       where: { id: tripId },
@@ -345,6 +354,11 @@ export const vehiclesService = {
     })
 
     if (!trip) throw new TripNotFoundError(tripId)
+
+    // ⚙️ Perfis com escopo pessoal só podem encerrar viagens onde são o motorista
+    if (ownerEmployeeId !== undefined && trip.driverEmployeeId !== ownerEmployeeId) {
+      throw new TripAccessDeniedError()
+    }
 
     // 2. Valida que a viagem ainda está aberta
     if (trip.arrivalDateTime !== null) {
@@ -444,8 +458,11 @@ export const vehiclesService = {
   },
 
   // ── GET /vehicles/trips ────────────────────────────────────────────────────
-  async listTrips(opts?: { vehicleId?: string; limit?: number; offset?: number }) {
-    const where = opts?.vehicleId ? { vehicleId: opts.vehicleId } : {}
+  async listTrips(opts?: { vehicleId?: string; limit?: number; offset?: number; driverEmployeeId?: string }) {
+    const where = {
+      ...(opts?.vehicleId ? { vehicleId: opts.vehicleId } : {}),
+      ...(opts?.driverEmployeeId ? { driverEmployeeId: opts.driverEmployeeId } : {}),
+    }
     const [total, trips] = await prisma.$transaction([
       prisma.vehicleTrip.count({ where }),
       prisma.vehicleTrip.findMany({
@@ -617,12 +634,19 @@ export const vehiclesService = {
     return true
   },
 
-  async createIncident(tripId: string, body: { description: string; location: string; photos?: string[] | undefined }) {
+  async createIncident(
+    tripId: string,
+    body: { description: string; location: string; photos?: string[] | undefined },
+    ownerEmployeeId?: string | null,
+  ) {
     const trip = await prisma.vehicleTrip.findUnique({
       where: { id: tripId },
     })
     if (!trip) {
       throw new TripNotFoundError(tripId)
+    }
+    if (ownerEmployeeId !== undefined && trip.driverEmployeeId !== ownerEmployeeId) {
+      throw new TripAccessDeniedError()
     }
     return prisma.tripIncident.create({
       data: {
@@ -634,12 +658,15 @@ export const vehiclesService = {
     })
   },
 
-  async createFuelRecord(tripId: string, body: CreateFuelRecordBody) {
+  async createFuelRecord(tripId: string, body: CreateFuelRecordBody, ownerEmployeeId?: string | null) {
     const trip = await prisma.vehicleTrip.findUnique({
       where: { id: tripId },
     })
     if (!trip) {
       throw new TripNotFoundError(tripId)
+    }
+    if (ownerEmployeeId !== undefined && trip.driverEmployeeId !== ownerEmployeeId) {
+      throw new TripAccessDeniedError()
     }
     const fuelRecord = await prisma.tripFuelRecord.create({
       data: {

@@ -536,9 +536,9 @@ export const assetsService = {
     })
   },
 
-  async listLoanRequests(userId: string, role: string) {
-    // Se for colaborador comum, filtra apenas as dele
-    if (role === 'COLLABORATOR') {
+  async listLoanRequests(userId: string, isOwnScoped: boolean) {
+    // Perfis com escopo pessoal só veem as próprias solicitações
+    if (isOwnScoped) {
       const user = await prisma.user.findUnique({
         where: { id: userId },
         include: { employee: true }

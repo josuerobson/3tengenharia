@@ -13,7 +13,7 @@ export async function maintenanceTypeRoutes(app: FastifyInstance): Promise<void>
   app.get(
     '/:vehicleId/maintenance-types',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.maintenance.types', 'READ')],
       schema: {
         tags: ['Vehicles'],
         summary: 'Lista tipos de manutenção de um veículo',
@@ -62,7 +62,7 @@ export async function maintenanceTypeRoutes(app: FastifyInstance): Promise<void>
   app.post(
     '/:vehicleId/maintenance-types',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.maintenance.types', 'WRITE')],
       schema: {
         tags: ['Vehicles'],
         summary: 'Cadastra novo tipo de manutenção',
@@ -99,7 +99,7 @@ export async function maintenanceTypeRoutes(app: FastifyInstance): Promise<void>
   app.patch(
     '/:vehicleId/maintenance-types/:id',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.maintenance.types', 'WRITE')],
       schema: {
         tags: ['Vehicles'],
         summary: 'Atualiza tipo de manutenção',
@@ -139,7 +139,7 @@ export async function maintenanceTypeRoutes(app: FastifyInstance): Promise<void>
   app.delete(
     '/:vehicleId/maintenance-types/:id',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.maintenance.types', 'WRITE')],
       schema: {
         tags: ['Vehicles'],
         summary: 'Remove tipo de manutenção',
@@ -167,7 +167,7 @@ export async function maintenanceTypeRoutes(app: FastifyInstance): Promise<void>
   app.post(
     '/:vehicleId/maintenance-types/:id/complete',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.maintenance.types', 'WRITE')],
       schema: {
         tags: ['Vehicles'],
         summary: 'Registra conclusão de serviço de manutenção',
@@ -231,7 +231,7 @@ export async function maintenanceTypeRoutes(app: FastifyInstance): Promise<void>
   app.get(
     '/:vehicleId/alerts',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('vehicles.maintenance.alerts', 'READ')],
       schema: {
         tags: ['Vehicles'],
         summary: 'Alertas de manutenção por tipo de serviço',

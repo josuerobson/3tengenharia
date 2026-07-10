@@ -700,6 +700,13 @@ export interface ApiUser {
   role: 'ADMIN' | 'COLLABORATOR' | 'MANAGER_WORKSITE' | 'MANAGER_HR' | 'MANAGER_WAREHOUSE'
   isActive: boolean
   createdAt: string
+  accessProfileId?: string | null
+  accessProfile?: {
+    id: string
+    name: string
+    isMaster: boolean
+    isAdminType: boolean
+  } | null
   employee?: {
     id: string
     fullName: string
@@ -726,6 +733,7 @@ export const usersApi = {
     email: string
     password?: string
     role: 'ADMIN' | 'COLLABORATOR' | 'MANAGER_WORKSITE' | 'MANAGER_HR' | 'MANAGER_WAREHOUSE'
+    accessProfileId?: string | null
     fullName: string
     phone: string
     cpf: string
@@ -746,6 +754,7 @@ export const usersApi = {
       email: string
       password?: string
       role: 'ADMIN' | 'COLLABORATOR' | 'MANAGER_WORKSITE' | 'MANAGER_HR' | 'MANAGER_WAREHOUSE'
+      accessProfileId: string | null
       fullName: string
       phone: string
       cpf: string
@@ -1141,6 +1150,74 @@ export const dashboardApi = {
   getSummary(): Promise<DashboardSummary> {
     return request('/dashboard/summary')
   }
+}
+
+// ── Endpoints de Perfis de Acesso (AccessProfile) ─────────────────────────────
+
+export type ApiAccessLevel = 'NONE' | 'READ_OWN' | 'READ_ALL' | 'WRITE_OWN' | 'WRITE_ALL'
+
+export interface ApiAccessProfilePermission {
+  pageKey: string
+  level: ApiAccessLevel
+}
+
+export interface ApiAccessProfile {
+  id: string
+  name: string
+  isMaster: boolean
+  isAdminType: boolean
+  createdAt: string
+  updatedAt: string
+  permissions: ApiAccessProfilePermission[]
+  _count: { users: number }
+}
+
+export interface ApiPageDefinition {
+  key: string
+  label: string
+  group: string
+  supportsOwnScope: boolean
+}
+
+export const accessProfilesApi = {
+  listPages(): Promise<ApiPageDefinition[]> {
+    return request('/access-profiles/pages')
+  },
+
+  list(): Promise<ApiAccessProfile[]> {
+    return request('/access-profiles')
+  },
+
+  create(data: {
+    name: string
+    isAdminType?: boolean
+    permissions: ApiAccessProfilePermission[]
+  }): Promise<ApiAccessProfile> {
+    return request('/access-profiles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  edit(
+    id: string,
+    data: Partial<{
+      name: string
+      isAdminType: boolean
+      permissions: ApiAccessProfilePermission[]
+    }>,
+  ): Promise<ApiAccessProfile> {
+    return request(`/access-profiles/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
+  delete(id: string): Promise<void> {
+    return request(`/access-profiles/${id}`, {
+      method: 'DELETE',
+    })
+  },
 }
 
 

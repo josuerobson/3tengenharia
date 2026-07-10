@@ -183,8 +183,8 @@ export function assetsController(_app: FastifyInstance) {
 
     async listLoanRequests(request: FastifyRequest, reply: FastifyReply) {
       const userId = request.currentUser.sub
-      const role = request.currentUser.role
-      const requests = await assetsService.listLoanRequests(userId, role)
+      const isOwnScoped = request.accessScope?.isOwnScoped ?? false
+      const requests = await assetsService.listLoanRequests(userId, isOwnScoped)
       return reply.status(200).send(requests)
     },
 

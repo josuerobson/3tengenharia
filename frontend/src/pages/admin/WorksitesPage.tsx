@@ -43,9 +43,9 @@ function formatDateForInput(dateStr?: string | null) {
 
 export default function WorksitesPage() {
   const navigate = useNavigate()
-  const { user: currentUser } = useAuth()
-  const isAuthorized = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
-  const isDeleteAllowed = currentUser?.role === 'ADMIN'
+  const { canReadPage, canWritePage } = useAuth()
+  const isAuthorized = canReadPage('admin.worksites')
+  const canManage = canWritePage('admin.worksites')
 
   // ── Estados de Dados ───────────────────────────────────────────────────────
   const [worksites, setWorksites] = useState<ApiWorksite[]>([])
@@ -243,10 +243,12 @@ export default function WorksitesPage() {
           </p>
         </div>
 
-        <Button onClick={handleOpenNewForm}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Obra
-        </Button>
+        {canManage && (
+          <Button onClick={handleOpenNewForm}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Obra
+          </Button>
+        )}
       </div>
 
       {fetchError && (
@@ -364,6 +366,7 @@ export default function WorksitesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-xs">
                         <div className="flex items-center justify-end gap-1.5">
+                          {canManage && (
                           <Button
                             size="icon-sm"
                             variant="ghost"
@@ -372,7 +375,8 @@ export default function WorksitesPage() {
                           >
                             <Edit2 className="w-4 h-4 text-gray-500 hover:text-brand-primary" />
                           </Button>
-                          {isDeleteAllowed && (
+                          )}
+                          {canManage && (
                             <Button
                               size="icon-sm"
                               variant="ghost"

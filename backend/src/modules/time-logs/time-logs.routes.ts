@@ -2,7 +2,6 @@
 
 import type { FastifyInstance } from 'fastify'
 import { timeLogsController } from './time-logs.controller.js'
-import { UserRole } from '@prisma/client'
 
 export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   const controller = timeLogsController(app)
@@ -14,7 +13,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/bulk',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('timelogs.daily', 'WRITE')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Lançamento coletivo de horas (bulk)',
@@ -120,7 +119,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('timelogs.daily', 'READ')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Listar lançamentos de horas',
@@ -211,8 +210,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   app.patch(
     '/:id/validate',
     {
-      onRequest: [app.authenticate],
-      preHandler: [app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])],
+      onRequest: [app.authenticate, app.requirePermission('timelogs.daily', 'WRITE')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Validar/aprovar um lançamento de horas',
@@ -252,7 +250,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   app.patch(
     '/:id',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('timelogs.daily', 'WRITE')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Atualizar um lançamento de horas',
@@ -297,7 +295,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   app.delete(
     '/:id',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('timelogs.daily', 'WRITE')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Excluir um lançamento de horas',
@@ -323,7 +321,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/team-allocation',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('timelogs.allocation', 'READ')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Dados para alocação de equipes (obras, gestores e colaboradores)',
@@ -409,7 +407,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/team-allocation',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('timelogs.allocation', 'WRITE')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Salvar alocação de equipe',

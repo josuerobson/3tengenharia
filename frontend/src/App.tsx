@@ -5,6 +5,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import LoginPage from '@/pages/auth/LoginPage'
+import RequirePage from '@/components/RequirePage'
 
 // ── Páginas reais (Etapa 5) ───────────────────────────────────────────────────
 import TripStartPage           from '@/pages/vehicles/TripStartPage'
@@ -32,6 +33,7 @@ import UsersPage                 from '@/pages/admin/UsersPage'
 import ProfilePage               from '@/pages/auth/ProfilePage'
 import WorksitesPage             from '@/pages/admin/WorksitesPage'
 import DashboardPage             from '@/pages/dashboard/DashboardPage'
+import AccessControlPage         from '@/pages/admin/AccessControlPage'
 
 // ── Página placeholder genérica (substituir pelas páginas reais na Etapa 5) ──
 
@@ -73,34 +75,35 @@ export default function App() {
                 <Route index element={<Navigate to="/dashboard" replace />} />
 
                 {/* Dashboard */}
-                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="dashboard" element={<RequirePage pageKey="dashboard"><DashboardPage /></RequirePage>} />
 
                 {/* Módulo 1 — Veículos */}
-                <Route path="vehicles/trips/new"        element={<TripStartPage />} />
-                <Route path="vehicles/trips"             element={<TripHistoryPage />} />
-                <Route path="vehicles/maintenance"       element={<MaintenanceAlertsPage />} />
-                <Route path="vehicles/maintenance-types" element={<MaintenanceTypesPage />} />
-                <Route path="vehicles/fleet"             element={<VehicleRegistrationPage />} />
+                <Route path="vehicles/trips/new"        element={<RequirePage pageKey="vehicles.trips.new"><TripStartPage /></RequirePage>} />
+                <Route path="vehicles/trips"             element={<RequirePage pageKey="vehicles.trips.history"><TripHistoryPage /></RequirePage>} />
+                <Route path="vehicles/maintenance"       element={<RequirePage pageKey="vehicles.maintenance.alerts"><MaintenanceAlertsPage /></RequirePage>} />
+                <Route path="vehicles/maintenance-types" element={<RequirePage pageKey="vehicles.maintenance.types"><MaintenanceTypesPage /></RequirePage>} />
+                <Route path="vehicles/fleet"             element={<RequirePage pageKey="vehicles.fleet"><VehicleRegistrationPage /></RequirePage>} />
 
                 {/* Módulo 2 — Ferramentas */}
-                <Route path="assets/catalog" element={<AssetCatalogPage />} />
-                <Route path="assets/requests" element={<LoanRequestsPage />} />
-                <Route path="assets/maintenance/new" element={<NewDefectReportPage />} />
-                <Route path="assets/warehouse" element={<WarehousePage />} />
+                <Route path="assets/catalog" element={<RequirePage pageKey="assets.catalog"><AssetCatalogPage /></RequirePage>} />
+                <Route path="assets/requests" element={<RequirePage pageKey="assets.requests"><LoanRequestsPage /></RequirePage>} />
+                <Route path="assets/maintenance/new" element={<RequirePage pageKey="assets.defect.new"><NewDefectReportPage /></RequirePage>} />
+                <Route path="assets/warehouse" element={<RequirePage pageKey={['assets.warehouse.inventory', 'assets.warehouse.fulfillment', 'assets.warehouse.activeLoans']}><WarehousePage /></RequirePage>} />
 
                 {/* Módulo 3 — Horas */}
-                <Route path="time-logs/daily" element={<DailyLogPage />} />
-                <Route path="time-logs/report" element={<ReportPage />} />
-                <Route path="time-logs/team-allocation" element={<TeamAllocationPage />} />
-                <Route path="time-logs/teams" element={<TeamsPage />} />
+                <Route path="time-logs/daily" element={<RequirePage pageKey="timelogs.daily"><DailyLogPage /></RequirePage>} />
+                <Route path="time-logs/report" element={<RequirePage pageKey="timelogs.report"><ReportPage /></RequirePage>} />
+                <Route path="time-logs/team-allocation" element={<RequirePage pageKey="timelogs.allocation"><TeamAllocationPage /></RequirePage>} />
+                <Route path="time-logs/teams" element={<RequirePage pageKey="timelogs.teams"><TeamsPage /></RequirePage>} />
 
                 {/* Módulo 5S — Auditorias de Organização */}
-                <Route path="5s/audit/new" element={<DailyAuditForm5S />} />
-                <Route path="5s/panel"     element={<QualityValidationPanel5S />} />
+                <Route path="5s/audit/new" element={<RequirePage pageKey="fiveS.audit.new"><DailyAuditForm5S /></RequirePage>} />
+                <Route path="5s/panel"     element={<RequirePage pageKey="fiveS.panel"><QualityValidationPanel5S /></RequirePage>} />
 
                 {/* Admin */}
-                <Route path="admin/users"    element={<UsersPage />} />
-                <Route path="admin/worksites" element={<WorksitesPage />} />
+                <Route path="admin/users"    element={<RequirePage pageKey="admin.users"><UsersPage /></RequirePage>} />
+                <Route path="admin/worksites" element={<RequirePage pageKey="admin.worksites"><WorksitesPage /></RequirePage>} />
+                <Route path="admin/access-control" element={<RequirePage pageKey="admin.accessControl"><AccessControlPage /></RequirePage>} />
 
                 {/* Perfil */}
                 <Route path="profile" element={<ProfilePage />} />

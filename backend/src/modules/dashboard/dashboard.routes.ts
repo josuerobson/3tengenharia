@@ -5,7 +5,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/summary',
     {
-      onRequest: [app.authenticate],
+      onRequest: [app.authenticate, app.requirePermission('dashboard', 'READ')],
       schema: {
         tags: ['Dashboard'],
         summary: 'Obter indicadores de resumo de todos os módulos',

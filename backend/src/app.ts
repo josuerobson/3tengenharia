@@ -5,6 +5,7 @@
 import Fastify from 'fastify'
 import { corsPlugin } from './plugins/cors.js'
 import { jwtPlugin } from './plugins/jwt.js'
+import { permissionsPlugin } from './plugins/permissions.js'
 import { errorHandlerPlugin } from './plugins/error-handler.js'
 import { authRoutes }              from './modules/auth/auth.routes.js'
 import { vehicleRoutes }           from './modules/vehicles/vehicles.routes.js'
@@ -15,6 +16,7 @@ import { fiveSRoutes }             from './modules/fiveS/fiveS.routes.js'
 import { userRoutes }              from './modules/users/users.routes.js'
 import { worksiteRoutes }          from './modules/worksites/worksites.routes.js'
 import { dashboardRoutes }         from './modules/dashboard/dashboard.routes.js'
+import { accessProfileRoutes }     from './modules/accessProfiles/accessProfiles.routes.js'
 import { env } from './lib/env.js'
 
 export async function buildApp() {
@@ -60,6 +62,7 @@ export async function buildApp() {
   // ── Plugins de infraestrutura (ordem importa) ─────────────────────────────
   await app.register(corsPlugin)        // 1. CORS antes de qualquer rota
   await app.register(jwtPlugin)         // 2. JWT — adiciona decorators
+  await app.register(permissionsPlugin) // 2.1 Perfis de acesso dinâmicos — requirePermission
   await app.register(errorHandlerPlugin) // 3. Error handler global
 
   // ── Rotas de saúde / health check (sem prefixo de versão) ────────────────
@@ -83,6 +86,7 @@ export async function buildApp() {
       await v1.register(userRoutes,             { prefix: '/users' })      // Módulo: Usuários
       await v1.register(worksiteRoutes,         { prefix: '/worksites' })  // Módulo: Obras
       await v1.register(dashboardRoutes,        { prefix: '/dashboard' })  // Módulo: Dashboard
+      await v1.register(accessProfileRoutes,    { prefix: '/access-profiles' }) // Módulo: Perfis de Acesso
     },
     { prefix: '/api/v1' },
   )
