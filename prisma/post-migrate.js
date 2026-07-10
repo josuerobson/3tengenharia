@@ -1,5 +1,32 @@
 // prisma/post-migrate.js
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
+
+// ── Bootstrap do administrador inicial (banco vazio) ────────────────────────
+// Roda apenas quando o projeto sobe pela primeira vez, sem nenhum usuário
+// cadastrado — nunca mexe em um banco que já tem dados. Resolve o "ovo e a
+// galinha" de precisar de um admin logado para criar o primeiro usuário.
+async function seedGenesisAdmin(prisma) {
+  const userCount = await prisma.user.count()
+  if (userCount > 0) return
+
+  const email = process.env.GENESIS_ADMIN_EMAIL || 'admin@3tengenharia.com.br'
+  const password = process.env.GENESIS_ADMIN_PASSWORD || 'Admin@3T2024!'
+  const passwordHash = await bcrypt.hash(password, 12)
+
+  await prisma.user.create({
+    data: {
+      email,
+      passwordHash,
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
+
+  console.log(
+    `Post-migration: banco vazio — usuário administrador inicial criado (${email}). TROQUE A SENHA NO PRIMEIRO LOGIN.`,
+  )
+}
 
 // ── Seed dos perfis de acesso de sistema ────────────────────────────────────
 // Mantido em sincronia manual com backend/src/lib/accessControl.ts (PAGE_DEFINITIONS).
@@ -146,6 +173,8 @@ async function seedAccessProfiles(prisma) {
 async function main() {
   const prisma = new PrismaClient()
   try {
+    await seedGenesisAdmin(prisma)
+
     console.log('Running post-migration: restoring admin master roles...')
 
     // 1. Promote admin@3tengenharia.com.br to ADMIN
