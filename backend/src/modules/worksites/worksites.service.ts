@@ -20,9 +20,9 @@ export class WorksiteCodeAlreadyExistsError extends Error {
 
 export class WorksiteHasRelationsError extends Error {
   readonly statusCode = 409
-  constructor() {
+  constructor(reasons: string[]) {
     super(
-      'Esta obra possui colaboradores lotados ou rateios de horas associados e não pode ser excluída. Inative-a se necessário.'
+      `Esta obra possui ${reasons.join(', ')} associado(s) e não pode ser excluída. Inative-a se necessário.`
     )
     this.name = 'WorksiteHasRelationsError'
   }
@@ -106,14 +106,26 @@ export const worksitesService = {
       include: {
         employees: { select: { id: true } },
         timeLogs: { select: { id: true } },
+        vehicleTrips: { select: { id: true } },
+        audits5S: { select: { id: true } },
+        assetRequests: { select: { id: true } },
+        assetLoans: { select: { id: true } },
       },
     })
     if (!worksite) {
       throw new WorksiteNotFoundError(id)
     }
 
-    if (worksite.employees.length > 0 || worksite.timeLogs.length > 0) {
-      throw new WorksiteHasRelationsError()
+    const reasons: string[] = []
+    if (worksite.employees.length > 0) reasons.push('colaboradores lotados')
+    if (worksite.timeLogs.length > 0) reasons.push('rateios de horas')
+    if (worksite.vehicleTrips.length > 0) reasons.push('viagens de veículos')
+    if (worksite.audits5S.length > 0) reasons.push('auditorias 5S')
+    if (worksite.assetRequests.length > 0) reasons.push('solicitações de ferramentas')
+    if (worksite.assetLoans.length > 0) reasons.push('empréstimos de patrimônio')
+
+    if (reasons.length > 0) {
+      throw new WorksiteHasRelationsError(reasons)
     }
 
     await prisma.worksite.delete({
