@@ -63,6 +63,22 @@ const STATUS_COLORS: Record<string, string> = {
   REJECTED: 'text-red-700 bg-red-100 border-red-200',
 }
 
+/** Agrupa solicitações que compartilham o mesmo batchId (pedido com múltiplos itens/quantidades). */
+function groupRequestsByBatch(reqs: AssetLoanRequest[]): AssetLoanRequest[][] {
+  const seen = new Set<string>()
+  const groups: AssetLoanRequest[][] = []
+  for (const req of reqs) {
+    if (req.batchId) {
+      if (seen.has(req.batchId)) continue
+      seen.add(req.batchId)
+      groups.push(reqs.filter((r) => r.batchId === req.batchId))
+    } else {
+      groups.push([req])
+    }
+  }
+  return groups
+}
+
 export default function LoanRequestsPage() {
   useAuth()
 
@@ -73,9 +89,11 @@ export default function LoanRequestsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // ── Modal Nova Solicitação ─────────────────────────────────────────────────
+  // ── Modal Nova Solicitação (múltiplos itens) ───────────────────────────────
   const [newModalOpen, setNewModalOpen] = useState(false)
-  const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [requestItems, setRequestItems] = useState<{ categoryId: string; quantity: string }[]>([
+    { categoryId: '', quantity: '1' },
+  ])
   const [selectedWorksiteId, setSelectedWorksiteId] = useState('')
   const [requestNotes, setRequestNotes] = useState('')
   const [newSubmitting, setNewSubmitting] = useState(false)
@@ -104,9 +122,6 @@ export default function LoanRequestsPage() {
       setRequests(reqData)
       setCategories(catData.filter(c => c.isActive))
       setWorksites(worksiteData)
-      if (catData.filter(c => c.isActive).length > 0) {
-        setSelectedCategoryId(catData.filter(c => c.isActive)[0].id)
-      }
     } catch (err: any) {
       console.error('Erro ao carregar solicitações:', err)
       setError(err?.message ?? 'Falha ao conectar com o servidor.')
@@ -119,11 +134,45 @@ export default function LoanRequestsPage() {
     loadData()
   }, [loadData])
 
+  // ── Handlers dos itens da Nova Solicitação ─────────────────────────────────
+  const handleOpenNewModal = () => {
+    setRequestItems([{ categoryId: categories[0]?.id ?? '', quantity: '1' }])
+    setSelectedWorksiteId('')
+    setRequestNotes('')
+    setNewError(null)
+    setNewModalOpen(true)
+  }
+
+  const handleAddRequestItem = () => {
+    setRequestItems((prev) => [...prev, { categoryId: categories[0]?.id ?? '', quantity: '1' }])
+  }
+
+  const handleRemoveRequestItem = (index: number) => {
+    setRequestItems((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleRequestItemCategoryChange = (index: number, categoryId: string) => {
+    setRequestItems((prev) => prev.map((item, i) => (i === index ? { ...item, categoryId } : item)))
+  }
+
+  const handleRequestItemQuantityChange = (index: number, quantity: string) => {
+    setRequestItems((prev) => prev.map((item, i) => (i === index ? { ...item, quantity } : item)))
+  }
+
   // ── Handler Nova Solicitação ────────────────────────────────────────────────
   const handleNewRequest = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedCategoryId) {
-      setNewError('Selecione a categoria do bem que precisa.')
+
+    if (requestItems.some((item) => !item.categoryId)) {
+      setNewError('Selecione o tipo de equipamento em todos os itens.')
+      return
+    }
+    const parsedItems = requestItems.map((item) => ({
+      categoryId: item.categoryId,
+      quantity: parseInt(item.quantity, 10),
+    }))
+    if (parsedItems.some((item) => isNaN(item.quantity) || item.quantity < 1)) {
+      setNewError('Informe uma quantidade válida (mínimo 1) para todos os itens.')
       return
     }
 
@@ -131,8 +180,8 @@ export default function LoanRequestsPage() {
     setNewError(null)
 
     try {
-      await assetsApi.createLoanRequest({
-        categoryId: selectedCategoryId,
+      await assetsApi.createLoanRequestBatch({
+        items: parsedItems,
         destinationWorksiteId: selectedWorksiteId || null,
         requestNotes: requestNotes.trim() || null,
       })
@@ -211,8 +260,12 @@ export default function LoanRequestsPage() {
   }
 
   // ── Derivados ──────────────────────────────────────────────────────────────
-  const activeRequests = requests.filter(r => ['PENDING', 'LOANED', 'RETURNING'].includes(r.status))
-  const closedRequests = requests.filter(r => ['RETURNED', 'REJECTED'].includes(r.status))
+  // Agrupa unidades criadas juntas em um único pedido com múltiplos itens (mesmo batchId).
+  const requestGroups = groupRequestsByBatch(requests)
+  const activeGroups = requestGroups.filter(g => g.some(r => ['PENDING', 'LOANED', 'RETURNING'].includes(r.status)))
+  const closedGroups = requestGroups.filter(g => g.every(r => ['RETURNED', 'REJECTED'].includes(r.status)))
+  const activeCount = activeGroups.reduce((sum, g) => sum + g.length, 0)
+  const closedCount = closedGroups.reduce((sum, g) => sum + g.length, 0)
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
@@ -227,7 +280,7 @@ export default function LoanRequestsPage() {
             Solicite equipamentos e acompanhe o status dos seus empréstimos.
           </p>
         </div>
-        <Button onClick={() => setNewModalOpen(true)} className="shrink-0">
+        <Button onClick={handleOpenNewModal} className="shrink-0">
           <Plus className="w-4 h-4 mr-2" />
           Nova Solicitação
         </Button>
@@ -255,7 +308,7 @@ export default function LoanRequestsPage() {
       ) : (
         <div className="space-y-6">
           {/* Ativos */}
-          {activeRequests.length === 0 && closedRequests.length === 0 ? (
+          {activeGroups.length === 0 && closedGroups.length === 0 ? (
             <div className="py-16 text-center bg-white border border-gray-100 rounded-2xl">
               <Package className="w-12 h-12 mx-auto text-gray-300 mb-3" />
               <p className="text-base font-semibold text-gray-500">Nenhuma solicitação ainda.</p>
@@ -264,111 +317,134 @@ export default function LoanRequestsPage() {
           ) : (
             <>
               {/* Seção Ativas */}
-              {activeRequests.length > 0 && (
+              {activeGroups.length > 0 && (
                 <div>
                   <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
-                    Em andamento ({activeRequests.length})
+                    Em andamento ({activeCount})
                   </h2>
                   <div className="grid grid-cols-1 gap-4">
-                    {activeRequests.map((req) => (
-                      <Card key={req.id} className="p-4 sm:p-5 border-gray-100 bg-white shadow-sm">
-                        <div className="flex justify-between items-start gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className={`inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full border ${STATUS_COLORS[req.status] ?? 'text-gray-600 bg-gray-100'}`}>
-                                {req.status === 'PENDING' && <Clock className="w-3 h-3 mr-1" />}
-                                {req.status === 'LOANED' && <Package className="w-3 h-3 mr-1" />}
-                                {req.status === 'RETURNING' && <ArrowLeftRight className="w-3 h-3 mr-1" />}
-                                {STATUS_LABELS[req.status] ?? req.status}
+                    {activeGroups.map((group) => {
+                      const first = group[0]
+                      return (
+                        <Card key={first.batchId ?? first.id} className="p-4 sm:p-5 border-gray-100 bg-white shadow-sm">
+                          {group.length > 1 && (
+                            <div className="flex items-center gap-2 flex-wrap mb-2">
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border text-brand-primary bg-brand-primary/5 border-brand-primary/20">
+                                <Package className="w-3 h-3" />
+                                Pedido com {group.length} itens
                               </span>
                             </div>
-                            <p className="text-base font-bold text-gray-900 mt-2">{req.category?.name}</p>
-                            {req.allocatedAsset && (
-                              <p className="text-sm text-gray-600 mt-0.5 font-medium">
-                                Bem alocado: <span className="text-gray-800">{req.allocatedAsset.assetTag} — {req.allocatedAsset.description}</span>
-                              </p>
-                            )}
-                            {req.destinationWorksite && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                Obra: {req.destinationWorksite.name}
-                              </p>
-                            )}
-                            {req.requestNotes && (
-                              <p className="text-xs text-gray-400 mt-1 italic">"{req.requestNotes}"</p>
-                            )}
-                            <p className="text-xs text-gray-400 mt-2">
-                              Solicitado em {new Date(req.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                          )}
+                          {first.destinationWorksite && (
+                            <p className="text-xs text-gray-500">
+                              Obra: {first.destinationWorksite.name}
                             </p>
-                          </div>
-                        </div>
+                          )}
+                          {first.requestNotes && (
+                            <p className="text-xs text-gray-400 mt-1 italic">"{first.requestNotes}"</p>
+                          )}
+                          <p className="text-xs text-gray-400 mt-1">
+                            Solicitado em {new Date(first.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                          </p>
 
-                        {/* Fotos de envio (quando LOANED ou RETURNING) */}
-                        {req.status !== 'PENDING' && req.checkoutPhoto1 && (
-                          <div className="mt-3 pt-3 border-t border-gray-100">
-                            <p className="text-xs font-semibold text-gray-400 mb-2">Fotos no envio:</p>
-                            <div className="flex gap-2 flex-wrap">
-                              {[req.checkoutPhoto1, req.checkoutPhoto2, req.checkoutPhoto3, req.checkoutPhoto4].filter(Boolean).map((photo, idx) => (
-                                <img key={idx} src={photo!} alt="Foto de envio" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
-                              ))}
-                            </div>
-                            {req.checkoutNotes && (
-                              <p className="text-xs text-gray-400 mt-1.5 italic">"{req.checkoutNotes}"</p>
-                            )}
-                          </div>
-                        )}
+                          <div className={group.length > 1 ? 'mt-3 pt-3 border-t border-gray-100 space-y-4 divide-y divide-gray-100' : ''}>
+                            {group.map((req) => (
+                              <div key={req.id} className={group.length > 1 ? 'pt-4 first:pt-0' : ''}>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full border ${STATUS_COLORS[req.status] ?? 'text-gray-600 bg-gray-100'}`}>
+                                    {req.status === 'PENDING' && <Clock className="w-3 h-3 mr-1" />}
+                                    {req.status === 'LOANED' && <Package className="w-3 h-3 mr-1" />}
+                                    {req.status === 'RETURNING' && <ArrowLeftRight className="w-3 h-3 mr-1" />}
+                                    {STATUS_LABELS[req.status] ?? req.status}
+                                  </span>
+                                </div>
+                                <p className="text-base font-bold text-gray-900 mt-2">{req.category?.name}</p>
+                                {req.allocatedAsset && (
+                                  <p className="text-sm text-gray-600 mt-0.5 font-medium">
+                                    Bem alocado: <span className="text-gray-800">{req.allocatedAsset.assetTag} — {req.allocatedAsset.description}</span>
+                                  </p>
+                                )}
 
-                        {/* Botão de devolver (só aparece quando LOANED) */}
-                        {req.status === 'LOANED' && (
-                          <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenReturnModal(req)}
-                              className="flex items-center gap-1.5 text-xs font-semibold border-brand-primary text-brand-primary hover:bg-brand-primary/5 h-9"
-                            >
-                              <ArrowLeftRight size={13} />
-                              Registrar Devolução
-                            </Button>
-                          </div>
-                        )}
+                                {/* Fotos de envio (quando LOANED ou RETURNING) */}
+                                {req.status !== 'PENDING' && req.checkoutPhoto1 && (
+                                  <div className="mt-3 pt-3 border-t border-gray-100">
+                                    <p className="text-xs font-semibold text-gray-400 mb-2">Fotos no envio:</p>
+                                    <div className="flex gap-2 flex-wrap">
+                                      {[req.checkoutPhoto1, req.checkoutPhoto2, req.checkoutPhoto3, req.checkoutPhoto4].filter(Boolean).map((photo, idx) => (
+                                        <img key={idx} src={photo!} alt="Foto de envio" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                                      ))}
+                                    </div>
+                                    {req.checkoutNotes && (
+                                      <p className="text-xs text-gray-400 mt-1.5 italic">"{req.checkoutNotes}"</p>
+                                    )}
+                                  </div>
+                                )}
 
-                        {/* Aguardando validação do gestor */}
-                        {req.status === 'RETURNING' && (
-                          <div className="mt-3 pt-3 border-t border-gray-100">
-                            <p className="text-xs text-orange-700 font-semibold flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5" />
-                              Devolução registrada. Aguardando confirmação do gestor.
-                            </p>
+                                {/* Botão de devolver (só aparece quando LOANED) */}
+                                {req.status === 'LOANED' && (
+                                  <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleOpenReturnModal(req)}
+                                      className="flex items-center gap-1.5 text-xs font-semibold border-brand-primary text-brand-primary hover:bg-brand-primary/5 h-9"
+                                    >
+                                      <ArrowLeftRight size={13} />
+                                      Registrar Devolução
+                                    </Button>
+                                  </div>
+                                )}
+
+                                {/* Aguardando validação do gestor */}
+                                {req.status === 'RETURNING' && (
+                                  <div className="mt-3 pt-3 border-t border-gray-100">
+                                    <p className="text-xs text-orange-700 font-semibold flex items-center gap-1.5">
+                                      <Clock className="w-3.5 h-3.5" />
+                                      Devolução registrada. Aguardando confirmação do gestor.
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        )}
-                      </Card>
-                    ))}
+                        </Card>
+                      )
+                    })}
                   </div>
                 </div>
               )}
 
               {/* Seção Histórico */}
-              {closedRequests.length > 0 && (
+              {closedGroups.length > 0 && (
                 <div>
                   <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
-                    Histórico ({closedRequests.length})
+                    Histórico ({closedCount})
                   </h2>
                   <div className="divide-y divide-gray-100 bg-white border border-gray-100 rounded-2xl overflow-hidden">
-                    {closedRequests.map((req) => (
-                      <div key={req.id} className="px-5 py-4 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-gray-800 text-sm truncate">{req.category?.name}</p>
-                          {req.allocatedAsset && (
-                            <p className="text-xs text-gray-500 truncate">{req.allocatedAsset.description}</p>
-                          )}
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {new Date(req.createdAt).toLocaleDateString('pt-BR')}
+                    {closedGroups.map((group) => (
+                      <div key={group[0].batchId ?? group[0].id} className="px-5 py-4 space-y-3">
+                        {group.length > 1 && (
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                            Pedido com {group.length} itens
                           </p>
-                        </div>
-                        <span className={`inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${STATUS_COLORS[req.status] ?? 'text-gray-600 bg-gray-100'}`}>
-                          {req.status === 'RETURNED' && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                          {STATUS_LABELS[req.status] ?? req.status}
-                        </span>
+                        )}
+                        {group.map((req) => (
+                          <div key={req.id} className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-gray-800 text-sm truncate">{req.category?.name}</p>
+                              {req.allocatedAsset && (
+                                <p className="text-xs text-gray-500 truncate">{req.allocatedAsset.description}</p>
+                              )}
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {new Date(req.createdAt).toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
+                            <span className={`inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${STATUS_COLORS[req.status] ?? 'text-gray-600 bg-gray-100'}`}>
+                              {req.status === 'RETURNED' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                              {STATUS_LABELS[req.status] ?? req.status}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </div>
@@ -394,19 +470,57 @@ export default function LoanRequestsPage() {
             </div>
           )}
 
-          <div>
-            <Label htmlFor="reqCategory" required>Tipo de Equipamento</Label>
-            <select
-              id="reqCategory"
-              value={selectedCategoryId}
-              onChange={(e) => setSelectedCategoryId(e.target.value)}
-              className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
-              required
+          <div className="space-y-2.5">
+            <Label required>Equipamentos Necessários</Label>
+            {requestItems.map((item, idx) => (
+              <div key={idx} className="flex items-end gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="flex-1 min-w-0">
+                  <label className="text-[11px] text-gray-500 font-medium">Tipo de Equipamento</label>
+                  <select
+                    value={item.categoryId}
+                    onChange={(e) => handleRequestItemCategoryChange(idx, e.target.value)}
+                    className="mt-1 w-full h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+                    required
+                  >
+                    <option value="">Selecione...</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="w-20 shrink-0">
+                  <label className="text-[11px] text-gray-500 font-medium">Qtd.</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={50}
+                    value={item.quantity}
+                    onChange={(e) => handleRequestItemQuantityChange(idx, e.target.value)}
+                    className="mt-1 w-full h-10 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-900 text-center focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
+                    required
+                  />
+                </div>
+                {requestItems.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveRequestItem(idx)}
+                    className="h-10 w-10 shrink-0 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                    aria-label="Remover item"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={handleAddRequestItem}
+              className="w-full h-10 rounded-xl border-2 border-dashed border-gray-200 hover:border-brand-primary/40 text-xs font-semibold text-gray-500 hover:text-brand-primary flex items-center justify-center gap-1.5 transition-colors"
             >
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
+              <Plus className="w-3.5 h-3.5" />
+              Adicionar outro equipamento
+            </button>
           </div>
 
           <div>

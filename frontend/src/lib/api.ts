@@ -25,6 +25,8 @@ export interface AssetLoanRequest {
   categoryId: string
   category: AssetCategory
   status: 'PENDING' | 'LOANED' | 'RETURNING' | 'RETURNED' | 'REJECTED'
+  /** Agrupa unidades criadas juntas em um único pedido com múltiplos itens/quantidades. */
+  batchId: string | null
   destinationWorksiteId: string | null
   destinationWorksite: {
     id: string
@@ -590,6 +592,17 @@ export const assetsApi = {
     })
   },
 
+  createLoanRequestBatch(data: {
+    items: { categoryId: string; quantity: number }[]
+    destinationWorksiteId?: string | null
+    requestNotes?: string | null
+  }): Promise<{ message: string; requests: AssetLoanRequest[]; batchId: string | null }> {
+    return request('/assets/requests/batch', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    })
+  },
+
   allocateLoanRequest(
     requestId: string,
     data: {
@@ -602,6 +615,23 @@ export const assetsApi = {
     }
   ): Promise<{ message: string; loanRequest: AssetLoanRequest }> {
     return request(`/assets/requests/${requestId}/allocate`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    })
+  },
+
+  allocateLoanRequestBatch(data: {
+    allocations: {
+      requestId: string
+      allocatedAssetId: string
+      checkoutPhoto1?: string | null
+      checkoutPhoto2?: string | null
+      checkoutPhoto3?: string | null
+      checkoutPhoto4?: string | null
+      checkoutNotes?: string | null
+    }[]
+  }): Promise<{ message: string; requests: AssetLoanRequest[] }> {
+    return request('/assets/requests/batch/allocate', {
       method: 'POST',
       body: JSON.stringify(data)
     })

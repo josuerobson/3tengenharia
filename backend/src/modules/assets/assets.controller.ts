@@ -9,7 +9,9 @@ import {
   createCategoryBodySchema,
   editCategoryBodySchema,
   createAssetLoanRequestBodySchema,
+  createAssetLoanRequestBatchBodySchema,
   allocateAssetLoanRequestBodySchema,
+  allocateAssetLoanRequestBatchBodySchema,
   returnAssetLoanRequestBodySchema,
   validateReturnAssetLoanRequestBodySchema,
 } from './assets.schema.js'
@@ -186,6 +188,23 @@ export function assetsController(_app: FastifyInstance) {
       return reply.status(200).send(requests)
     },
 
+    async createLoanRequestBatch(request: FastifyRequest, reply: FastifyReply) {
+      const body = createAssetLoanRequestBatchBodySchema.parse(request.body)
+      const userId = request.currentUser.sub
+      let requests
+      try {
+        requests = await assetsService.createLoanRequestBatch(userId, body)
+      } catch (err: any) {
+        return reply.status(400).send({ message: err.message })
+      }
+      const count = requests.length
+      return reply.status(201).send({
+        message: `Solicitação criada com ${count} ite${count === 1 ? 'm' : 'ns'}.`,
+        requests,
+        batchId: requests[0]?.batchId ?? null,
+      })
+    },
+
     async allocateLoanRequest(request: FastifyRequest, reply: FastifyReply) {
       const params = request.params as { id: string }
       const body = allocateAssetLoanRequestBodySchema.parse(request.body)
@@ -199,6 +218,22 @@ export function assetsController(_app: FastifyInstance) {
       return reply.status(200).send({
         message: 'Patrimônio físico alocado e enviado com sucesso.',
         loanRequest
+      })
+    },
+
+    async allocateLoanRequestBatch(request: FastifyRequest, reply: FastifyReply) {
+      const body = allocateAssetLoanRequestBatchBodySchema.parse(request.body)
+      const userId = request.currentUser.sub
+      let requests
+      try {
+        requests = await assetsService.allocateLoanRequestBatch(userId, body)
+      } catch (err: any) {
+        return reply.status(400).send({ message: err.message })
+      }
+      const count = requests.length
+      return reply.status(200).send({
+        message: `${count} ite${count === 1 ? 'm alocado' : 'ns alocados'} e enviados com sucesso.`,
+        requests
       })
     },
 

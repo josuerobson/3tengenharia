@@ -428,6 +428,19 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   )
 
   app.post(
+    '/requests/batch',
+    {
+      onRequest: [app.authenticate],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Criar solicitação com múltiplos equipamentos/quantidades em um único pedido',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.createLoanRequestBatch
+  )
+
+  app.post(
     '/requests/:id/allocate',
     {
       onRequest: [
@@ -441,6 +454,22 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
       } as any
     },
     controller.allocateLoanRequest
+  )
+
+  app.post(
+    '/requests/batch/allocate',
+    {
+      onRequest: [
+        app.authenticate,
+        app.requireRole([UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE, UserRole.ADMIN])
+      ],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Vincular e enviar bens físicos para todas as unidades de um pedido em lote',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.allocateLoanRequestBatch
   )
 
   app.post(

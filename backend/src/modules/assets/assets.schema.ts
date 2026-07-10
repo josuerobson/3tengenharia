@@ -127,6 +127,33 @@ export type CreateAssetLoanRequestBody = z.infer<
   typeof createAssetLoanRequestBodySchema
 >
 
+export const createAssetLoanRequestBatchBodySchema = z.object({
+  items: z
+    .array(
+      z.object({
+        categoryId: z
+          .string({ required_error: 'Categoria é obrigatória.' })
+          .cuid('ID de categoria inválido.'),
+        quantity: z
+          .number({ required_error: 'Quantidade é obrigatória.' })
+          .int('Quantidade deve ser um número inteiro.')
+          .min(1, 'Quantidade mínima é 1.')
+          .max(50, 'Quantidade máxima por item é 50.'),
+      }),
+    )
+    .min(1, 'Inclua ao menos um equipamento na solicitação.'),
+  destinationWorksiteId: z
+    .string()
+    .cuid('ID da obra de destino inválido.')
+    .optional()
+    .nullable(),
+  requestNotes: z.string().trim().max(1000).optional().nullable(),
+})
+
+export type CreateAssetLoanRequestBatchBody = z.infer<
+  typeof createAssetLoanRequestBatchBodySchema
+>
+
 export const allocateAssetLoanRequestBodySchema = z.object({
   allocatedAssetId: z
     .string({ required_error: 'Bem patrimonial a ser alocado é obrigatório.' })
@@ -140,6 +167,30 @@ export const allocateAssetLoanRequestBodySchema = z.object({
 
 export type AllocateAssetLoanRequestBody = z.infer<
   typeof allocateAssetLoanRequestBodySchema
+>
+
+export const allocateAssetLoanRequestBatchBodySchema = z.object({
+  allocations: z
+    .array(
+      z.object({
+        requestId: z
+          .string({ required_error: 'ID da solicitação é obrigatório.' })
+          .cuid('ID de solicitação inválido.'),
+        allocatedAssetId: z
+          .string({ required_error: 'Bem patrimonial a ser alocado é obrigatório.' })
+          .cuid('ID do bem inválido.'),
+        checkoutPhoto1: z.string().optional().nullable(),
+        checkoutPhoto2: z.string().optional().nullable(),
+        checkoutPhoto3: z.string().optional().nullable(),
+        checkoutPhoto4: z.string().optional().nullable(),
+        checkoutNotes: z.string().trim().max(1000).optional().nullable(),
+      }),
+    )
+    .min(1, 'Inclua ao menos uma alocação.'),
+})
+
+export type AllocateAssetLoanRequestBatchBody = z.infer<
+  typeof allocateAssetLoanRequestBatchBodySchema
 >
 
 export const returnAssetLoanRequestBodySchema = z.object({

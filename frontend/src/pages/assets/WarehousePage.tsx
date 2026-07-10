@@ -31,6 +31,23 @@ import { Dialog } from '@/components/ui/dialog'
 import { useAuth } from '@/contexts/AuthContext'
 import { assetsApi, type AssetCategory, type AssetLoanRequest } from '@/lib/api'
 import { type Asset } from '@/data/mockData'
+import BatchAllocateModal from '@/components/assets/BatchAllocateModal'
+
+/** Agrupa solicitações que compartilham o mesmo batchId (pedido com múltiplos itens/quantidades). */
+function groupRequestsByBatch(reqs: AssetLoanRequest[]): AssetLoanRequest[][] {
+  const seen = new Set<string>()
+  const groups: AssetLoanRequest[][] = []
+  for (const req of reqs) {
+    if (req.batchId) {
+      if (seen.has(req.batchId)) continue
+      seen.add(req.batchId)
+      groups.push(reqs.filter((r) => r.batchId === req.batchId))
+    } else {
+      groups.push([req])
+    }
+  }
+  return groups
+}
 
 function compressImage(file: File, maxWidth = 800, maxHeight = 800, quality = 0.6): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -125,6 +142,9 @@ export default function WarehousePage() {
   const [allocationPhotos, setAllocationPhotos] = useState<string[]>([])
   const [allocationSubmitting, setAllocationSubmitting] = useState(false)
   const [allocationError, setAllocationError] = useState<string | null>(null)
+
+  // Modal de Alocação em Lote (pedido com múltiplos itens)
+  const [batchAllocateGroup, setBatchAllocateGroup] = useState<AssetLoanRequest[] | null>(null)
 
   // Modal de Validação de Devolução
   const [validateModalOpen, setValidateModalOpen] = useState(false)
@@ -982,6 +1002,7 @@ export default function WarehousePage() {
           {/* Tab Solicitações & Devoluções */}
           {activeTab === 'requests' && (() => {
             const pending = requests.filter(r => r.status === 'PENDING')
+            const pendingGroups = groupRequestsByBatch(pending)
             const returning = requests.filter(r => r.status === 'RETURNING')
             const activeRequests = requests.filter(r => r.status === 'LOANED')
 
@@ -993,37 +1014,83 @@ export default function WarehousePage() {
                     <ClipboardList className="w-4 h-4" />
                     Solicitações Pendentes ({pending.length})
                   </h3>
-                  {pending.length === 0 ? (
+                  {pendingGroups.length === 0 ? (
                     <p className="text-xs text-gray-400 py-2">Nenhuma solicitação pendente.</p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {pending.map((req) => (
-                        <Card key={req.id} className="p-4 border-amber-200/60 bg-white shadow-sm">
-                          <div className="flex justify-between items-start gap-2">
-                            <div className="min-w-0">
-                              <span className="block text-xs font-bold text-gray-400 uppercase tracking-wide">Solicitante</span>
-                              <span className="block text-sm font-bold text-gray-900 truncate">{req.requesterEmployee?.fullName}</span>
-                              <span className="block text-xs text-gray-500 mt-1 font-medium">
-                                Categoria: <span className="text-gray-700">{req.category?.name}</span>
-                              </span>
-                              {req.requestNotes && (
-                                <p className="text-xs text-gray-400 mt-1 italic">"{req.requestNotes}"</p>
-                              )}
+                      {pendingGroups.map((group) => {
+                        const req = group[0]
+
+                        if (group.length === 1) {
+                          return (
+                            <Card key={req.id} className="p-4 border-amber-200/60 bg-white shadow-sm">
+                              <div className="flex justify-between items-start gap-2">
+                                <div className="min-w-0">
+                                  <span className="block text-xs font-bold text-gray-400 uppercase tracking-wide">Solicitante</span>
+                                  <span className="block text-sm font-bold text-gray-900 truncate">{req.requesterEmployee?.fullName}</span>
+                                  <span className="block text-xs text-gray-500 mt-1 font-medium">
+                                    Categoria: <span className="text-gray-700">{req.category?.name}</span>
+                                  </span>
+                                  {req.requestNotes && (
+                                    <p className="text-xs text-gray-400 mt-1 italic">"{req.requestNotes}"</p>
+                                  )}
+                                </div>
+                                <Badge variant="loaned" className="bg-amber-100 text-amber-700 border-amber-200 shrink-0">Pendente</Badge>
+                              </div>
+                              <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleOpenAllocateModal(req)}
+                                  className="text-xs font-semibold flex items-center gap-1.5 h-9"
+                                >
+                                  <Package size={13} />
+                                  Alocar e Enviar
+                                </Button>
+                              </div>
+                            </Card>
+                          )
+                        }
+
+                        // Pedido com múltiplos itens/quantidades (mesmo batchId)
+                        const countsByCategory = new Map<string, number>()
+                        for (const item of group) {
+                          const label = item.category?.name ?? '—'
+                          countsByCategory.set(label, (countsByCategory.get(label) ?? 0) + 1)
+                        }
+                        return (
+                          <Card key={req.batchId} className="p-4 border-amber-200/60 bg-white shadow-sm">
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="min-w-0">
+                                <span className="block text-xs font-bold text-gray-400 uppercase tracking-wide">Solicitante</span>
+                                <span className="block text-sm font-bold text-gray-900 truncate">{req.requesterEmployee?.fullName}</span>
+                                <div className="mt-1.5 space-y-0.5">
+                                  {Array.from(countsByCategory.entries()).map(([label, count]) => (
+                                    <span key={label} className="block text-xs text-gray-500 font-medium">
+                                      {count}x <span className="text-gray-700">{label}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                                {req.requestNotes && (
+                                  <p className="text-xs text-gray-400 mt-1 italic">"{req.requestNotes}"</p>
+                                )}
+                              </div>
+                              <Badge variant="loaned" className="bg-amber-100 text-amber-700 border-amber-200 shrink-0">
+                                {group.length} itens
+                              </Badge>
                             </div>
-                            <Badge variant="loaned" className="bg-amber-100 text-amber-700 border-amber-200 shrink-0">Pendente</Badge>
-                          </div>
-                          <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
-                            <Button
-                              size="sm"
-                              onClick={() => handleOpenAllocateModal(req)}
-                              className="text-xs font-semibold flex items-center gap-1.5 h-9"
-                            >
-                              <Package size={13} />
-                              Alocar e Enviar
-                            </Button>
-                          </div>
-                        </Card>
-                      ))}
+                            <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
+                              <Button
+                                size="sm"
+                                onClick={() => setBatchAllocateGroup(group)}
+                                className="text-xs font-semibold flex items-center gap-1.5 h-9"
+                              >
+                                <Package size={13} />
+                                Alocar e Enviar Pedido
+                              </Button>
+                            </div>
+                          </Card>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -1828,6 +1895,19 @@ export default function WarehousePage() {
           </div>
         </form>
       </Dialog>
+
+      {/* ── Modal de Alocação em Lote (Pedido com Múltiplos Itens) ─────────────── */}
+      {batchAllocateGroup && (
+        <BatchAllocateModal
+          requests={batchAllocateGroup}
+          assets={assets}
+          onClose={() => setBatchAllocateGroup(null)}
+          onSuccess={() => {
+            setBatchAllocateGroup(null)
+            loadAssets()
+          }}
+        />
+      )}
 
       {/* ── Modal de Validação de Devolução ────────────────────────────────────── */}
       <Dialog

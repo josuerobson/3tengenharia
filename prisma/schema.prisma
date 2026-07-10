@@ -680,6 +680,10 @@ model AssetLoanRequest {
   // Notas de solicitação
   requestNotes String? @map("request_notes") @db.Text
 
+  // Agrupa solicitações criadas juntas em um único pedido com múltiplos itens/quantidades
+  // (cada unidade vira uma AssetLoanRequest própria, já que a devolução continua unitária)
+  batchId String? @map("batch_id")
+
   // Bem físico vinculado (quando a solicitação é aprovada/enviada)
   allocatedAssetId String? @map("allocated_asset_id")
   allocatedAsset   Asset?  @relation(fields: [allocatedAssetId], references: [id], onDelete: SetNull)
@@ -724,5 +728,6 @@ model AssetLoanRequest {
   @@index([categoryId])
   @@index([status])
   @@index([allocatedAssetId])
+  @@index([batchId])
   @@map("asset_loan_requests")
 }

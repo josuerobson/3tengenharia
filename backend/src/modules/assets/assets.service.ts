@@ -1,6 +1,7 @@
 // src/modules/assets/assets.service.ts
 // Regras de negócio do módulo de Ferramentas & Patrimônio.
 
+import { randomUUID } from 'node:crypto'
 import { prisma } from '../../lib/prisma.js'
 import type {
   CreateMaintenanceLogBody,
@@ -10,7 +11,9 @@ import type {
   CreateCategoryBody,
   EditCategoryBody,
   CreateAssetLoanRequestBody,
+  CreateAssetLoanRequestBatchBody,
   AllocateAssetLoanRequestBody,
+  AllocateAssetLoanRequestBatchBody,
   ReturnAssetLoanRequestBody,
   ValidateReturnAssetLoanRequestBody,
 } from './assets.schema.js'
@@ -482,6 +485,57 @@ export const assetsService = {
     })
   },
 
+  // ── Solicitação com múltiplos equipamentos/quantidades em um único pedido ────
+  async createLoanRequestBatch(requesterUserId: string, body: CreateAssetLoanRequestBatchBody) {
+    // 1. Encontra o colaborador associado ao usuário logado
+    const user = await prisma.user.findUnique({
+      where: { id: requesterUserId },
+      include: { employee: true }
+    })
+    if (!user?.employee) {
+      throw new Error('Somente usuários colaboradores vinculados podem abrir solicitações.')
+    }
+
+    // 2. Valida todas as categorias antes de criar qualquer coisa
+    const categoryIds = [...new Set(body.items.map((item) => item.categoryId))]
+    const categories = await prisma.assetCategory.findMany({
+      where: { id: { in: categoryIds } }
+    })
+    for (const item of body.items) {
+      const category = categories.find((c) => c.id === item.categoryId)
+      if (!category || !category.isActive) {
+        throw new Error('Uma ou mais categorias solicitadas são inválidas ou estão inativas.')
+      }
+    }
+
+    // 3. Expande cada item (categoria + quantidade) em uma solicitação individual por unidade,
+    // já que a devolução de cada bem continua sendo unitária.
+    const batchId = randomUUID()
+    const employeeId = user.employee.id
+    const rowsToCreate = body.items.flatMap((item) =>
+      Array.from({ length: item.quantity }, () => ({
+        requesterEmployeeId: employeeId,
+        categoryId: item.categoryId,
+        destinationWorksiteId: body.destinationWorksiteId ?? null,
+        requestNotes: body.requestNotes ?? null,
+        status: 'PENDING' as const,
+        batchId,
+      })),
+    )
+
+    await prisma.assetLoanRequest.createMany({ data: rowsToCreate })
+
+    return prisma.assetLoanRequest.findMany({
+      where: { batchId },
+      include: {
+        category: true,
+        requesterEmployee: true,
+        destinationWorksite: true
+      },
+      orderBy: { createdAt: 'asc' }
+    })
+  },
+
   async listLoanRequests(userId: string, role: string) {
     // Se for colaborador comum, filtra apenas as dele
     if (role === 'COLLABORATOR') {
@@ -586,6 +640,61 @@ export const assetsService = {
     })
 
     return updatedRequest
+  },
+
+  // ── Aloca e envia todas as unidades de um lote (pedido com múltiplos itens) ──
+  async allocateLoanRequestBatch(checkoutByUserId: string, body: AllocateAssetLoanRequestBatchBody) {
+    const requestIds = body.allocations.map((a) => a.requestId)
+    const assetIds = body.allocations.map((a) => a.allocatedAssetId)
+
+    // 1. Não permite vincular o mesmo bem físico a mais de um item nesta submissão
+    if (new Set(assetIds).size !== assetIds.length) {
+      throw new Error('Não é possível vincular o mesmo bem físico a mais de um item da solicitação.')
+    }
+
+    // 2. Pré-valida todas as solicitações antes de aplicar qualquer alteração
+    const requests = await prisma.assetLoanRequest.findMany({
+      where: { id: { in: requestIds } }
+    })
+    for (const alloc of body.allocations) {
+      const req = requests.find((r) => r.id === alloc.requestId)
+      if (!req) {
+        throw new Error(`Solicitação ${alloc.requestId} não encontrada.`)
+      }
+      if (req.status !== 'PENDING') {
+        throw new Error('Uma ou mais solicitações deste pedido já não estão mais pendentes.')
+      }
+    }
+
+    // 3. Pré-valida todos os bens físicos antes de aplicar qualquer alteração
+    const assets = await prisma.asset.findMany({
+      where: { id: { in: assetIds } }
+    })
+    for (const alloc of body.allocations) {
+      const asset = assets.find((a) => a.id === alloc.allocatedAssetId)
+      if (!asset) {
+        throw new Error(`Bem patrimonial ${alloc.allocatedAssetId} não encontrado.`)
+      }
+      if (asset.currentStatus !== 'AVAILABLE') {
+        throw new Error(`O patrimônio "${asset.assetTag}" não está disponível para envio. Status: ${asset.currentStatus}`)
+      }
+    }
+
+    // 4. Aplica cada alocação reaproveitando a mesma lógica do fluxo individual
+    const updatedRequests = []
+    for (const alloc of body.allocations) {
+      const updated = await this.allocateLoanRequest(alloc.requestId, checkoutByUserId, {
+        allocatedAssetId: alloc.allocatedAssetId,
+        checkoutPhoto1: alloc.checkoutPhoto1 ?? null,
+        checkoutPhoto2: alloc.checkoutPhoto2 ?? null,
+        checkoutPhoto3: alloc.checkoutPhoto3 ?? null,
+        checkoutPhoto4: alloc.checkoutPhoto4 ?? null,
+        checkoutNotes: alloc.checkoutNotes ?? null,
+      })
+      updatedRequests.push(updated)
+    }
+
+    return updatedRequests
   },
 
   async submitReturn(requestId: string, requesterUserId: string, body: ReturnAssetLoanRequestBody) {
