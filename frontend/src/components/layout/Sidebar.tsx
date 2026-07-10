@@ -28,7 +28,6 @@ import {
   Plus,
   History,
   AlertTriangle,
-  Package,
   ArrowLeftRight,
   AlertCircle,
   Warehouse,
@@ -123,13 +122,6 @@ const MENU_ITEMS: MenuItem[] = [
     label: 'Ferramentas & Equipamentos',
     icon: Wrench,
     subItems: [
-      {
-        id: 'assets-catalog',
-        label: 'Catálogo de Itens',
-        path: '/assets/catalog',
-        icon: Package,
-        pageKeys: ['assets.catalog'],
-      },
       {
         id: 'assets-loan',
         label: 'Minhas Solicitações',

@@ -22,7 +22,6 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
   { key: 'vehicles.maintenance.alerts', label: 'Alertas de Manutenção', group: 'Controle de Veículos', supportsOwnScope: false },
   { key: 'vehicles.maintenance.types', label: 'Tipos de Manutenção', group: 'Controle de Veículos', supportsOwnScope: false },
 
-  { key: 'assets.catalog', label: 'Catálogo de Itens', group: 'Ferramentas & Equipamentos', supportsOwnScope: false },
   { key: 'assets.requests', label: 'Minhas Solicitações', group: 'Ferramentas & Equipamentos', supportsOwnScope: true },
   { key: 'assets.defect.new', label: 'Relatar Defeito', group: 'Ferramentas & Equipamentos', supportsOwnScope: false },
   { key: 'assets.warehouse.inventory', label: 'Almoxarifado > Estoque, Itens & Categorias', group: 'Ferramentas & Equipamentos', supportsOwnScope: false },

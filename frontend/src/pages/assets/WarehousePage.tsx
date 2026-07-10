@@ -96,8 +96,22 @@ type ActiveTab = 'inventory' | 'requests' | 'loans' | 'maintenance' | 'categorie
 
 export default function WarehousePage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, canReadPage } = useAuth()
   const isManagerOrAdmin = user?.role === 'ADMIN' || user?.role?.startsWith('MANAGER')
+
+  // ── Permissões por aba ──────────────────────────────────────────────────────
+  // Inventário/Empréstimos/Manutenção/Categorias compartilham a mesma origem de
+  // dados (GET /assets, gated por assets.warehouse.inventory). Solicitações &
+  // Devoluções é a visão gerencial das solicitações, gated por assets.warehouse.fulfillment.
+  const canInventory = canReadPage('assets.warehouse.inventory')
+  const canFulfillment = canReadPage('assets.warehouse.fulfillment')
+
+  const visibleTabs = useMemo(() => {
+    const tabs: ActiveTab[] = []
+    if (canInventory) tabs.push('inventory', 'loans', 'maintenance', 'categories')
+    if (canFulfillment) tabs.push('requests')
+    return tabs
+  }, [canInventory, canFulfillment])
 
   // ── Estados de Dados ───────────────────────────────────────────────────────
   const [assets, setAssets] = useState<Asset[]>([])
@@ -107,7 +121,9 @@ export default function WarehousePage() {
   const [error, setError] = useState<string | null>(null)
 
   // ── Estados de UI / Navegação ──────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<ActiveTab>('inventory')
+  // Abre na primeira aba que o perfil realmente enxerga — evita cair numa aba
+  // vazia/inacessível para perfis customizados que só têm uma das permissões.
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => visibleTabs[0] ?? 'inventory')
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
@@ -180,14 +196,17 @@ export default function WarehousePage() {
   const [repairError, setRepairError] = useState<string | null>(null)
 
   // ── Carregar Dados ─────────────────────────────────────────────────────────
+  // Cada chamada só é feita se o perfil tiver a permissão correspondente no
+  // backend — evita que uma única rota negada (403) derrube o Promise.all
+  // inteiro para perfis customizados que só têm acesso parcial a esta página.
   const loadAssets = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
       const [assetsData, categoriesData, requestsData] = await Promise.all([
-        assetsApi.list(),
+        canInventory ? assetsApi.list() : Promise.resolve([]),
         assetsApi.listCategories(),
-        assetsApi.listLoanRequests()
+        canFulfillment ? assetsApi.listLoanRequests() : Promise.resolve([]),
       ])
       setAssets(assetsData)
       setCategories(categoriesData)
@@ -201,7 +220,7 @@ export default function WarehousePage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [canInventory, canFulfillment])
 
   useEffect(() => {
     loadAssets()
@@ -698,6 +717,7 @@ export default function WarehousePage() {
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200 overflow-x-auto scrollbar-none">
+        {canInventory && (
         <button
           onClick={() => setActiveTab('inventory')}
           className={cn(
@@ -709,6 +729,8 @@ export default function WarehousePage() {
         >
           Inventário Geral
         </button>
+        )}
+        {canFulfillment && (
         <button
           onClick={() => setActiveTab('requests')}
           className={cn(
@@ -725,6 +747,8 @@ export default function WarehousePage() {
             </span>
           )}
         </button>
+        )}
+        {canInventory && (
         <button
           onClick={() => setActiveTab('loans')}
           className={cn(
@@ -741,6 +765,8 @@ export default function WarehousePage() {
             </span>
           )}
         </button>
+        )}
+        {canInventory && (
         <button
           onClick={() => setActiveTab('maintenance')}
           className={cn(
@@ -757,6 +783,8 @@ export default function WarehousePage() {
             </span>
           )}
         </button>
+        )}
+        {canInventory && (
         <button
           onClick={() => setActiveTab('categories')}
           className={cn(
@@ -768,6 +796,7 @@ export default function WarehousePage() {
         >
           Categorias
         </button>
+        )}
       </div>
 
       {loading ? (

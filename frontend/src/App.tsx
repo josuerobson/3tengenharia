@@ -12,7 +12,6 @@ import TripStartPage           from '@/pages/vehicles/TripStartPage'
 import TripHistoryPage         from '@/pages/vehicles/TripHistoryPage'
 import MaintenanceAlertsPage   from '@/pages/vehicles/MaintenanceAlertsPage'
 import MaintenanceTypesPage    from '@/pages/vehicles/MaintenanceTypesPage'
-import AssetCatalogPage        from '@/pages/assets/AssetCatalogPage'
 import NewDefectReportPage     from '@/pages/assets/NewDefectReportPage'
 import WarehousePage           from '@/pages/assets/WarehousePage'
 import LoanRequestsPage        from '@/pages/assets/LoanRequestsPage'
@@ -85,7 +84,8 @@ export default function App() {
                 <Route path="vehicles/fleet"             element={<RequirePage pageKey="vehicles.fleet"><VehicleRegistrationPage /></RequirePage>} />
 
                 {/* Módulo 2 — Ferramentas */}
-                <Route path="assets/catalog" element={<RequirePage pageKey="assets.catalog"><AssetCatalogPage /></RequirePage>} />
+                {/* Catálogo de Itens foi consolidado em Almoxarifado > Inventário Geral */}
+                <Route path="assets/catalog" element={<Navigate to="/assets/warehouse" replace />} />
                 <Route path="assets/requests" element={<RequirePage pageKey="assets.requests"><LoanRequestsPage /></RequirePage>} />
                 <Route path="assets/maintenance/new" element={<RequirePage pageKey="assets.defect.new"><NewDefectReportPage /></RequirePage>} />
                 <Route path="assets/warehouse" element={<RequirePage pageKey={['assets.warehouse.inventory', 'assets.warehouse.fulfillment', 'assets.warehouse.activeLoans']}><WarehousePage /></RequirePage>} />

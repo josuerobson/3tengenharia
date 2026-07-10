@@ -83,7 +83,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/',
     {
-      onRequest: [app.authenticate, app.requirePermission('assets.catalog', 'READ')],
+      onRequest: [app.authenticate, app.requirePermission('assets.warehouse.inventory', 'READ')],
       schema: {
         tags: ['Assets'],
         summary: 'Listar todos os bens patrimoniais',
