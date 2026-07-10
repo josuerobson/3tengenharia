@@ -640,7 +640,7 @@ export default function Sidebar({
          ══════════════════════════════════════════════════════ */}
       <aside
         className={cn(
-          'hidden lg:block fixed top-16 left-0 bottom-0 z-40',
+          'hidden lg:block fixed top-[calc(4rem+env(safe-area-inset-top))] left-0 bottom-0 z-40',
           'transition-all duration-300 ease-in-out overflow-hidden',
           isCollapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_EXPANDED_W,
         )}
@@ -677,6 +677,7 @@ export default function Sidebar({
         id="mobile-sidebar"
         className={cn(
           'lg:hidden fixed top-0 left-0 bottom-0 z-50',
+          'pt-[env(safe-area-inset-top)]',
           MOBILE_DRAWER_W,
           'transition-transform duration-300 ease-in-out',
           'shadow-2xl',

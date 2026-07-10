@@ -60,7 +60,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* ── Área de Conteúdo Principal ──────────────────────────────────── */}
       {/*
-          pt-16     → compensa o Header fixo de 64px
+          pt-[...]  → compensa o Header fixo de 64px + safe-area do notch/Dynamic Island (PWA iOS)
           lg:pl-64  → compensa a sidebar expandida (256px)
           lg:pl-[70px] → compensa a sidebar colapsada (70px)
           A transição de padding-left é sincronizada com a largura da sidebar.
@@ -68,13 +68,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <div
         className={cn(
           'transition-all duration-300 ease-in-out',
-          'pt-16 min-h-screen',
+          'pt-[calc(4rem+env(safe-area-inset-top))] min-h-screen',
           isCollapsed ? 'lg:pl-[70px]' : 'lg:pl-64',
         )}
       >
         <main
           id="main-content"
-          className="p-4 sm:p-5 lg:p-6 min-h-[calc(100vh-4rem)]"
+          className="p-4 sm:p-5 lg:p-6 min-h-[calc(100vh-4rem-env(safe-area-inset-top))]"
           // Acessibilidade: âncora para "skip to content"
           tabIndex={-1}
         >

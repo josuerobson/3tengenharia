@@ -326,12 +326,12 @@ export default function Header({
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 h-16 z-50
+      className="fixed top-0 left-0 right-0 z-50
                  bg-brand-primary shadow-header
-                 flex items-center"
+                 pt-[env(safe-area-inset-top)]"
       role="banner"
     >
-      <div className="flex items-center w-full h-full px-3 sm:px-4 gap-1 sm:gap-2">
+      <div className="flex items-center w-full h-16 px-3 sm:px-4 gap-1 sm:gap-2">
 
         {/* ── Hambúrguer (mobile apenas) ─────────────────────────────────── */}
         <button
