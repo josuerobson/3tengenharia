@@ -1,7 +1,7 @@
 // src/modules/users/users.service.ts
 import { prisma } from '../../lib/prisma.js'
 import bcrypt from 'bcryptjs'
-import type { CreateUserBody, UpdateUserBody } from './users.schema.js'
+import type { CreateUserBody, UpdateUserBody, CreateJobFunctionBody, EditJobFunctionBody } from './users.schema.js'
 
 export class UserNotFoundError extends Error {
   readonly statusCode = 404
@@ -48,6 +48,30 @@ export class EmployeeAlreadyLinkedError extends Error {
   constructor(fullName: string) {
     super(`Colaborador "${fullName}" já está vinculado a outro usuário.`)
     this.name = 'EmployeeAlreadyLinkedError'
+  }
+}
+
+export class JobFunctionNotFoundError extends Error {
+  readonly statusCode = 404
+  constructor(id: string) {
+    super(`Função não encontrada: ${id}`)
+    this.name = 'JobFunctionNotFoundError'
+  }
+}
+
+export class JobFunctionAlreadyExistsError extends Error {
+  readonly statusCode = 409
+  constructor(name: string) {
+    super(`Já existe uma função chamada "${name}".`)
+    this.name = 'JobFunctionAlreadyExistsError'
+  }
+}
+
+export class JobFunctionInUseError extends Error {
+  readonly statusCode = 409
+  constructor(name: string, count: number) {
+    super(`Não é possível excluir "${name}": há ${count} funcionário(s) vinculado(s) a esta função.`)
+    this.name = 'JobFunctionInUseError'
   }
 }
 
@@ -277,5 +301,63 @@ export const usersService = {
     await prisma.user.delete({
       where: { id },
     })
+  },
+
+  // ── Funções/Cargos (lista gerenciável) ───────────────────────────────────────
+
+  async listJobFunctions() {
+    return prisma.jobFunction.findMany({ orderBy: { name: 'asc' } })
+  },
+
+  async createJobFunction(body: CreateJobFunctionBody) {
+    const name = body.name.trim()
+    const existing = await prisma.jobFunction.findUnique({ where: { name } })
+    if (existing) {
+      throw new JobFunctionAlreadyExistsError(name)
+    }
+    return prisma.jobFunction.create({ data: { name } })
+  },
+
+  async editJobFunction(id: string, body: EditJobFunctionBody) {
+    const jobFunction = await prisma.jobFunction.findUnique({ where: { id } })
+    if (!jobFunction) {
+      throw new JobFunctionNotFoundError(id)
+    }
+
+    const newName = body.name?.trim()
+    if (newName && newName !== jobFunction.name) {
+      const existing = await prisma.jobFunction.findUnique({ where: { name: newName } })
+      if (existing) {
+        throw new JobFunctionAlreadyExistsError(newName)
+      }
+      // Atualiza os funcionários que já usam o nome antigo para o novo nome
+      await prisma.employee.updateMany({
+        where: { position: jobFunction.name },
+        data: { position: newName },
+      })
+    }
+
+    const updateData: { name?: string; isActive?: boolean } = {}
+    if (newName !== undefined) updateData.name = newName
+    if (body.isActive !== undefined) updateData.isActive = body.isActive
+
+    return prisma.jobFunction.update({
+      where: { id },
+      data: updateData,
+    })
+  },
+
+  async deleteJobFunction(id: string) {
+    const jobFunction = await prisma.jobFunction.findUnique({ where: { id } })
+    if (!jobFunction) {
+      throw new JobFunctionNotFoundError(id)
+    }
+
+    const linkedCount = await prisma.employee.count({ where: { position: jobFunction.name } })
+    if (linkedCount > 0) {
+      throw new JobFunctionInUseError(jobFunction.name, linkedCount)
+    }
+
+    await prisma.jobFunction.delete({ where: { id } })
   },
 }

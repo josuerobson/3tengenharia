@@ -196,4 +196,69 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     },
     controller.deleteUser,
   )
+
+  // ── FUNÇÕES/CARGOS (lista gerenciável) ─────────────────────────────────────
+  app.get(
+    '/positions',
+    {
+      onRequest: [
+        app.authenticate,
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
+      ],
+      schema: {
+        tags: ['Users'],
+        summary: 'Listar funções/cargos cadastrados',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.listJobFunctions,
+  )
+
+  app.post(
+    '/positions',
+    {
+      onRequest: [
+        app.authenticate,
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
+      ],
+      schema: {
+        tags: ['Users'],
+        summary: 'Criar função/cargo',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.createJobFunction,
+  )
+
+  app.patch(
+    '/positions/:id',
+    {
+      onRequest: [
+        app.authenticate,
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
+      ],
+      schema: {
+        tags: ['Users'],
+        summary: 'Editar função/cargo (renomear e/ou ativar-desativar)',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.editJobFunction,
+  )
+
+  app.delete(
+    '/positions/:id',
+    {
+      onRequest: [
+        app.authenticate,
+        app.requireRole([UserRole.ADMIN, UserRole.MANAGER_WORKSITE, UserRole.MANAGER_HR, UserRole.MANAGER_WAREHOUSE]),
+      ],
+      schema: {
+        tags: ['Users'],
+        summary: 'Excluir função/cargo (bloqueado se houver funcionário vinculado)',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.deleteJobFunction,
+  )
 }

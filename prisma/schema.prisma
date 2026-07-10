@@ -226,6 +226,20 @@ model Employee {
   @@map("employees")
 }
 
+/// Lista gerenciável de funções/cargos disponíveis no cadastro de usuário.
+/// Employee.position continua sendo uma string livre (não é FK) para não quebrar
+/// nada que já lê esse campo — esta tabela só serve para popular/gerenciar as opções
+/// oferecidas no formulário e permitir editar/excluir com segurança.
+model JobFunction {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("job_functions")
+}
+
 // =============================================================================
 // MÓDULO 1: VEÍCULOS
 // =============================================================================

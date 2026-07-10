@@ -1,5 +1,5 @@
 // src/pages/time-logs/DailyLogPage.tsx
-// Diário de Classe — Preenchimento rápido de horas ao final do turno.
+// Registro Diário — Preenchimento rápido de horas ao final do turno.
 // Layout mobile-first:
 //   • Topo: seletor de Gestor (para admin/hr/warehouse) + Obra
 //   • Meio: lista de funcionários da equipe com checkboxes touch-friendly
@@ -669,7 +669,7 @@ export default function DailyLogPage() {
     <div className="max-w-5xl mx-auto">
       {/* Cabeçalho */}
       <div className="mb-6">
-        <h1 className="text-2xl font-extrabold text-gray-900">Diário de Classe</h1>
+        <h1 className="text-2xl font-extrabold text-gray-900">Registro Diário</h1>
         <p className="text-gray-500 text-sm mt-0.5">Rateio de horas — Módulo 3</p>
       </div>
 

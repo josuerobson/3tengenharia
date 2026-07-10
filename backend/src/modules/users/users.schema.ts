@@ -80,3 +80,22 @@ export const updateUserBodySchema = z.object({
 })
 
 export type UpdateUserBody = z.infer<typeof updateUserBodySchema>
+
+// ── Funções/Cargos (lista gerenciável) ────────────────────────────────────────
+
+export const createJobFunctionBodySchema = z.object({
+  name: z
+    .string({ required_error: 'Nome da função é obrigatório.' })
+    .trim()
+    .min(1, 'Nome da função não pode ser vazio.')
+    .max(100),
+})
+
+export type CreateJobFunctionBody = z.infer<typeof createJobFunctionBodySchema>
+
+export const editJobFunctionBodySchema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  isActive: z.boolean().optional(),
+})
+
+export type EditJobFunctionBody = z.infer<typeof editJobFunctionBodySchema>

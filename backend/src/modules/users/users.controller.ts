@@ -1,6 +1,11 @@
 // src/modules/users/users.controller.ts
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import { createUserBodySchema, updateUserBodySchema } from './users.schema.js'
+import {
+  createUserBodySchema,
+  updateUserBodySchema,
+  createJobFunctionBodySchema,
+  editJobFunctionBodySchema,
+} from './users.schema.js'
 import {
   usersService,
   UserNotFoundError,
@@ -8,6 +13,9 @@ import {
   EmployeeNotFoundError,
   EmployeeAlreadyLinkedError,
   RegistrationAlreadyExistsError,
+  JobFunctionNotFoundError,
+  JobFunctionAlreadyExistsError,
+  JobFunctionInUseError,
 } from './users.service.js'
 
 const DOMAIN_ERRORS = [
@@ -16,6 +24,9 @@ const DOMAIN_ERRORS = [
   EmployeeNotFoundError,
   EmployeeAlreadyLinkedError,
   RegistrationAlreadyExistsError,
+  JobFunctionNotFoundError,
+  JobFunctionAlreadyExistsError,
+  JobFunctionInUseError,
 ]
 
 function rethrowDomain(err: unknown): never {
@@ -59,6 +70,46 @@ export function usersController(_app: FastifyInstance) {
       const { id } = request.params as { id: string }
       try {
         await usersService.delete(id)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+      return reply.status(204).send()
+    },
+
+    // ── Funções/Cargos (lista gerenciável) ─────────────────────────────────────
+
+    async listJobFunctions(request: FastifyRequest, reply: FastifyReply) {
+      const jobFunctions = await usersService.listJobFunctions()
+      return reply.status(200).send(jobFunctions)
+    },
+
+    async createJobFunction(request: FastifyRequest, reply: FastifyReply) {
+      const body = createJobFunctionBodySchema.parse(request.body)
+      let jobFunction: Awaited<ReturnType<typeof usersService.createJobFunction>>
+      try {
+        jobFunction = await usersService.createJobFunction(body)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+      return reply.status(201).send(jobFunction)
+    },
+
+    async editJobFunction(request: FastifyRequest, reply: FastifyReply) {
+      const { id } = request.params as { id: string }
+      const body = editJobFunctionBodySchema.parse(request.body)
+      let jobFunction: Awaited<ReturnType<typeof usersService.editJobFunction>>
+      try {
+        jobFunction = await usersService.editJobFunction(id, body)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+      return reply.status(200).send(jobFunction)
+    },
+
+    async deleteJobFunction(request: FastifyRequest, reply: FastifyReply) {
+      const { id } = request.params as { id: string }
+      try {
+        await usersService.deleteJobFunction(id)
       } catch (err) {
         rethrowDomain(err)
       }

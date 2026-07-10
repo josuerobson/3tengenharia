@@ -22,7 +22,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
-import { usersApi, assetsApi, type ApiUser, type ApiEmployee } from '@/lib/api'
+import { usersApi, type ApiUser, type ApiJobFunction } from '@/lib/api'
 
 type RoleFilter = 'ALL' | 'ADMIN' | 'COLLABORATOR' | 'MANAGER_WORKSITE' | 'MANAGER_HR' | 'MANAGER_WAREHOUSE'
 type StatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE'
@@ -58,7 +58,7 @@ export default function UsersPage() {
 
   // ── Estados de Dados ───────────────────────────────────────────────────────
   const [users, setUsers] = useState<ApiUser[]>([])
-  const [employees, setEmployees] = useState<ApiEmployee[]>([])
+  const [jobFunctions, setJobFunctions] = useState<ApiJobFunction[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
 
@@ -93,30 +93,37 @@ export default function UsersPage() {
   const [deleteSubmitting, setDeleteSubmitting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  // ── Funções de exemplo (para o select) ─────────────────────────────────────
-  const existingPositions = useMemo(() => {
-    const set = new Set<string>()
-    employees.forEach((e) => {
-      if (e.position) set.add(e.position.trim())
-    })
-    set.add('Administrador')
-    set.add('Gestor de Obras')
-    set.add('Coordenador')
-    set.add('Almoxarife')
-    return Array.from(set).sort()
-  }, [employees])
+  // ── Estados de Modal (Gerenciar Funções) ───────────────────────────────────
+  const [jobFunctionModalOpen, setJobFunctionModalOpen] = useState(false)
+  const [newJobFunctionName, setNewJobFunctionName] = useState('')
+  const [editingJobFunctionId, setEditingJobFunctionId] = useState<string | null>(null)
+  const [editingJobFunctionName, setEditingJobFunctionName] = useState('')
+  const [jobFunctionActionError, setJobFunctionActionError] = useState<string | null>(null)
+  const [jobFunctionActionLoading, setJobFunctionActionLoading] = useState<string | null>(null)
+
+  // ── Funções ativas disponíveis para o select ───────────────────────────────
+  // Inclui a função atual do usuário em edição mesmo se ela tiver sido desativada,
+  // para não "sumir" do dropdown e o admin salvar sem querer com outro valor.
+  const activeJobFunctions = useMemo(() => {
+    const opts = jobFunctions.filter((f) => f.isActive)
+    if (position && !opts.some((f) => f.name === position)) {
+      const current = jobFunctions.find((f) => f.name === position)
+      opts.unshift(current ?? { id: '__current__', name: position, isActive: false, createdAt: '', updatedAt: '' })
+    }
+    return opts
+  }, [jobFunctions, position])
 
   // ── Carregar Dados ─────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     try {
       setLoadingData(true)
       setFetchError(null)
-      const [usersData, employeesData] = await Promise.all([
+      const [usersData, jobFunctionsData] = await Promise.all([
         usersApi.list(),
-        assetsApi.listEmployees(),
+        usersApi.listJobFunctions(),
       ])
       setUsers(usersData)
-      setEmployees(employeesData)
+      setJobFunctions(jobFunctionsData)
     } catch (err: any) {
       console.error('Erro ao carregar dados de usuários:', err)
       setFetchError(err?.message ?? 'Falha ao conectar com o servidor.')
@@ -124,6 +131,87 @@ export default function UsersPage() {
       setLoadingData(false)
     }
   }, [])
+
+  const reloadJobFunctions = useCallback(async () => {
+    try {
+      const data = await usersApi.listJobFunctions()
+      setJobFunctions(data)
+    } catch (err) {
+      console.error('Erro ao carregar funções:', err)
+    }
+  }, [])
+
+  // ── Handlers de Gerenciar Funções ───────────────────────────────────────────
+  const handleOpenJobFunctionModal = () => {
+    setJobFunctionActionError(null)
+    setNewJobFunctionName('')
+    setEditingJobFunctionId(null)
+    setJobFunctionModalOpen(true)
+  }
+
+  const handleCreateJobFunction = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const name = newJobFunctionName.trim()
+    if (!name) return
+    setJobFunctionActionError(null)
+    try {
+      await usersApi.createJobFunction({ name })
+      setNewJobFunctionName('')
+      await reloadJobFunctions()
+    } catch (err: any) {
+      setJobFunctionActionError(err?.message ?? 'Erro ao criar função.')
+    }
+  }
+
+  const handleStartEditJobFunction = (jf: ApiJobFunction) => {
+    setEditingJobFunctionId(jf.id)
+    setEditingJobFunctionName(jf.name)
+    setJobFunctionActionError(null)
+  }
+
+  const handleSaveEditJobFunction = async (id: string) => {
+    const name = editingJobFunctionName.trim()
+    if (!name) return
+    setJobFunctionActionLoading(id)
+    setJobFunctionActionError(null)
+    try {
+      await usersApi.updateJobFunction(id, { name })
+      setEditingJobFunctionId(null)
+      await reloadJobFunctions()
+      await loadData()
+    } catch (err: any) {
+      setJobFunctionActionError(err?.message ?? 'Erro ao renomear função.')
+    } finally {
+      setJobFunctionActionLoading(null)
+    }
+  }
+
+  const handleToggleJobFunctionActive = async (jf: ApiJobFunction) => {
+    setJobFunctionActionLoading(jf.id)
+    setJobFunctionActionError(null)
+    try {
+      await usersApi.updateJobFunction(jf.id, { isActive: !jf.isActive })
+      await reloadJobFunctions()
+    } catch (err: any) {
+      setJobFunctionActionError(err?.message ?? 'Erro ao atualizar função.')
+    } finally {
+      setJobFunctionActionLoading(null)
+    }
+  }
+
+  const handleDeleteJobFunction = async (jf: ApiJobFunction) => {
+    if (!confirm(`Excluir a função "${jf.name}"?`)) return
+    setJobFunctionActionLoading(jf.id)
+    setJobFunctionActionError(null)
+    try {
+      await usersApi.deleteJobFunction(jf.id)
+      await reloadJobFunctions()
+    } catch (err: any) {
+      setJobFunctionActionError(err?.message ?? 'Erro ao excluir função.')
+    } finally {
+      setJobFunctionActionLoading(null)
+    }
+  }
 
   useEffect(() => {
     if (isAuthorized) {
@@ -235,6 +323,15 @@ export default function UsersPage() {
     setFormSubmitting(true)
 
     try {
+      // Se for uma função nova (digitada livremente), registra na lista gerenciável também
+      if (isCustomPosition && !jobFunctions.some((f) => f.name.toLowerCase() === finalPosition.toLowerCase())) {
+        try {
+          await usersApi.createJobFunction({ name: finalPosition })
+        } catch (err) {
+          console.error('Não foi possível registrar a nova função na lista gerenciável:', err)
+        }
+      }
+
       if (editingUser) {
         // Atualizar
         await usersApi.update(editingUser.id, {
@@ -656,9 +753,18 @@ export default function UsersPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="position" required>
-                Função
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="position" required>
+                  Função
+                </Label>
+                <button
+                  type="button"
+                  onClick={handleOpenJobFunctionModal}
+                  className="text-[11px] font-semibold text-brand-primary hover:underline mb-1.5"
+                >
+                  Gerenciar funções
+                </button>
+              </div>
               <select
                 id="position"
                 value={isCustomPosition ? 'CUSTOM' : position}
@@ -675,9 +781,9 @@ export default function UsersPage() {
                 required
               >
                 <option value="">Selecione uma função...</option>
-                {existingPositions.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
+                {activeJobFunctions.map((f) => (
+                  <option key={f.id} value={f.name}>
+                    {f.name}
                   </option>
                 ))}
                 <option value="CUSTOM">+ Adicionar nova função...</option>
@@ -785,6 +891,113 @@ export default function UsersPage() {
                 'Excluir Conta'
               )}
             </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* ── MODAL: GERENCIAR FUNÇÕES ── */}
+      <Dialog
+        open={jobFunctionModalOpen}
+        onClose={() => setJobFunctionModalOpen(false)}
+        title="Gerenciar Funções"
+        description="Edite ou exclua funções cadastradas. Só é possível excluir funções sem funcionário vinculado."
+      >
+        <div className="space-y-4 pt-2">
+          {jobFunctionActionError && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2.5 text-xs text-red-600">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <p className="font-semibold">{jobFunctionActionError}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleCreateJobFunction} className="flex gap-2">
+            <Input
+              placeholder="Nova função..."
+              value={newJobFunctionName}
+              onChange={(e) => setNewJobFunctionName(e.target.value)}
+              className="flex-1 h-10"
+            />
+            <Button type="submit" size="sm" className="h-10 shrink-0">
+              <Plus className="w-4 h-4" />
+            </Button>
+          </form>
+
+          <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 border border-gray-100 rounded-xl">
+            {jobFunctions.length === 0 ? (
+              <p className="p-4 text-xs text-gray-400 text-center">Nenhuma função cadastrada.</p>
+            ) : (
+              jobFunctions.map((jf) => (
+                <div key={jf.id} className="p-3 flex items-center gap-2">
+                  {editingJobFunctionId === jf.id ? (
+                    <>
+                      <Input
+                        value={editingJobFunctionName}
+                        onChange={(e) => setEditingJobFunctionName(e.target.value)}
+                        className="flex-1 h-9 text-sm"
+                        autoFocus
+                      />
+                      <Button
+                        size="sm"
+                        className="h-9 shrink-0"
+                        onClick={() => handleSaveEditJobFunction(jf.id)}
+                        disabled={jobFunctionActionLoading === jf.id}
+                      >
+                        Salvar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-9 shrink-0"
+                        onClick={() => setEditingJobFunctionId(null)}
+                        disabled={jobFunctionActionLoading === jf.id}
+                      >
+                        Cancelar
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn('text-sm font-semibold truncate', !jf.isActive && 'text-gray-400 line-through')}>
+                          {jf.name}
+                        </p>
+                        {!jf.isActive && <p className="text-[10px] text-gray-400">Inativa</p>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleJobFunctionActive(jf)}
+                        disabled={jobFunctionActionLoading === jf.id}
+                        className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-50"
+                        title={jf.isActive ? 'Desativar' : 'Ativar'}
+                      >
+                        {jf.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditJobFunction(jf)}
+                        disabled={jobFunctionActionLoading === jf.id}
+                        className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-brand-primary transition-colors disabled:opacity-50"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteJobFunction(jf)}
+                        disabled={jobFunctionActionLoading === jf.id}
+                        className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
+                        title="Excluir"
+                      >
+                        {jobFunctionActionLoading === jf.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       </Dialog>

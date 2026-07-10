@@ -766,6 +766,40 @@ export const usersApi = {
       method: 'DELETE',
     })
   },
+
+  // ── Funções/Cargos (lista gerenciável) ───────────────────────────────────────
+
+  listJobFunctions(): Promise<ApiJobFunction[]> {
+    return request('/users/positions')
+  },
+
+  createJobFunction(data: { name: string }): Promise<ApiJobFunction> {
+    return request('/users/positions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  updateJobFunction(id: string, data: { name?: string; isActive?: boolean }): Promise<ApiJobFunction> {
+    return request(`/users/positions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
+  deleteJobFunction(id: string): Promise<void> {
+    return request(`/users/positions/${id}`, {
+      method: 'DELETE',
+    })
+  },
+}
+
+export interface ApiJobFunction {
+  id: string
+  name: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 // ── Endpoints de Obras (Worksites) ───────────────────────────────────────────

@@ -146,7 +146,7 @@ const MENU_ITEMS: MenuItem[] = [
     subItems: [
       {
         id: 'timelogs-daily',
-        label: 'Diário de Classe',
+        label: 'Registro Diário',
         path: '/time-logs/daily',
         icon: BookOpen,
       },
