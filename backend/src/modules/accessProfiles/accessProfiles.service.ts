@@ -46,22 +46,14 @@ export class AccessProfileInUseError extends Error {
   }
 }
 
-export class InvalidPageKeyError extends Error {
-  readonly statusCode = 400
-  constructor(pageKey: string) {
-    super(`Página inválida: ${pageKey}`)
-    this.name = 'InvalidPageKeyError'
-  }
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function validatePageKeys(permissions: { pageKey: string }[]) {
-  for (const p of permissions) {
-    if (!isValidPageKey(p.pageKey)) {
-      throw new InvalidPageKeyError(p.pageKey)
-    }
-  }
+// Descarta silenciosamente páginas que não existem mais (ex: uma página removida
+// do sistema que ainda está salva em perfis antigos). Isso evita que a edição de
+// um perfil trave para sempre por causa de uma permissão órfã que o usuário nem
+// tocou — a limpeza acontece sozinha na próxima vez que o perfil for salvo.
+function filterValidPermissions<T extends { pageKey: string }>(permissions: T[]): T[] {
+  return permissions.filter((p) => isValidPageKey(p.pageKey))
 }
 
 const profileInclude = {
@@ -84,7 +76,7 @@ export const accessProfilesService = {
   },
 
   async create(body: CreateAccessProfileBody, requesterIsAdminType: boolean) {
-    validatePageKeys(body.permissions)
+    const validPermissions = filterValidPermissions(body.permissions)
 
     if (body.isAdminType && !requesterIsAdminType) {
       throw new OnlyAdminCanGrantAdminTypeError()
@@ -100,7 +92,7 @@ export const accessProfilesService = {
         name: body.name,
         isAdminType: body.isAdminType,
         permissions: {
-          create: body.permissions.map((p) => ({ pageKey: p.pageKey, level: p.level })),
+          create: validPermissions.map((p) => ({ pageKey: p.pageKey, level: p.level })),
         },
       },
       include: profileInclude,
@@ -116,9 +108,7 @@ export const accessProfilesService = {
       throw new CannotModifyMasterProfileError()
     }
 
-    if (body.permissions) {
-      validatePageKeys(body.permissions)
-    }
+    const validPermissions = body.permissions ? filterValidPermissions(body.permissions) : undefined
 
     const willBeAdminType = body.isAdminType ?? profile.isAdminType
     if (willBeAdminType && !profile.isAdminType && !requesterIsAdminType) {
@@ -145,10 +135,10 @@ export const accessProfilesService = {
       where: { id },
       data: {
         ...updateData,
-        ...(body.permissions
+        ...(validPermissions
           ? {
               permissions: {
-                create: body.permissions.map((p) => ({ pageKey: p.pageKey, level: p.level })),
+                create: validPermissions.map((p) => ({ pageKey: p.pageKey, level: p.level })),
               },
             }
           : {}),

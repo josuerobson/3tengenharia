@@ -9,7 +9,6 @@ import {
   CannotModifyMasterProfileError,
   OnlyAdminCanGrantAdminTypeError,
   AccessProfileInUseError,
-  InvalidPageKeyError,
 } from './accessProfiles.service.js'
 
 const DOMAIN_ERRORS = [
@@ -18,7 +17,6 @@ const DOMAIN_ERRORS = [
   CannotModifyMasterProfileError,
   OnlyAdminCanGrantAdminTypeError,
   AccessProfileInUseError,
-  InvalidPageKeyError,
 ]
 
 function rethrowDomain(err: unknown): never {
