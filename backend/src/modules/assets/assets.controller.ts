@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import {
   createMaintenanceLogBodySchema,
   createAssetBodySchema,
+  updateAssetBodySchema,
   returnLoanBodySchema,
   resolveMaintenanceLogBodySchema,
   createCategoryBodySchema,
@@ -63,6 +64,19 @@ export function assetsController(_app: FastifyInstance) {
         rethrowDomain(err)
       }
       return reply.status(201).send(asset)
+    },
+
+    // ── PATCH /assets/:id ────────────────────────────────────────────────────
+    async updateAsset(request: FastifyRequest, reply: FastifyReply) {
+      const params = request.params as { id: string }
+      const body = updateAssetBodySchema.parse(request.body)
+      let asset: Awaited<ReturnType<typeof assetsService.update>>
+      try {
+        asset = await assetsService.update(params.id, body)
+      } catch (err) {
+        rethrowDomain(err)
+      }
+      return reply.status(200).send(asset)
     },
 
     // ── POST /assets/loans/:id/return (legado) ────────────────────────────────

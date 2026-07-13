@@ -249,7 +249,11 @@ export interface Asset {
   acquisitionValue: number | null
   currentBorrowee: string | null
   activeLoanId?: string | null
+  notes?: string | null
   photoUrl?: string | null
+  photoUrl2?: string | null
+  photoUrl3?: string | null
+  photoUrl4?: string | null
 }
 
 export const MOCK_ASSETS: Asset[] = [

@@ -71,9 +71,35 @@ export const createAssetBodySchema = z.object({
   location: z.string().trim().nullable().optional(),
   notes: z.string().trim().nullable().optional(),
   photoUrl: z.string().trim().nullable().optional(),
+  photoUrl2: z.string().trim().nullable().optional(),
+  photoUrl3: z.string().trim().nullable().optional(),
+  photoUrl4: z.string().trim().nullable().optional(),
 })
 
 export type CreateAssetBody = z.infer<typeof createAssetBodySchema>
+
+// ── Asset (edição de bem patrimonial) ───────────────────────────────────────
+// Não inclui currentStatus — mudanças de status passam pelos fluxos dedicados
+// (relatar defeito, resolver manutenção, empréstimo/devolução).
+
+export const updateAssetBodySchema = z.object({
+  assetTag: z.string().trim().min(1, 'Código Patrimonial não pode ser vazio.').optional(),
+  description: z.string().trim().min(1, 'Descrição não pode ser vazia.').optional(),
+  categoryId: z.string().cuid('ID de categoria inválido.').optional(),
+  brand: z.string().trim().nullable().optional(),
+  model: z.string().trim().nullable().optional(),
+  serialNumber: z.string().trim().nullable().optional(),
+  acquisitionDate: z.coerce.date().nullable().optional(),
+  acquisitionValue: z.coerce.number().nullable().optional(),
+  location: z.string().trim().nullable().optional(),
+  notes: z.string().trim().nullable().optional(),
+  photoUrl: z.string().trim().nullable().optional(),
+  photoUrl2: z.string().trim().nullable().optional(),
+  photoUrl3: z.string().trim().nullable().optional(),
+  photoUrl4: z.string().trim().nullable().optional(),
+})
+
+export type UpdateAssetBody = z.infer<typeof updateAssetBodySchema>
 
 // ── Return Loan (legado) ──────────────────────────────────────────────────────
 

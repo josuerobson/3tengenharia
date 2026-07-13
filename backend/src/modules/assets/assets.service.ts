@@ -6,6 +6,7 @@ import { prisma } from '../../lib/prisma.js'
 import type {
   CreateMaintenanceLogBody,
   CreateAssetBody,
+  UpdateAssetBody,
   ReturnLoanBody,
   ResolveMaintenanceLogBody,
   CreateCategoryBody,
@@ -120,6 +121,9 @@ function mapAssetToResponse(asset: {
   acquisitionValue: unknown
   notes: string | null
   photoUrl: string | null
+  photoUrl2: string | null
+  photoUrl3: string | null
+  photoUrl4: string | null
   loans?: { id: string; borrowerEmployee?: { fullName: string } | null }[]
 }) {
   return {
@@ -137,6 +141,9 @@ function mapAssetToResponse(asset: {
     acquisitionValue: asset.acquisitionValue !== null && asset.acquisitionValue !== undefined ? Number(asset.acquisitionValue as number) : null,
     notes: asset.notes,
     photoUrl: asset.photoUrl,
+    photoUrl2: asset.photoUrl2,
+    photoUrl3: asset.photoUrl3,
+    photoUrl4: asset.photoUrl4,
     currentBorrowee: asset.loans?.[0]?.borrowerEmployee?.fullName ?? null,
     activeLoanId: asset.loans?.[0]?.id ?? null,
   }
@@ -207,6 +214,9 @@ export const assetsService = {
         location: body.location || null,
         notes: body.notes || null,
         photoUrl: body.photoUrl || null,
+        photoUrl2: body.photoUrl2 || null,
+        photoUrl3: body.photoUrl3 || null,
+        photoUrl4: body.photoUrl4 || null,
         currentStatus: 'AVAILABLE',
       },
       include: {
@@ -215,6 +225,64 @@ export const assetsService = {
     })
 
     return mapAssetToResponse(created)
+  },
+
+  // ── PATCH /assets/:id ─────────────────────────────────────────────────────
+  // Edita os dados cadastrais de um bem já existente. Não altera currentStatus —
+  // isso continua exclusivo dos fluxos de manutenção/empréstimo/devolução.
+  async update(id: string, body: UpdateAssetBody) {
+    const existing = await prisma.asset.findUnique({ where: { id } })
+    if (!existing) {
+      throw new AssetNotFoundError(id)
+    }
+
+    // 1. Validar duplicidade de tag de patrimônio (ignorando o próprio registro)
+    if (body.assetTag && body.assetTag !== existing.assetTag) {
+      const existingTag = await prisma.asset.findUnique({ where: { assetTag: body.assetTag } })
+      if (existingTag) {
+        throw new DuplicateAssetTagError(body.assetTag)
+      }
+    }
+
+    // 2. Validar duplicidade de serial (ignorando o próprio registro)
+    if (body.serialNumber && body.serialNumber !== existing.serialNumber) {
+      const existingSerial = await prisma.asset.findUnique({ where: { serialNumber: body.serialNumber } })
+      if (existingSerial) {
+        throw new DuplicateSerialNumberError(body.serialNumber)
+      }
+    }
+
+    // 3. Validar categoria, se informada
+    if (body.categoryId) {
+      const category = await prisma.assetCategory.findUnique({ where: { id: body.categoryId } })
+      if (!category) {
+        throw new Error('Categoria informada não existe no banco de dados.')
+      }
+    }
+
+    const updateData: any = {}
+    if (body.assetTag !== undefined) updateData.assetTag = body.assetTag
+    if (body.description !== undefined) updateData.description = body.description
+    if (body.categoryId !== undefined) updateData.categoryId = body.categoryId
+    if (body.brand !== undefined) updateData.brand = body.brand
+    if (body.model !== undefined) updateData.model = body.model
+    if (body.serialNumber !== undefined) updateData.serialNumber = body.serialNumber
+    if (body.acquisitionDate !== undefined) updateData.acquisitionDate = body.acquisitionDate
+    if (body.acquisitionValue !== undefined) updateData.acquisitionValue = body.acquisitionValue
+    if (body.location !== undefined) updateData.location = body.location
+    if (body.notes !== undefined) updateData.notes = body.notes
+    if (body.photoUrl !== undefined) updateData.photoUrl = body.photoUrl
+    if (body.photoUrl2 !== undefined) updateData.photoUrl2 = body.photoUrl2
+    if (body.photoUrl3 !== undefined) updateData.photoUrl3 = body.photoUrl3
+    if (body.photoUrl4 !== undefined) updateData.photoUrl4 = body.photoUrl4
+
+    const updated = await prisma.asset.update({
+      where: { id },
+      data: updateData,
+      include: { category: true },
+    })
+
+    return mapAssetToResponse(updated)
   },
 
   // ── POST /assets/maintenance ──────────────────────────────────────────────

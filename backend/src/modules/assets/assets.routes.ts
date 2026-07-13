@@ -3,6 +3,45 @@
 import type { FastifyInstance } from 'fastify'
 import { assetsController } from './assets.controller.js'
 
+const assetResponseProperties = {
+  id: { type: 'string' },
+  assetTag: { type: 'string' },
+  description: { type: 'string' },
+  categoryId: { type: 'string', nullable: true },
+  category: { type: 'string' },
+  brand: { type: 'string', nullable: true },
+  model: { type: 'string', nullable: true },
+  serialNumber: { type: 'string', nullable: true },
+  acquisitionDate: { type: 'string', nullable: true },
+  acquisitionValue: { type: 'number', nullable: true },
+  currentStatus: { type: 'string' },
+  location: { type: 'string', nullable: true },
+  notes: { type: 'string', nullable: true },
+  photoUrl: { type: 'string', nullable: true },
+  photoUrl2: { type: 'string', nullable: true },
+  photoUrl3: { type: 'string', nullable: true },
+  photoUrl4: { type: 'string', nullable: true },
+  currentBorrowee: { type: 'string', nullable: true },
+  activeLoanId: { type: 'string', nullable: true },
+} as const
+
+const assetWriteBodyProperties = {
+  assetTag: { type: 'string' },
+  description: { type: 'string' },
+  categoryId: { type: 'string' },
+  brand: { type: 'string', nullable: true },
+  model: { type: 'string', nullable: true },
+  serialNumber: { type: 'string', nullable: true },
+  acquisitionDate: { type: 'string', nullable: true },
+  acquisitionValue: { type: 'number', nullable: true },
+  location: { type: 'string', nullable: true },
+  notes: { type: 'string', nullable: true },
+  photoUrl: { type: 'string', nullable: true },
+  photoUrl2: { type: 'string', nullable: true },
+  photoUrl3: { type: 'string', nullable: true },
+  photoUrl4: { type: 'string', nullable: true },
+} as const
+
 const loanResponseSchema = {
   type: 'object',
   properties: {
@@ -93,24 +132,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
             type: 'array',
             items: {
               type: 'object',
-              properties: {
-                id: { type: 'string' },
-                assetTag: { type: 'string' },
-                description: { type: 'string' },
-                categoryId: { type: 'string', nullable: true },
-                category: { type: 'string' },
-                brand: { type: 'string', nullable: true },
-                model: { type: 'string', nullable: true },
-                serialNumber: { type: 'string', nullable: true },
-                acquisitionDate: { type: 'string', nullable: true },
-                acquisitionValue: { type: 'number', nullable: true },
-                currentStatus: { type: 'string' },
-                location: { type: 'string', nullable: true },
-                notes: { type: 'string', nullable: true },
-                photoUrl: { type: 'string', nullable: true },
-                currentBorrowee: { type: 'string', nullable: true },
-                activeLoanId: { type: 'string', nullable: true },
-              },
+              properties: assetResponseProperties,
             },
           },
         },
@@ -131,44 +153,52 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
         body: {
           type: 'object',
           required: ['assetTag', 'description', 'categoryId'],
-          properties: {
-            assetTag: { type: 'string' },
-            description: { type: 'string' },
-            categoryId: { type: 'string' },
-            brand: { type: 'string', nullable: true },
-            model: { type: 'string', nullable: true },
-            serialNumber: { type: 'string', nullable: true },
-            acquisitionDate: { type: 'string', nullable: true },
-            acquisitionValue: { type: 'number', nullable: true },
-            location: { type: 'string', nullable: true },
-            notes: { type: 'string', nullable: true },
-            photoUrl: { type: 'string', nullable: true },
-          },
+          properties: assetWriteBodyProperties,
         },
         response: {
           201: {
             type: 'object',
-            properties: {
-              id: { type: 'string' },
-              assetTag: { type: 'string' },
-              description: { type: 'string' },
-              categoryId: { type: 'string', nullable: true },
-              category: { type: 'string' },
-              brand: { type: 'string', nullable: true },
-              model: { type: 'string', nullable: true },
-              serialNumber: { type: 'string', nullable: true },
-              acquisitionDate: { type: 'string', nullable: true },
-              acquisitionValue: { type: 'number', nullable: true },
-              currentStatus: { type: 'string' },
-              location: { type: 'string', nullable: true },
-              notes: { type: 'string', nullable: true },
-              photoUrl: { type: 'string', nullable: true },
-            },
+            properties: assetResponseProperties,
           },
         },
       },
     },
     controller.createAsset,
+  )
+
+  // ── PATCH /assets/:id ──────────────────────────────────────────────────────
+  // Edita os dados cadastrais de um bem existente (não altera currentStatus —
+  // isso continua exclusivo dos fluxos de manutenção/empréstimo/devolução).
+  app.patch(
+    '/:id',
+    {
+      onRequest: [app.authenticate, app.requirePermission('assets.warehouse.inventory', 'WRITE')],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Editar um bem patrimonial existente',
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          properties: assetWriteBodyProperties,
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: assetResponseProperties,
+          },
+          404: { type: 'object', properties: { statusCode: { type: 'number' }, error: { type: 'string' }, message: { type: 'string' } } },
+          409: { type: 'object', properties: { statusCode: { type: 'number' }, error: { type: 'string' }, message: { type: 'string' } } },
+        },
+      },
+    },
+    controller.updateAsset,
   )
 
   // ── POST /assets/loans/:id/return ──────────────────────────────────────────

@@ -131,8 +131,9 @@ export default function WarehousePage() {
   const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
 
-  // Modal Novo Item
+  // Modal Novo Item / Editar Item (mesmo modal, editingAsset != null = modo edição)
   const [newModalOpen, setNewModalOpen] = useState(false)
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
   const [assetTag, setAssetTag] = useState('')
   const [description, setDescription] = useState('')
   const [categoryId, setCategoryId] = useState('')
@@ -222,9 +223,8 @@ export default function WarehousePage() {
   const [repairModalOpen, setRepairModalOpen] = useState(false)
   const [selectedAssetForRepair, setSelectedAssetForRepair] = useState<Asset | null>(null)
 
-  // Foto para novo cadastro
-  const [newAssetPhotoPreview, setNewAssetPhotoPreview] = useState<string | null>(null)
-  const [newAssetPhotoBase64, setNewAssetPhotoBase64] = useState<string | null>(null)
+  // Fotos do cadastro de item (até 4, novo ou edição)
+  const [assetPhotos, setAssetPhotos] = useState<string[]>([])
   const [resolutionNotes, setResolutionNotes] = useState('')
   const [repairCost, setRepairCost] = useState('')
   const [repairAction, setRepairAction] = useState<'RESOLVED' | 'WRITTEN_OFF'>('RESOLVED')
@@ -397,6 +397,7 @@ export default function WarehousePage() {
 
   // ── Handlers do Modal ──────────────────────────────────────────────────────
   const handleOpenNewModal = () => {
+    setEditingAsset(null)
     setAssetTag('')
     setDescription('')
     if (categories.length > 0) setCategoryId(categories[0].id)
@@ -407,41 +408,53 @@ export default function WarehousePage() {
     setAcquisitionValue('')
     setLocation('')
     setNotes('')
+    setAssetPhotos([])
     setModalError(null)
     setNewModalOpen(true)
   }
 
-  const handleNewAssetPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null
-    if (newAssetPhotoPreview) URL.revokeObjectURL(newAssetPhotoPreview)
-    setNewAssetPhotoPreview(file ? URL.createObjectURL(file) : null)
+  const handleOpenEditModal = useCallback((asset: Asset) => {
+    setEditingAsset(asset)
+    setAssetTag(asset.assetTag)
+    setDescription(asset.description)
+    setCategoryId(asset.categoryId ?? '')
+    setBrand(asset.brand ?? '')
+    setModel(asset.model ?? '')
+    setSerialNumber(asset.serialNumber ?? '')
+    setAcquisitionDate(asset.acquisitionDate ? asset.acquisitionDate.slice(0, 10) : '')
+    setAcquisitionValue(asset.acquisitionValue != null ? String(asset.acquisitionValue) : '')
+    setLocation(asset.location ?? '')
+    setNotes(asset.notes ?? '')
+    setAssetPhotos([asset.photoUrl, asset.photoUrl2, asset.photoUrl3, asset.photoUrl4].filter(Boolean) as string[])
+    setModalError(null)
+    setNewModalOpen(true)
+  }, [])
 
-    if (file) {
+  const handleAssetPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const base64Photos: string[] = []
+    for (let i = 0; i < files.length; i++) {
+      if (base64Photos.length + assetPhotos.length >= 4) break
       try {
-        const compressed = await compressImage(file, 800, 800, 0.6)
-        setNewAssetPhotoBase64(compressed)
+        const compressed = await compressImage(files[i], 800, 800, 0.6)
+        base64Photos.push(compressed)
       } catch (err) {
         console.error('Erro ao comprimir imagem:', err)
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          setNewAssetPhotoBase64(reader.result as string)
-        }
-        reader.readAsDataURL(file)
       }
-    } else {
-      setNewAssetPhotoBase64(null)
     }
+    setAssetPhotos((prev) => [...prev, ...base64Photos].slice(0, 4))
   }
 
-  const handleRemoveNewAssetPhoto = useCallback(() => {
-    if (newAssetPhotoPreview) URL.revokeObjectURL(newAssetPhotoPreview)
-    setNewAssetPhotoPreview(null)
-    setNewAssetPhotoBase64(null)
-  }, [newAssetPhotoPreview])
+  const handleRemoveAssetPhoto = useCallback((index: number) => {
+    setAssetPhotos((prev) => prev.filter((_, i) => i !== index))
+  }, [])
 
   useEffect(() => {
     if (!newModalOpen) {
-      handleRemoveNewAssetPhoto()
+      setEditingAsset(null)
+      setAssetPhotos([])
       setAssetTag('')
       setDescription('')
       if (categories.length > 0) {
@@ -458,7 +471,7 @@ export default function WarehousePage() {
       setNotes('')
       setModalError(null)
     }
-  }, [newModalOpen, handleRemoveNewAssetPhoto, categories])
+  }, [newModalOpen, categories])
 
   const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -478,24 +491,33 @@ export default function WarehousePage() {
     setModalSubmitting(true)
     setModalError(null)
 
+    const payload = {
+      assetTag: assetTag.trim(),
+      description: description.trim(),
+      categoryId,
+      brand: brand.trim() || null,
+      model: model.trim() || null,
+      serialNumber: serialNumber.trim() || null,
+      acquisitionDate: acquisitionDate ? new Date(acquisitionDate).toISOString() : null,
+      acquisitionValue: acquisitionValue ? parseFloat(acquisitionValue) : null,
+      location: location.trim() || null,
+      notes: notes.trim() || null,
+      photoUrl: assetPhotos[0] || null,
+      photoUrl2: assetPhotos[1] || null,
+      photoUrl3: assetPhotos[2] || null,
+      photoUrl4: assetPhotos[3] || null,
+    }
+
     try {
-      await assetsApi.create({
-        assetTag: assetTag.trim(),
-        description: description.trim(),
-        categoryId,
-        brand: brand.trim() || null,
-        model: model.trim() || null,
-        serialNumber: serialNumber.trim() || null,
-        acquisitionDate: acquisitionDate ? new Date(acquisitionDate).toISOString() : null,
-        acquisitionValue: acquisitionValue ? parseFloat(acquisitionValue) : null,
-        location: location.trim() || null,
-        notes: notes.trim() || null,
-        photoUrl: newAssetPhotoBase64 || null,
-      })
+      if (editingAsset) {
+        await assetsApi.update(editingAsset.id, payload)
+      } else {
+        await assetsApi.create(payload)
+      }
       setNewModalOpen(false)
       loadAssets()
     } catch (err: any) {
-      console.error('Erro ao salvar novo item:', err)
+      console.error('Erro ao salvar item:', err)
       setModalError(err?.message ?? 'Ocorreu um erro ao salvar o item.')
     } finally {
       setModalSubmitting(false)
@@ -954,6 +976,16 @@ export default function WarehousePage() {
                             </Badge>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-xs">
+                            {isManagerOrAdmin && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleOpenEditModal(asset)}
+                                className="text-brand-primary hover:text-brand-primary-hover hover:bg-brand-primary/5 font-bold"
+                              >
+                                Editar
+                              </Button>
+                            )}
                             {asset.currentStatus !== 'MAINTENANCE' && asset.currentStatus !== 'WRITTEN_OFF' && (
                               <Button
                                 size="sm"
@@ -1387,12 +1419,16 @@ export default function WarehousePage() {
         </Card>
       )}
 
-      {/* ── Modal de Novo Item (Dialog) ────────────────────────────────────────── */}
+      {/* ── Modal de Novo Item / Editar Item (Dialog) ─────────────────────────── */}
       <Dialog
         open={newModalOpen}
         onClose={() => setNewModalOpen(false)}
-        title="Novo Item Patrimonial"
-        description="Cadastre uma ferramenta, equipamento ou EPI no estoque do almoxarifado."
+        title={editingAsset ? 'Editar Item Patrimonial' : 'Novo Item Patrimonial'}
+        description={
+          editingAsset
+            ? `Atualize os dados de ${editingAsset.assetTag}.`
+            : 'Cadastre uma ferramenta, equipamento ou EPI no estoque do almoxarifado.'
+        }
       >
         <form onSubmit={handleCreateAsset} className="space-y-4 pt-2">
           {modalError && (
@@ -1534,42 +1570,40 @@ export default function WarehousePage() {
           </div>
 
           <div>
-            <Label>Foto do Equipamento (Opcional)</Label>
-            {newAssetPhotoPreview ? (
-              <div className="relative rounded-xl border border-gray-200 overflow-hidden bg-gray-50 max-w-sm mt-1.5">
-                <img
-                  src={newAssetPhotoPreview}
-                  alt="Preview do Equipamento"
-                  className="w-full h-48 object-cover"
-                />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon-sm"
-                  onClick={handleRemoveNewAssetPhoto}
-                  className="absolute top-2 right-2 rounded-full shadow-md"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center w-full mt-1.5">
-                <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-gray-200 border-dashed rounded-xl cursor-pointer bg-white hover:bg-gray-50 transition-colors">
-                  <div className="flex flex-col items-center justify-center pt-4 pb-4">
-                    <Camera className="w-6 h-6 text-gray-400 mb-1" />
-                    <p className="text-xs text-gray-500 font-medium">Tire ou anexe uma foto</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">PNG, JPG (máx. 5MB)</p>
-                  </div>
+            <Label>Fotos do Equipamento (até 4, opcional)</Label>
+            <div className="flex flex-wrap gap-2 mt-1.5">
+              {assetPhotos.map((photo, idx) => (
+                <div key={idx} className="relative w-20 h-20 rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+                  <img
+                    src={photo}
+                    alt={`Foto ${idx + 1}`}
+                    className="w-full h-full object-cover cursor-zoom-in hover:opacity-80 transition-opacity"
+                    onClick={() => handleZoomPhoto(photo, assetPhotos)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAssetPhoto(idx)}
+                    className="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {assetPhotos.length < 4 && (
+                <label className="w-20 h-20 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
+                  <Camera className="w-5 h-5 text-gray-400 mb-1" />
+                  <span className="text-[10px] text-gray-400">Foto</span>
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     capture="environment"
                     className="hidden"
-                    onChange={handleNewAssetPhotoChange}
+                    onChange={handleAssetPhotoChange}
                   />
                 </label>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
@@ -1590,6 +1624,8 @@ export default function WarehousePage() {
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   Salvando...
                 </>
+              ) : editingAsset ? (
+                'Salvar Alterações'
               ) : (
                 'Cadastrar Item'
               )}

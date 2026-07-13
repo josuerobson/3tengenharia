@@ -489,26 +489,38 @@ export const maintenanceApi = {
 
 // ── Endpoints de Patrimônio (Assets) ──────────────────────────────────────────
 
+export interface AssetWritePayload {
+  assetTag: string
+  description: string
+  categoryId: string
+  brand?: string | null
+  model?: string | null
+  serialNumber?: string | null
+  acquisitionDate?: string | null
+  acquisitionValue?: number | null
+  location?: string | null
+  notes?: string | null
+  photoUrl?: string | null
+  photoUrl2?: string | null
+  photoUrl3?: string | null
+  photoUrl4?: string | null
+}
+
 export const assetsApi = {
   list(): Promise<Asset[]> {
     return request('/assets')
   },
 
-  create(data: {
-    assetTag: string
-    description: string
-    categoryId: string
-    brand?: string | null
-    model?: string | null
-    serialNumber?: string | null
-    acquisitionDate?: string | null
-    acquisitionValue?: number | null
-    location?: string | null
-    notes?: string | null
-    photoUrl?: string | null
-  }): Promise<Asset> {
+  create(data: AssetWritePayload): Promise<Asset> {
     return request('/assets', {
       method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  update(id: string, data: Partial<AssetWritePayload>): Promise<Asset> {
+    return request(`/assets/${id}`, {
+      method: 'PATCH',
       body: JSON.stringify(data),
     })
   },

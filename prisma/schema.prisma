@@ -437,6 +437,9 @@ model Asset {
   location         String? // Localização física atual
   notes            String?        @db.Text
   photoUrl         String?        @map("photo_url") @db.Text
+  photoUrl2        String?        @map("photo_url_2") @db.Text
+  photoUrl3        String?        @map("photo_url_3") @db.Text
+  photoUrl4        String?        @map("photo_url_4") @db.Text
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
