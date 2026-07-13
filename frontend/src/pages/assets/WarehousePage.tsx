@@ -2,6 +2,7 @@
 // Tela de Gestão do Almoxarifado - Controle de estoque de ferramentas e EPIs.
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
   Warehouse,
@@ -2155,10 +2156,12 @@ export default function WarehousePage() {
         </form>
       </Dialog>
 
-      {/* ── Lightbox de Ampliação de Fotos (galeria com navegação) ────────────── */}
-      {lightboxIndex >= 0 && lightboxPhotos.length > 0 && (
+      {/* ── Lightbox de Ampliação de Fotos (galeria com navegação) ──────────────
+          Renderizado via portal com z-index acima do Dialog (z-[200]) — caso
+          contrário, fica atrás de qualquer modal aberto (ex: Validar Devolução). */}
+      {lightboxIndex >= 0 && lightboxPhotos.length > 0 && createPortal(
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md select-none"
+          className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md select-none"
           onClick={closeLightbox}
         >
           <button
@@ -2212,7 +2215,8 @@ export default function WarehousePage() {
               {lightboxIndex + 1} / {lightboxPhotos.length}
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
