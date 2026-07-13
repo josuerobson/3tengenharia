@@ -19,6 +19,8 @@ import {
   ClipboardList,
   Camera,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -181,6 +183,39 @@ export default function WarehousePage() {
   // Fotos de devolução (Legado)
   const [returnPhotoPreview, setReturnPhotoPreview] = useState<string | null>(null)
   const [returnPhotoBase64, setReturnPhotoBase64] = useState<string | null>(null)
+
+  // Lightbox de ampliação de fotos (galeria com navegação)
+  const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([])
+  const [lightboxIndex, setLightboxIndex] = useState<number>(-1)
+
+  const handleZoomPhoto = useCallback((photoUrl: string, gallery?: (string | null | undefined)[]) => {
+    const cleanGallery = gallery ? (gallery.filter(Boolean) as string[]) : [photoUrl]
+    setLightboxPhotos(cleanGallery)
+    const idx = cleanGallery.indexOf(photoUrl)
+    setLightboxIndex(idx >= 0 ? idx : 0)
+  }, [])
+
+  const closeLightbox = useCallback(() => {
+    setLightboxIndex(-1)
+    setLightboxPhotos([])
+  }, [])
+
+  // Navegação por teclado no lightbox (setas + Esc)
+  useEffect(() => {
+    if (lightboxIndex < 0 || lightboxPhotos.length === 0) return
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'ArrowLeft' && lightboxIndex > 0) {
+        setLightboxIndex((prev) => prev - 1)
+      } else if (e.key === 'ArrowRight' && lightboxIndex < lightboxPhotos.length - 1) {
+        setLightboxIndex((prev) => prev + 1)
+      } else if (e.key === 'Escape') {
+        closeLightbox()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [lightboxIndex, lightboxPhotos, closeLightbox])
 
   // Modal Reparo/Manutenção
   const [repairModalOpen, setRepairModalOpen] = useState(false)
@@ -1167,7 +1202,8 @@ export default function WarehousePage() {
                                   key={idx}
                                   src={photo!}
                                   alt={`Foto de devolução ${idx + 1}`}
-                                  className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                  className="w-16 h-16 object-cover rounded-lg border border-gray-200 cursor-zoom-in hover:opacity-80 transition-opacity"
+                                  onClick={() => handleZoomPhoto(photo!, [req.returnPhoto1, req.returnPhoto2, req.returnPhoto3, req.returnPhoto4])}
                                 />
                               ))}
                             </div>
@@ -1981,7 +2017,13 @@ export default function WarehousePage() {
                       key={idx}
                       src={photo!}
                       alt={`Foto de devolução ${idx + 1}`}
-                      className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                      className="w-16 h-16 object-cover rounded-lg border border-gray-200 cursor-zoom-in hover:opacity-80 transition-opacity"
+                      onClick={() => handleZoomPhoto(photo!, [
+                        selectedRequestForValidation.returnPhoto1,
+                        selectedRequestForValidation.returnPhoto2,
+                        selectedRequestForValidation.returnPhoto3,
+                        selectedRequestForValidation.returnPhoto4,
+                      ])}
                     />
                   ))}
                 </div>
@@ -1997,7 +2039,12 @@ export default function WarehousePage() {
             <div className="flex flex-wrap gap-2">
               {validationPhotos.map((photo, idx) => (
                 <div key={idx} className="relative w-20 h-20 rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
-                  <img src={photo} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                  <img
+                    src={photo}
+                    alt={`Foto ${idx + 1}`}
+                    className="w-full h-full object-cover cursor-zoom-in hover:opacity-80 transition-opacity"
+                    onClick={() => handleZoomPhoto(photo, validationPhotos)}
+                  />
                   <button
                     type="button"
                     onClick={() => handleRemoveValidationPhoto(idx)}
@@ -2107,6 +2154,66 @@ export default function WarehousePage() {
           </div>
         </form>
       </Dialog>
+
+      {/* ── Lightbox de Ampliação de Fotos (galeria com navegação) ────────────── */}
+      {lightboxIndex >= 0 && lightboxPhotos.length > 0 && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md select-none"
+          onClick={closeLightbox}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              closeLightbox()
+            }}
+            className="absolute top-4 right-4 p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors z-[80] shadow-lg active:scale-95"
+            title="Fechar"
+          >
+            <X size={20} />
+          </button>
+
+          {lightboxIndex > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setLightboxIndex((prev) => prev - 1)
+              }}
+              className="absolute left-4 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all z-[80] shadow-lg active:scale-95 hover:scale-105"
+              title="Anterior"
+            >
+              <ChevronLeft size={28} />
+            </button>
+          )}
+
+          <div className="relative max-w-full max-h-[85vh] flex items-center justify-center pointer-events-none">
+            <img
+              src={lightboxPhotos[lightboxIndex]}
+              alt={`Foto Ampliada ${lightboxIndex + 1}`}
+              className="max-w-full max-h-[80vh] rounded-2xl object-contain shadow-2xl animate-scale-in pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+
+          {lightboxIndex < lightboxPhotos.length - 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setLightboxIndex((prev) => prev + 1)
+              }}
+              className="absolute right-4 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all z-[80] shadow-lg active:scale-95 hover:scale-105"
+              title="Próxima"
+            >
+              <ChevronRight size={28} />
+            </button>
+          )}
+
+          {lightboxPhotos.length > 1 && (
+            <div className="absolute bottom-6 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 text-white text-xs font-bold font-mono shadow-md">
+              {lightboxIndex + 1} / {lightboxPhotos.length}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
