@@ -3,6 +3,8 @@
 > Última atualização: 2026-07-15. Se você é um agente de IA (ou uma nova sessão) começando a trabalhar neste projeto, leia este arquivo inteiro antes de fazer qualquer alteração. Ele existe para que você não precise reconstruir o contexto lendo o histórico completo do repositório.
 >
 > Para convenções de código e arquitetura (não estado do projeto), ver [`AGENTS.md`](./AGENTS.md).
+>
+> **🔒 Regra obrigatória para qualquer agente**: toda vez que uma mudança for publicada no GitHub (`git push`), atualize este arquivo (seção 6, e seção 7 se aplicável) antes de encerrar a tarefa — sem exceção, mesmo em mudanças pequenas. Ver seção 8 para o detalhe.
 
 ## 1. O que é este sistema
 
@@ -108,6 +110,7 @@ Nenhuma credencial real está neste arquivo nem em nenhum outro arquivo versiona
 
 ## 6. Linha do tempo do que foi construído (mais recente primeiro)
 
+- **Regra obrigatória de sincronização do handoff**: adicionada regra em `HANDOFF.md` e `AGENTS.md` exigindo que todo agente atualize esses arquivos a cada `git push`, sem exceção — ver seção 8.
 - **Remoção da "Linha do Tempo de Viagens"** em Alertas de Manutenção (redundante com Histórico de Viagens) — código exclusivo removido, não só escondido.
 - **Fotos múltiplas (até 4) + edição de patrimônio** no Almoxarifado: cadastro de item passou de 1 para 4 fotos; nova rota `PATCH /assets/:id` para editar dados cadastrais (não existia antes — só criação). Edição não altera `currentStatus` (isso continua exclusivo dos fluxos de manutenção/empréstimo).
 - **Correções de UI no Almoxarifado**: lightbox de fotos de devolução (não ampliava; depois, ampliava atrás do modal — corrigido com portal + z-index).
@@ -129,4 +132,8 @@ Nenhuma credencial real está neste arquivo nem em nenhum outro arquivo versiona
 
 ## 8. Como manter este handoff atualizado
 
-Ao concluir uma mudança relevante (não triviais como ajuste de CSS isolado), adicione uma entrada no topo da seção 6, e se a mudança introduzir uma pendência/dívida técnica nova, registre na seção 7. Não é necessário detalhar cada commit — o `git log` já serve pra isso; este arquivo deve responder "o que eu preciso saber que não está óbvio só de ler o código."
+**Regra obrigatória, sem exceção**: toda vez que uma mudança for publicada no GitHub (`git push`), atualize este arquivo antes de encerrar a tarefa — adicione uma entrada no topo da seção 6 descrevendo o que mudou, e se a mudança introduzir ou resolver uma pendência/dívida técnica, atualize a seção 7 também. Isso vale mesmo para mudanças pequenas — não decida sozinho que algo é "trivial demais" para registrar.
+
+Vários commits pequenos que fazem parte da mesma tarefa podem virar uma única entrada resumida — não é necessário detalhar commit por commit (o `git log` já serve pra isso); este arquivo deve responder "o que eu preciso saber que não está óbvio só de ler o código." Se a mudança estabelecer uma convenção de código nova (não estado do projeto), registre no `AGENTS.md` em vez daqui — ou nos dois, se for o caso.
+
+Esta regra vale para qualquer agente de IA trabalhando neste repositório, não só Claude Code.

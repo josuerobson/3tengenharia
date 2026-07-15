@@ -4,6 +4,14 @@ Instruções para qualquer agente de IA (Claude Code, Codex, Cursor, etc.) traba
 
 **Antes de qualquer tarefa, leia [`HANDOFF.md`](./HANDOFF.md)** — ele tem o estado atual do projeto, o que já foi construído e o que está pendente. Este arquivo (`AGENTS.md`) é sobre *como* trabalhar no código; o `HANDOFF.md` é sobre *onde* o projeto está.
 
+## 🔒 Regra obrigatória — manter o handoff sincronizado
+
+**Toda vez que uma mudança for publicada no GitHub (`git push`), antes de encerrar a tarefa, atualize o `HANDOFF.md`** — sem exceção, mesmo em mudanças pequenas. Adicione uma entrada no topo da seção 6 (linha do tempo) descrevendo o que mudou, e se a mudança criar ou resolver uma pendência/dívida técnica, atualize a seção 7 também.
+
+- Se a mudança estabelecer uma convenção ou padrão de código novo (não estado do projeto), atualize este arquivo (`AGENTS.md`) em vez do `HANDOFF.md` — ou os dois, se for o caso.
+- Vários commits pequenos da mesma tarefa podem virar uma única entrada resumida — não é necessário decompor commit por commit (o `git log` já serve pra isso).
+- Essa regra vale para **qualquer agente de IA** trabalhando neste repositório, não só Claude Code. Não pule esse passo por achar a mudança "pequena demais" — o objetivo é que este arquivo nunca fique desatualizado em relação ao que está publicado.
+
 ## O que é o sistema
 
 Sistema de Gestão Operacional da 3T Engenharia: controle de veículos (viagens, manutenção), ferramentas/almoxarifado (patrimônio, empréstimos, solicitações), rateio de horas, auditorias 5S, e administração (usuários, obras, perfis de acesso).
@@ -67,4 +75,4 @@ Para rotas com `supportsOwnScope: true`, o controller calcula `ownerEmployeeId =
 2. Build de produção do frontend (`npm run build`).
 3. Se a mudança tiver efeito visual/comportamental, verificar no navegador quando possível.
 4. Se envolver deploy, confirmar o commit realmente implantado nos dois ambientes (ver seção de Deploy acima).
-5. Atualizar o `HANDOFF.md` com o que foi feito, se for uma mudança relevante para o estado do projeto (ver seção "Como manter este handoff atualizado" lá).
+5. **Atualizar `HANDOFF.md`/`AGENTS.md` com o que foi publicado** — obrigatório em todo push, ver regra no topo deste arquivo.
