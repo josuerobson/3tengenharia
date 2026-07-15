@@ -6,14 +6,10 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   AlertTriangle,
   Car,
-  Clock,
-  MapPin,
   User,
   Filter,
-  ChevronRight,
   Wrench,
   CheckCircle2,
-  Navigation,
   Gauge,
   Calendar,
   CheckCheck,
@@ -23,23 +19,14 @@ import {
   DollarSign,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
 import {
   vehiclesApi,
-  tripsApi,
   maintenanceApi,
   type ApiVehicle,
-  type ApiTrip,
   type ApiMaintenanceAlert,
 } from '@/lib/api'
 
 // ── Helpers locais para formatação ─────────────────────────────────────────────
-
-function formatDateTime(iso: string) {
-  const d = new Date(iso)
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
-         d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-}
 
 function formatDate(iso: string) {
   const d = new Date(iso + 'T12:00:00') // evita offset de timezone
@@ -356,68 +343,6 @@ function Metric({ label, value, unit, highlight = false, overdue = false }: {
   )
 }
 
-// ── Item da linha do tempo de viagens ─────────────────────────────────────────
-
-function TimelineItem({ trip, isLast }: { trip: ApiTrip; isLast: boolean }) {
-  const isOngoing = trip.arrivalDateTime === null || trip.finalKm === null
-  const initials = trip.driverEmployee?.fullName
-    ? trip.driverEmployee.fullName.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
-    : 'U'
-
-  return (
-    <div className="flex gap-4">
-      <div className="flex flex-col items-center flex-shrink-0">
-        <div className={cn('w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs text-white flex-shrink-0',
-          isOngoing ? 'bg-[#FF8C00] ring-2 ring-[#FF8C00]/30' : 'bg-[#00475B]')}>
-          {initials}
-        </div>
-        {!isLast && <div className="flex-1 w-0.5 bg-gray-100 mt-2 min-h-[24px]" />}
-      </div>
-      <div className={cn('flex-1 bg-white rounded-2xl border shadow-sm p-4 mb-4',
-        isOngoing ? 'border-[#FF8C00]/30' : 'border-gray-100',
-        trip.maintenanceAlertActive && 'border-amber-200')}>
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-bold text-gray-900 text-sm">{trip.vehicle.licensePlate}</p>
-              <span className="text-gray-400 text-xs">·</span>
-              <p className="text-xs text-gray-500">{trip.vehicle.brand} {trip.vehicle.model}</p>
-              {isOngoing && <Badge variant="accent" dot>Em viagem</Badge>}
-              {trip.maintenanceAlertActive && <Badge variant="high" dot>Alerta KM</Badge>}
-            </div>
-            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-              <User size={11} />{trip.driverEmployee?.fullName ?? 'Motorista não informado'} <span className="text-gray-300">·</span> {trip.driverEmployee?.registration ?? '—'}
-            </p>
-          </div>
-          <ChevronRight size={16} className="text-gray-300 flex-shrink-0 mt-0.5" />
-        </div>
-        <div className="flex items-start gap-2 mb-3">
-          <div className="flex flex-col items-center gap-1 mt-0.5 flex-shrink-0">
-            <MapPin size={12} className="text-[#00475B]" />
-            <div className="w-px h-3 bg-gray-200" />
-            <Navigation size={12} className="text-[#FF8C00]" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-gray-700 truncate">{trip.origin}</p>
-            <p className="text-xs font-medium text-gray-700 truncate mt-1">{trip.destination}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-          <span className="flex items-center gap-1"><Clock size={12} />{formatDateTime(trip.departureDateTime)}</span>
-          {trip.arrivalDateTime && (
-            <span className="flex items-center gap-1"><CheckCircle2 size={12} className="text-emerald-500" />
-              {new Date(trip.arrivalDateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
-          {trip.distanceTraveled !== null && (
-            <span className="flex items-center gap-1"><Gauge size={12} />{trip.distanceTraveled.toLocaleString('pt-BR')} km rodados</span>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Página principal ───────────────────────────────────────────────────────────
 
 type FilterType = 'all' | 'needs-service' | 'critical' | 'ok'
@@ -425,13 +350,11 @@ type FilterType = 'all' | 'needs-service' | 'critical' | 'ok'
 export default function MaintenanceAlertsPage() {
   const [filter, setFilter]           = useState<FilterType>('all')
   const [vehicleFilter, setVehicleFilter] = useState<string>('all')
-  const [auditVehicleFilter, setAuditVehicleFilter] = useState<string>('all')
   const [serviceModal, setServiceModal] = useState<ApiMaintenanceAlert | null>(null)
 
   // Estados reais carregados do backend
   const [vehicles, setVehicles] = useState<ApiVehicle[]>([])
   const [alerts, setAlerts]     = useState<ApiMaintenanceAlert[]>([])
-  const [trips, setTrips]       = useState<ApiTrip[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
 
@@ -439,14 +362,12 @@ export default function MaintenanceAlertsPage() {
     setLoading(true)
     setError(null)
     try {
-      const [vehiclesRes, alertsRes, tripsRes] = await Promise.all([
+      const [vehiclesRes, alertsRes] = await Promise.all([
         vehiclesApi.list(),
         maintenanceApi.listAllAlerts(),
-        tripsApi.list({ limit: 100 }),
       ])
       setVehicles(vehiclesRes.vehicles)
       setAlerts(alertsRes)
-      setTrips(tripsRes.trips)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados de manutenção.')
     } finally {
@@ -472,15 +393,6 @@ export default function MaintenanceAlertsPage() {
   // KPIs
   const criticalCount = useMemo(() => alerts.filter(a => a.urgency === 'critical' || a.urgency === 'high').length, [alerts])
   const overdueKmCount = useMemo(() => alerts.filter(a => a.kmRemaining !== null && a.kmRemaining < 0).length, [alerts])
-
-  // Viagens filtradas para a Linha do Tempo
-  const filteredTrips = useMemo(() => {
-    const sorted = [...trips].sort(
-      (a, b) => new Date(b.departureDateTime).getTime() - new Date(a.departureDateTime).getTime(),
-    )
-    if (auditVehicleFilter === 'all') return sorted
-    return sorted.filter(t => t.vehicle.id === auditVehicleFilter)
-  }, [trips, auditVehicleFilter])
 
   // Confirmar registro de serviço realizado
   const handleRegisterService = useCallback(async (
@@ -639,38 +551,6 @@ export default function MaintenanceAlertsPage() {
           ))}
         </div>
       )}
-
-      {/* Linha do Tempo de Viagens */}
-      <div>
-        <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-          <div>
-            <h2 className="text-xl font-extrabold text-gray-900">Linha do Tempo de Viagens</h2>
-            <p className="text-sm text-gray-500">Auditoria de uso da frota — datas, motoristas e rotas</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Car size={15} className="text-gray-400" />
-            <select value={auditVehicleFilter} onChange={e => setAuditVehicleFilter(e.target.value)}
-              className="h-9 pl-3 pr-8 text-sm rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#00475B]/30 text-gray-700 font-medium">
-              <option value="all">Todos os veículos</option>
-              {vehicles.map(v => (
-                <option key={v.id} value={v.id}>{v.licensePlate} — {v.model}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {filteredTrips.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 shadow-sm">
-            <p className="text-gray-400 text-sm">Nenhuma viagem registrada para este filtro</p>
-          </div>
-        ) : (
-          <div>
-            {filteredTrips.map((trip, idx) => (
-              <TimelineItem key={trip.id} trip={trip} isLast={idx === filteredTrips.length - 1} />
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Modal de registro de serviço */}
       {serviceModal && (
