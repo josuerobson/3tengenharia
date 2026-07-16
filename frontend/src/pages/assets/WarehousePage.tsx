@@ -1925,14 +1925,14 @@ export default function WarehousePage() {
                 value={selectedAssetId}
                 onChange={setSelectedAssetId}
                 options={assets
-                  .filter(a => a.currentStatus === 'AVAILABLE')
+                  .filter(a => a.currentStatus === 'AVAILABLE' && a.categoryId === selectedRequestForAllocation?.categoryId)
                   .map((a) => ({
                     value: a.id,
                     label: `${a.assetTag} — ${a.categoryData?.name ?? a.category}`,
                   }))}
                 placeholder="Selecione um bem disponível..."
-                searchPlaceholder="Buscar por código ou categoria..."
-                emptyMessage="Nenhum bem disponível encontrado."
+                searchPlaceholder="Buscar por código..."
+                emptyMessage="Nenhum bem disponível nesta categoria."
                 required
               />
             </div>
