@@ -1917,22 +1917,23 @@ export default function WarehousePage() {
 
           <div>
             <Label htmlFor="allocateAsset" required>Bem Físico a Enviar</Label>
-            <select
-              id="allocateAsset"
-              value={selectedAssetId}
-              onChange={(e) => setSelectedAssetId(e.target.value)}
-              className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
-              required
-            >
-              <option value="">Selecione um bem disponível...</option>
-              {assets
-                .filter(a => a.currentStatus === 'AVAILABLE')
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.assetTag} — {a.description}
-                  </option>
-                ))}
-            </select>
+            <div className="mt-1.5">
+              <SearchableSelect
+                id="allocateAsset"
+                value={selectedAssetId}
+                onChange={setSelectedAssetId}
+                options={assets
+                  .filter(a => a.currentStatus === 'AVAILABLE')
+                  .map((a) => ({
+                    value: a.id,
+                    label: `${a.assetTag} — ${a.categoryData?.name ?? a.category}`,
+                  }))}
+                placeholder="Selecione um bem disponível..."
+                searchPlaceholder="Buscar por código ou categoria..."
+                emptyMessage="Nenhum bem disponível encontrado."
+                required
+              />
+            </div>
           </div>
 
           <div>
