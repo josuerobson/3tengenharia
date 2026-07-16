@@ -110,6 +110,7 @@ Nenhuma credencial real está neste arquivo nem em nenhum outro arquivo versiona
 
 ## 6. Linha do tempo do que foi construído (mais recente primeiro)
 
+- **Notificações do Header zeradas temporariamente**: o sino tinha 4 notificações mock hardcoded (`INITIAL_NOTIFICATIONS` em `Header.tsx`), nunca ligadas a eventos reais do sistema. Zerado (`[]`), painel mostra "Sem notificações", ícone do sino continua visível sem o badge de contagem. **Pendência**: definir quais eventos reais devem gerar notificação e como (ver seção 7).
 - **Descrição do Bem deixou de ser obrigatória** no cadastro/edição de patrimônio no Almoxarifado. Removida a validação em 3 camadas (frontend, schema JSON da rota Fastify — `required: [...]` na rota, que é validado independentemente do Zod, e Zod). Coluna `description` no banco continua `NOT NULL`; quando omitida, o service persiste string vazia.
 - **Campo de busca no seletor de categoria** (Novo/Editar Item Patrimonial no Almoxarifado): novo componente reutilizável `frontend/src/components/ui/searchable-select.tsx` (sem dependência externa) para substituir `<select>` nativo em listas longas. O mesmo problema (dezenas de categorias num `<select>`) existe em `LoanRequestsPage.tsx` — não migrado ainda, só onde foi pedido.
 - **PWA travado em retrato no Android**: `manifest.webmanifest` tinha `orientation: "any"`, fazendo o app instalado (WebAPK) girar pelo sensor do aparelho mesmo com a rotação automática do Android desativada nas configurações do sistema. Corrigido para `"portrait-primary"` nos dois lugares que definem o manifest (`frontend/public/manifest.webmanifest` e o manifest gerado por `vite-plugin-pwa` em `vite.config.ts`, que sobrescreve o arquivo estático no build — os dois precisam ficar sincronizados).
@@ -126,6 +127,7 @@ Nenhuma credencial real está neste arquivo nem em nenhum outro arquivo versiona
 
 ## 7. Pendências e dívidas técnicas conhecidas
 
+- **Notificações reais ainda não definidas**: sistema de notificações no Header está zerado (era mock). Falta definir quais eventos do sistema devem gerar notificação (ex: alerta de manutenção, avaria reportada, lançamento pendente de validação — os mesmos tipos que existiam no mock, mas agora precisam vir de dados reais) e como isso é persistido/entregue (endpoint dedicado? polling? websocket?).
 - **Migração de dados para o ambiente novo**: ainda não feita. Procedimento já definido em conversa (dump/restore do Postgres, cutover de DNS) mas não executado — aguardando decisão do usuário sobre quando fazer o corte.
 - **Auto-deploy instável** (ver seção 5) — causa raiz não investigada.
 - **Acoplamento `GET /assets/requests` ↔ `assets.requests`**: a listagem é gated por `assets.requests`, mas a ação de atender/validar (aba "Solicitações & Devoluções" no Almoxarifado) é gated por `assets.warehouse.fulfillment` — um perfil customizado com *fulfillment* mas sem *assets.requests* amplo veria a aba vazia em vez de funcional. Mesma classe de bug que foi corrigida para o Catálogo/Inventário, não resolvida aqui ainda.
