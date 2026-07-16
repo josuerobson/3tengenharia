@@ -537,12 +537,15 @@ export default function TripStartPage() {
     setApiError(null)
     try {
       const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
+      // Cada chamada tem seu próprio fallback — um 403 isolado (perfil sem
+      // permissão pra uma das partes) não pode derrubar as demais que já
+      // teriam funcionado.
       const [vehRes, tripsRes, empRes, worksitesRes, meRes, alertsRes] = await Promise.all([
-        vehiclesApi.list(),
-        tripsApi.list({ limit: 100 }),
-        isManagerOrAdmin ? assetsApi.listEmployees() : Promise.resolve([]),
-        assetsApi.listWorksites(),
-        !isManagerOrAdmin ? authApi.me() : Promise.resolve(null),
+        vehiclesApi.list().catch(() => ({ vehicles: [] as ApiVehicle[] })),
+        tripsApi.list({ limit: 100 }).catch(() => ({ trips: [] as ApiTrip[], total: 0 })),
+        (isManagerOrAdmin ? assetsApi.listEmployees() : Promise.resolve([])).catch(() => [] as ApiEmployee[]),
+        assetsApi.listWorksites().catch(() => [] as ApiWorksite[]),
+        (!isManagerOrAdmin ? authApi.me() : Promise.resolve(null)).catch(() => null),
         maintenanceApi.listAllAlerts().catch(() => [] as ApiMaintenanceAlert[]),
       ])
       setVehiclesList(vehRes.vehicles)

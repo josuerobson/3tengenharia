@@ -20,7 +20,7 @@ export interface AccessScope {
 export const permissionsPlugin = fp(async (app: FastifyInstance) => {
   app.decorate(
     'requirePermission',
-    (pageKey: string, capability: PermissionCapability) =>
+    (pageKeyOrKeys: string | string[], capability: PermissionCapability) =>
       async (request: FastifyRequest, reply: FastifyReply) => {
         const user = request.currentUser
 
@@ -32,13 +32,16 @@ export const permissionsPlugin = fp(async (app: FastifyInstance) => {
           })
         }
 
-        if (!isValidPageKey(pageKey)) {
-          // Erro de programação (pageKey inválida) — não deveria acontecer em produção
-          return reply.status(500).send({
-            statusCode: 500,
-            error: 'Internal Server Error',
-            message: `pageKey de permissão inválida: ${pageKey}`,
-          })
+        const pageKeys = Array.isArray(pageKeyOrKeys) ? pageKeyOrKeys : [pageKeyOrKeys]
+        for (const pageKey of pageKeys) {
+          if (!isValidPageKey(pageKey)) {
+            // Erro de programação (pageKey inválida) — não deveria acontecer em produção
+            return reply.status(500).send({
+              statusCode: 500,
+              error: 'Internal Server Error',
+              message: `pageKey de permissão inválida: ${pageKey}`,
+            })
+          }
         }
 
         // Bypass total para perfis administradores (master ou tipo admin)
@@ -47,10 +50,23 @@ export const permissionsPlugin = fp(async (app: FastifyInstance) => {
           return
         }
 
-        const level = (user.permissions?.[pageKey] ?? 'NONE') as AccessLevel
+        // Quando mais de uma pageKey é aceita (endpoint compartilhado por mais de
+        // uma tela), usa a que der o melhor acesso: se qualquer uma delas conceder
+        // nível *_ALL, isso vence (acesso amplo); senão, cai para *_OWN se alguma
+        // conceder; só nega se nenhuma das pageKeys conceder a capacidade pedida.
+        let bestLevel: AccessLevel = 'NONE'
+        for (const pageKey of pageKeys) {
+          const level = (user.permissions?.[pageKey] ?? 'NONE') as AccessLevel
+          const allowed = capability === 'READ' ? canRead(level) : canWrite(level)
+          if (!allowed) continue
+          if (!isOwnScoped(level)) {
+            bestLevel = level
+            break
+          }
+          if (bestLevel === 'NONE') bestLevel = level
+        }
 
-        const allowed = capability === 'READ' ? canRead(level) : canWrite(level)
-        if (!allowed) {
+        if (bestLevel === 'NONE') {
           return reply.status(403).send({
             statusCode: 403,
             error: 'Forbidden',
@@ -58,7 +74,7 @@ export const permissionsPlugin = fp(async (app: FastifyInstance) => {
           })
         }
 
-        request.accessScope = { level, isOwnScoped: isOwnScoped(level) }
+        request.accessScope = { level: bestLevel, isOwnScoped: isOwnScoped(bestLevel) }
       },
   )
 })
@@ -66,7 +82,7 @@ export const permissionsPlugin = fp(async (app: FastifyInstance) => {
 declare module 'fastify' {
   interface FastifyInstance {
     requirePermission: (
-      pageKey: string,
+      pageKeyOrKeys: string | string[],
       capability: PermissionCapability,
     ) => (request: FastifyRequest, reply: FastifyReply) => Promise<void>
   }

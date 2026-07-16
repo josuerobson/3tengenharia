@@ -72,7 +72,10 @@ export async function vehicleRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/trips',
     {
-      onRequest: [app.authenticate, app.requirePermission('vehicles.trips.history', 'READ')],
+      // Aceita vehicles.trips.history OU vehicles.trips.new — Nova Viagem também
+      // usa esta rota para saber quais viagens estão em andamento antes de abrir
+      // uma nova, então precisa funcionar mesmo sem acesso à tela de Histórico.
+      onRequest: [app.authenticate, app.requirePermission(['vehicles.trips.history', 'vehicles.trips.new'], 'READ')],
       schema: schema({
         tags: ['Vehicles'], summary: 'Lista histórico de viagens', security: [{ bearerAuth: [] }],
         querystring: {
