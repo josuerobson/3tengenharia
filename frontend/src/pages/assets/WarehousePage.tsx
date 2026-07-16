@@ -31,6 +31,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
 import { Badge, ASSET_STATUS_BADGE } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useAuth } from '@/contexts/AuthContext'
 import { assetsApi, type AssetCategory, type AssetLoanRequest } from '@/lib/api'
 import { type Asset } from '@/data/mockData'
@@ -1457,19 +1458,18 @@ export default function WarehousePage() {
               <Label htmlFor="modalCategory" required>
                 Categoria
               </Label>
-              <select
-                id="modalCategory"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
-                required
-              >
-                {categories.filter(c => c.isActive).map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1.5">
+                <SearchableSelect
+                  id="modalCategory"
+                  value={categoryId}
+                  onChange={setCategoryId}
+                  options={categories.filter(c => c.isActive).map((cat) => ({ value: cat.id, label: cat.name }))}
+                  placeholder="Selecione uma categoria..."
+                  searchPlaceholder="Buscar categoria..."
+                  emptyMessage="Nenhuma categoria encontrada."
+                  required
+                />
+              </div>
             </div>
           </div>
 
