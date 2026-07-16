@@ -175,6 +175,10 @@ export default function LoanRequestsPage() {
       setNewError('Informe uma quantidade válida (mínimo 1) para todos os itens.')
       return
     }
+    if (!selectedWorksiteId) {
+      setNewError('Selecione a obra de destino.')
+      return
+    }
 
     setNewSubmitting(true)
     setNewError(null)
@@ -182,7 +186,7 @@ export default function LoanRequestsPage() {
     try {
       await assetsApi.createLoanRequestBatch({
         items: parsedItems,
-        destinationWorksiteId: selectedWorksiteId || null,
+        destinationWorksiteId: selectedWorksiteId,
         requestNotes: requestNotes.trim() || null,
       })
       setNewModalOpen(false)
@@ -524,14 +528,15 @@ export default function LoanRequestsPage() {
           </div>
 
           <div>
-            <Label htmlFor="reqWorksite">Obra de Destino (opcional)</Label>
+            <Label htmlFor="reqWorksite">Obra de Destino</Label>
             <select
               id="reqWorksite"
+              required
               value={selectedWorksiteId}
               onChange={(e) => setSelectedWorksiteId(e.target.value)}
               className="mt-1.5 w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 outline-none transition-all duration-150"
             >
-              <option value="">Nenhuma / Almoxarifado</option>
+              <option value="" disabled>Selecione a obra de destino</option>
               {worksites.map((ws) => (
                 <option key={ws.id} value={ws.id}>{ws.code} — {ws.name}</option>
               ))}

@@ -595,7 +595,7 @@ export const assetsApi = {
 
   createLoanRequest(data: {
     categoryId: string
-    destinationWorksiteId?: string | null
+    destinationWorksiteId: string
     requestNotes?: string | null
   }): Promise<AssetLoanRequest> {
     return request('/assets/requests', {
@@ -606,7 +606,7 @@ export const assetsApi = {
 
   createLoanRequestBatch(data: {
     items: { categoryId: string; quantity: number }[]
-    destinationWorksiteId?: string | null
+    destinationWorksiteId: string
     requestNotes?: string | null
   }): Promise<{ message: string; requests: AssetLoanRequest[]; batchId: string | null }> {
     return request('/assets/requests/batch', {

@@ -139,10 +139,8 @@ export const createAssetLoanRequestBodySchema = z.object({
     .string({ required_error: 'Categoria é obrigatória.' })
     .cuid('ID de categoria inválido.'),
   destinationWorksiteId: z
-    .string()
-    .cuid('ID da obra de destino inválido.')
-    .optional()
-    .nullable(),
+    .string({ required_error: 'Obra de destino é obrigatória.' })
+    .cuid('ID da obra de destino inválido.'),
   requestNotes: z.string().trim().max(1000).optional().nullable(),
 })
 
@@ -166,10 +164,8 @@ export const createAssetLoanRequestBatchBodySchema = z.object({
     )
     .min(1, 'Inclua ao menos um equipamento na solicitação.'),
   destinationWorksiteId: z
-    .string()
-    .cuid('ID da obra de destino inválido.')
-    .optional()
-    .nullable(),
+    .string({ required_error: 'Obra de destino é obrigatória.' })
+    .cuid('ID da obra de destino inválido.'),
   requestNotes: z.string().trim().max(1000).optional().nullable(),
 })
 
