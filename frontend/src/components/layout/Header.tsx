@@ -35,40 +35,9 @@ interface Notification {
   read: boolean
 }
 
-const INITIAL_NOTIFICATIONS: Notification[] = [
-  {
-    id: '1',
-    title: 'Alerta de Manutenção',
-    message: 'Veículo ABC-1D23 atingiu o limiar de KM preventivo.',
-    time: '5 min',
-    type: 'warning',
-    read: false,
-  },
-  {
-    id: '2',
-    title: 'Avaria Reportada',
-    message: 'Patrimônio #PAT-0042 (Furadeira) foi reportado com defeito.',
-    time: '1h',
-    type: 'error',
-    read: false,
-  },
-  {
-    id: '3',
-    title: 'Lançamentos Pendentes',
-    message: '3 lançamentos de horas aguardam sua validação.',
-    time: '2h',
-    type: 'info',
-    read: false,
-  },
-  {
-    id: '4',
-    title: 'Empréstimo Devolvido',
-    message: 'Martelo rotativo #PAT-0018 foi devolvido por João Silva.',
-    time: '3h',
-    type: 'success',
-    read: true,
-  },
-]
+// Zerado temporariamente — notificações eram mock/fake. Os gatilhos reais
+// (quais eventos geram notificação e como) ainda serão definidos.
+const INITIAL_NOTIFICATIONS: Notification[] = []
 
 // ── Sub-componentes internos ──────────────────────────────────────────────────
 
@@ -157,7 +126,7 @@ function NotificationPanel({
       <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto scrollbar-thin">
         {notifications.length === 0 ? (
           <div className="py-8 text-center text-gray-400 text-sm">
-            Nenhuma notificação
+            Sem notificações
           </div>
         ) : (
           notifications.map((notif) => (
