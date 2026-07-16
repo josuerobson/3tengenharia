@@ -467,9 +467,9 @@ export const timeLogsService = {
     const employees = await prisma.employee.findMany({
       where: {
         isActive: true,
-        // Apenas colaboradores com perfil de acesso COLLABORATOR
+        // Qualquer usuário ativo pode ser alocado a uma equipe/obra,
+        // independente do papel (antes restrito só a COLLABORATOR).
         user: {
-          role: UserRole.COLLABORATOR,
           isActive: true,
         },
       },
