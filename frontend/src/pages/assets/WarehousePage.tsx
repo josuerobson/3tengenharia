@@ -379,7 +379,7 @@ export default function WarehousePage() {
         (a.serialNumber ?? '').toLowerCase().includes(q) ||
         (a.currentBorrowee ?? '').toLowerCase().includes(q)
 
-      const matchesCategory = categoryFilter === 'ALL' || a.category === categoryFilter
+      const matchesCategory = categoryFilter === 'ALL' || a.categoryId === categoryFilter
       const matchesStatus = statusFilter === 'ALL' || a.currentStatus === statusFilter
 
       return matchesSearch && matchesCategory && matchesStatus
@@ -879,19 +879,21 @@ export default function WarehousePage() {
 
                 {/* Filtro Categoria */}
                 <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-gray-400 hidden sm:inline" />
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="h-12 rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 focus:border-brand-primary outline-none focus:ring-2 focus:ring-brand-primary/20"
-                  >
-                    <option value="ALL">Todas Categorias</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Filter className="w-4 h-4 text-gray-400 hidden sm:inline shrink-0" />
+                  <div className="w-full md:w-56">
+                    <SearchableSelect
+                      value={categoryFilter}
+                      onChange={setCategoryFilter}
+                      options={[
+                        { value: 'ALL', label: 'Todas Categorias' },
+                        ...categories.map((cat) => ({ value: cat.id, label: cat.name })),
+                      ]}
+                      placeholder="Todas Categorias"
+                      searchPlaceholder="Buscar categoria..."
+                      emptyMessage="Nenhuma categoria encontrada."
+                      className="h-12"
+                    />
+                  </div>
                 </div>
 
                 {/* Filtro Status */}
