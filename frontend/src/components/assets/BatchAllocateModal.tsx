@@ -87,13 +87,19 @@ export default function BatchAllocateModal({ requests, assets, onClose, onSucces
   }, [requests])
 
   const availableAssetsForRow = (requestId: string) => {
+    const request = requests.find((r) => r.id === requestId)
     const assetIdsUsedElsewhere = new Set(
       Object.entries(rows)
         .filter(([id]) => id !== requestId)
         .map(([, row]) => row.assetId)
         .filter(Boolean),
     )
-    return assets.filter((a) => a.currentStatus === 'AVAILABLE' && !assetIdsUsedElsewhere.has(a.id))
+    return assets.filter(
+      (a) =>
+        a.currentStatus === 'AVAILABLE' &&
+        a.categoryId === request?.categoryId &&
+        !assetIdsUsedElsewhere.has(a.id),
+    )
   }
 
   const handleAssetChange = (requestId: string, assetId: string) => {
