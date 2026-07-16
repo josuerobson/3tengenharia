@@ -85,9 +85,11 @@ curl -s "https://<dominio>/assets/$BUNDLE" | grep -c "<algum texto novo do seu d
 curl -s -X POST "https://5450wp.easypanel.host/api/rpc/services/app/deployService" \
   -H "Authorization: Bearer <EASYPANEL_API_KEY>" \
   -H "Content-Type: application/json" \
-  -d '{"json":{"projectName":"<projeto>","serviceName":"3tengenharia-backend"}}'
+  -d '{"json":{"projectName":"<projeto>","serviceName":"3tengenharia-backend","forceRebuild":true}}'
 # serviceName: "3tengenharia-backend" ou "3tengenharia-frontend"
 ```
+
+**Sempre inclua `"forceRebuild":true`.** Sem essa flag, a chamada retorna 200/`done` mesmo quando o EasyPanel decide não rebuildar nada (aparentemente por achar, incorretamente, que o commit não mudou) — o serviço fica servindo código velho mesmo com status "sucesso". Isso já causou pelo menos um caso real: uma correção foi enviada, o endpoint continuou retornando o comportamento antigo, e só depois de disparar com `forceRebuild:true` o build realmente rodou (confirmado pelo timestamp do log de build mudando).
 
 ### Como ver logs de build/runtime
 
@@ -97,9 +99,11 @@ curl -s "https://logs-do-easypanel-logs.5450wp.easypanel.host/<projeto>/<service
 # resposta: { dados: { deploy: { status, log }, ultimo_erro, container: { log } } }
 ```
 
-### Problema conhecido, não resolvido
+O campo `dados.deploy.log` termina com um timestamp (`### Thu, 16 Jul 2026 12:32:09 GMT`) — **é isso que prova que o build é recente, não o `status: "done"` sozinho**. Um deploy antigo bem-sucedido também mostra `status: "done"`.
 
-O auto-deploy via webhook do GitHub falhou em disparar (para pelo menos um dos dois projetos/serviços) em quase todo push feito nesta sessão — às vezes o backend, às vezes o frontend, às vezes só um dos dois projetos. Causa raiz não investigada (suspeita: configuração do webhook específica desse projeto no EasyPanel, ou rate limit). **Sempre verifique e dispare manualmente se necessário** — não assuma que o push sozinho é suficiente.
+### Problema conhecido — causa provável identificada, correção é usar `forceRebuild`
+
+O auto-deploy via webhook do GitHub (e até disparos manuais sem `forceRebuild`) falharam em produzir um build novo em pelo menos um dos dois projetos/serviços em quase todo push desta sessão — confirmado comparando o timestamp do log de build antes/depois de disparar com `forceRebuild:true`. Hipótese: o EasyPanel decide "nada mudou, pular build" com base numa comparação de ref que não está funcionando corretamente pra este projeto. Não confirmado 100% (a causa raiz no lado do EasyPanel não foi investigada), mas o workaround (`forceRebuild:true` + conferir timestamp) resolve na prática. **Sempre verifique o timestamp do build e dispare com `forceRebuild:true` se necessário** — não assuma que o push sozinho, nem um disparo manual sem essa flag, é suficiente.
 
 ### Onde ficam as credenciais
 
@@ -110,6 +114,7 @@ Nenhuma credencial real está neste arquivo nem em nenhum outro arquivo versiona
 
 ## 6. Linha do tempo do que foi construído (mais recente primeiro)
 
+- **`requirePermission` aceita array de pageKeys (OR) + Nova Viagem funciona com perfil restrito**: um perfil customizado com só `vehicles.trips.new` (Total Pessoal) e sem `vehicles.trips.history` não conseguia nem abrir a tela "Nova Viagem" — `GET /vehicles/trips` (usado internamente pra checar viagens em andamento antes de abrir uma nova) era gated exclusivamente por `vehicles.trips.history`, e como fazia parte do mesmo `Promise.all` que carregava veículos/obras, a rejeição de uma chamada derrubava as outras que já teriam funcionado. Corrigido em duas frentes: `app.requirePermission` agora aceita `string | string[]` (passa se qualquer uma das pageKeys conceder a capacidade, priorizando a de maior alcance) — `GET /vehicles/trips` passa a aceitar `vehicles.trips.history` OU `vehicles.trips.new`; e `TripStartPage.tsx` ganhou fallback individual em cada chamada do `Promise.all` (mesma classe de robustez já aplicada em `WarehousePage.tsx`). Durante a verificação desse fix foi descoberto o problema do `forceRebuild` (ver seção 5) — o deploy "funcionou" (status done) mas serviu código velho até eu forçar o rebuild.
 - **Alocar Equipes aceita qualquer usuário**: a lista de funcionários elegíveis pra alocação de equipe/obra (`listTeamAllocationData` em `time-logs.service.ts`) só mostrava quem tinha role legado `COLLABORATOR`. Removida essa restrição — qualquer usuário ativo com cadastro de funcionário aparece agora (confirmado em produção: 17 → 25 elegíveis). O filtro de quem pode ser o **gestor responsável** pela equipe continua exigindo `MANAGER_WORKSITE` — não foi tocado, só a lista de quem pode ser alocado como membro.
 - **Notificações do Header zeradas temporariamente**: o sino tinha 4 notificações mock hardcoded (`INITIAL_NOTIFICATIONS` em `Header.tsx`), nunca ligadas a eventos reais do sistema. Zerado (`[]`), painel mostra "Sem notificações", ícone do sino continua visível sem o badge de contagem. **Pendência**: definir quais eventos reais devem gerar notificação e como (ver seção 7).
 - **Descrição do Bem deixou de ser obrigatória** no cadastro/edição de patrimônio no Almoxarifado. Removida a validação em 3 camadas (frontend, schema JSON da rota Fastify — `required: [...]` na rota, que é validado independentemente do Zod, e Zod). Coluna `description` no banco continua `NOT NULL`; quando omitida, o service persiste string vazia.
@@ -131,7 +136,7 @@ Nenhuma credencial real está neste arquivo nem em nenhum outro arquivo versiona
 - **Notificações reais ainda não definidas**: sistema de notificações no Header está zerado (era mock). Falta definir quais eventos do sistema devem gerar notificação (ex: alerta de manutenção, avaria reportada, lançamento pendente de validação — os mesmos tipos que existiam no mock, mas agora precisam vir de dados reais) e como isso é persistido/entregue (endpoint dedicado? polling? websocket?).
 - **Migração de dados para o ambiente novo**: ainda não feita. Procedimento já definido em conversa (dump/restore do Postgres, cutover de DNS) mas não executado — aguardando decisão do usuário sobre quando fazer o corte.
 - **Auto-deploy instável** (ver seção 5) — causa raiz não investigada.
-- **Acoplamento `GET /assets/requests` ↔ `assets.requests`**: a listagem é gated por `assets.requests`, mas a ação de atender/validar (aba "Solicitações & Devoluções" no Almoxarifado) é gated por `assets.warehouse.fulfillment` — um perfil customizado com *fulfillment* mas sem *assets.requests* amplo veria a aba vazia em vez de funcional. Mesma classe de bug que foi corrigida para o Catálogo/Inventário, não resolvida aqui ainda.
+- **Acoplamento `GET /assets/requests` ↔ `assets.requests`**: a listagem é gated por `assets.requests`, mas a ação de atender/validar (aba "Solicitações & Devoluções" no Almoxarifado) é gated por `assets.warehouse.fulfillment` — um perfil customizado com *fulfillment* mas sem *assets.requests* amplo veria a aba vazia em vez de funcional. Mesma classe de bug que foi corrigida para o Catálogo/Inventário e para Nova Viagem (ver seção 6) — agora que `requirePermission` aceita array de pageKeys, a correção aqui é trocar o gate da rota para `app.requirePermission(['assets.requests', 'assets.warehouse.fulfillment'], 'READ')`, mas ainda não foi feita.
 - **`timelogs.report` e `timelogs.teams`** (páginas "Relatório por C.C." e "Equipes") não têm endpoint de backend próprio — reaproveitam os mesmos endpoints de "Registro Diário" (`timelogs.daily`) e "Alocar Equipes" (`timelogs.allocation`) respectivamente. Não há como dar permissão independente para essas duas páginas hoje sem criar endpoints dedicados.
 - **Exclusão de obra**: antes só `ADMIN` podia excluir; hoje qualquer perfil com Acesso Total em "Cadastro de Obras" pode. Mudança deliberada, não comunicada como aviso formal na época além do chat.
 - **Sistema de relatórios com IA**: consultoria/análise de ideias já foi feita e apresentada ao usuário (relatórios de controle de custo, erros recorrentes de equipe, controle de fraude), mas a implementação foi **explicitamente pausada** a pedido do usuário para priorizar o RBAC primeiro. Retomar quando solicitado.
