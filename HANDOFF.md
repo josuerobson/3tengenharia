@@ -110,6 +110,7 @@ Nenhuma credencial real está neste arquivo nem em nenhum outro arquivo versiona
 
 ## 6. Linha do tempo do que foi construído (mais recente primeiro)
 
+- **PWA travado em retrato no Android**: `manifest.webmanifest` tinha `orientation: "any"`, fazendo o app instalado (WebAPK) girar pelo sensor do aparelho mesmo com a rotação automática do Android desativada nas configurações do sistema. Corrigido para `"portrait-primary"` nos dois lugares que definem o manifest (`frontend/public/manifest.webmanifest` e o manifest gerado por `vite-plugin-pwa` em `vite.config.ts`, que sobrescreve o arquivo estático no build — os dois precisam ficar sincronizados).
 - **Regra obrigatória de sincronização do handoff**: adicionada regra em `HANDOFF.md` e `AGENTS.md` exigindo que todo agente atualize esses arquivos a cada `git push`, sem exceção — ver seção 8.
 - **Remoção da "Linha do Tempo de Viagens"** em Alertas de Manutenção (redundante com Histórico de Viagens) — código exclusivo removido, não só escondido.
 - **Fotos múltiplas (até 4) + edição de patrimônio** no Almoxarifado: cadastro de item passou de 1 para 4 fotos; nova rota `PATCH /assets/:id` para editar dados cadastrais (não existia antes — só criação). Edição não altera `currentStatus` (isso continua exclusivo dos fluxos de manutenção/empréstimo).
