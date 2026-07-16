@@ -480,10 +480,6 @@ export default function WarehousePage() {
       setModalError('Código Patrimonial é obrigatório.')
       return
     }
-    if (!description.trim()) {
-      setModalError('Descrição é obrigatória.')
-      return
-    }
     if (!categoryId) {
       setModalError('Categoria é obrigatória.')
       return
@@ -1474,7 +1470,7 @@ export default function WarehousePage() {
           </div>
 
           <div>
-            <Label htmlFor="modalDescription" required>
+            <Label htmlFor="modalDescription">
               Descrição do Bem
             </Label>
             <Input
@@ -1483,7 +1479,6 @@ export default function WarehousePage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="mt-1.5 h-11"
-              required
             />
           </div>
 

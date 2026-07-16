@@ -54,10 +54,7 @@ export const createAssetBodySchema = z.object({
     .trim()
     .min(1, 'Código Patrimonial não pode ser vazio.'),
 
-  description: z
-    .string({ required_error: 'Descrição é obrigatória.' })
-    .trim()
-    .min(1, 'Descrição não pode ser vazia.'),
+  description: z.string().trim().optional(),
 
   categoryId: z
     .string({ required_error: 'Categoria é obrigatória.' })
@@ -84,7 +81,7 @@ export type CreateAssetBody = z.infer<typeof createAssetBodySchema>
 
 export const updateAssetBodySchema = z.object({
   assetTag: z.string().trim().min(1, 'Código Patrimonial não pode ser vazio.').optional(),
-  description: z.string().trim().min(1, 'Descrição não pode ser vazia.').optional(),
+  description: z.string().trim().optional(),
   categoryId: z.string().cuid('ID de categoria inválido.').optional(),
   brand: z.string().trim().nullable().optional(),
   model: z.string().trim().nullable().optional(),

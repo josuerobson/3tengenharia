@@ -204,7 +204,7 @@ export const assetsService = {
     const created = await prisma.asset.create({
       data: {
         assetTag: body.assetTag,
-        description: body.description,
+        description: body.description ?? '',
         categoryId: body.categoryId,
         brand: body.brand || null,
         model: body.model || null,

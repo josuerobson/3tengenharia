@@ -152,7 +152,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
         security: [{ bearerAuth: [] }],
         body: {
           type: 'object',
-          required: ['assetTag', 'description', 'categoryId'],
+          required: ['assetTag', 'categoryId'],
           properties: assetWriteBodyProperties,
         },
         response: {
