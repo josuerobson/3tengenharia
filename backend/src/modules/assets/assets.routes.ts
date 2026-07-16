@@ -460,6 +460,19 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     controller.createLoanRequestBatch
   )
 
+  app.patch(
+    '/requests/:id/cancel',
+    {
+      onRequest: [app.authenticate, app.requirePermission('assets.requests', 'WRITE')],
+      schema: {
+        tags: ['Assets'],
+        summary: 'Cancelar solicitação de empréstimo ainda não atendida',
+        security: [{ bearerAuth: [] }],
+      } as any
+    },
+    controller.cancelLoanRequest
+  )
+
   app.post(
     '/requests/:id/allocate',
     {

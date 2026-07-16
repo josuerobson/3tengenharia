@@ -643,6 +643,42 @@ export const assetsService = {
     })
   },
 
+  async cancelLoanRequest(requestId: string, userId: string, isOwnScoped: boolean) {
+    // 1. Busca a solicitação
+    const request = await prisma.assetLoanRequest.findUnique({
+      where: { id: requestId }
+    })
+    if (!request) {
+      throw new Error('Solicitação de empréstimo não encontrada.')
+    }
+    if (request.status !== 'PENDING') {
+      throw new Error('Só é possível cancelar solicitações ainda não atendidas.')
+    }
+
+    // 2. Perfis com escopo pessoal só podem cancelar as próprias solicitações
+    if (isOwnScoped) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { employee: true }
+      })
+      if (user?.employee?.id !== request.requesterEmployeeId) {
+        throw new Error('Você só pode cancelar suas próprias solicitações.')
+      }
+    }
+
+    // 3. Marca a solicitação como cancelada — nenhum bem físico foi alocado ainda
+    return prisma.assetLoanRequest.update({
+      where: { id: requestId },
+      data: { status: 'CANCELLED' },
+      include: {
+        category: true,
+        requesterEmployee: true,
+        destinationWorksite: true,
+        allocatedAsset: { include: { category: true } }
+      }
+    })
+  },
+
   async allocateLoanRequest(requestId: string, checkoutByUserId: string, body: AllocateAssetLoanRequestBody) {
     // 1. Busca a solicitação
     const request = await prisma.assetLoanRequest.findUnique({

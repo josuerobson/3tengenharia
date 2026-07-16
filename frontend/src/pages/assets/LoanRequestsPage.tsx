@@ -53,6 +53,7 @@ const STATUS_LABELS: Record<string, string> = {
   RETURNING: 'Aguardando Validação',
   RETURNED: 'Devolvido',
   REJECTED: 'Rejeitado',
+  CANCELLED: 'Cancelado',
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -61,6 +62,7 @@ const STATUS_COLORS: Record<string, string> = {
   RETURNING: 'text-orange-700 bg-orange-100 border-orange-200',
   RETURNED: 'text-green-700 bg-green-100 border-green-200',
   REJECTED: 'text-red-700 bg-red-100 border-red-200',
+  CANCELLED: 'text-gray-600 bg-gray-100 border-gray-200',
 }
 
 /** Agrupa solicitações que compartilham o mesmo batchId (pedido com múltiplos itens/quantidades). */
@@ -108,6 +110,9 @@ export default function LoanRequestsPage() {
   const [returnPhotos, setReturnPhotos] = useState<string[]>([])
   const [returnSubmitting, setReturnSubmitting] = useState(false)
   const [returnError, setReturnError] = useState<string | null>(null)
+
+  // ── Cancelar Solicitação ──────────────────────────────────────────────────
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
 
   // ── Carregar Dados ──────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -201,6 +206,20 @@ export default function LoanRequestsPage() {
     }
   }
 
+  // ── Handler de Cancelamento ───────────────────────────────────────────────
+  const handleCancelRequest = async (req: AssetLoanRequest) => {
+    if (!confirm(`Cancelar a solicitação de "${req.category?.name}"?`)) return
+    setCancellingId(req.id)
+    try {
+      await assetsApi.cancelLoanRequest(req.id)
+      loadData()
+    } catch (err: any) {
+      alert(err?.message ?? 'Erro ao cancelar a solicitação.')
+    } finally {
+      setCancellingId(null)
+    }
+  }
+
   // ── Handlers de Devolução ──────────────────────────────────────────────────
   const handleOpenReturnModal = (req: AssetLoanRequest) => {
     setSelectedRequestForReturn(req)
@@ -267,7 +286,7 @@ export default function LoanRequestsPage() {
   // Agrupa unidades criadas juntas em um único pedido com múltiplos itens (mesmo batchId).
   const requestGroups = groupRequestsByBatch(requests)
   const activeGroups = requestGroups.filter(g => g.some(r => ['PENDING', 'LOANED', 'RETURNING'].includes(r.status)))
-  const closedGroups = requestGroups.filter(g => g.every(r => ['RETURNED', 'REJECTED'].includes(r.status)))
+  const closedGroups = requestGroups.filter(g => g.every(r => ['RETURNED', 'REJECTED', 'CANCELLED'].includes(r.status)))
   const activeCount = activeGroups.reduce((sum, g) => sum + g.length, 0)
   const closedCount = closedGroups.reduce((sum, g) => sum + g.length, 0)
 
@@ -395,6 +414,22 @@ export default function LoanRequestsPage() {
                                     >
                                       <ArrowLeftRight size={13} />
                                       Registrar Devolução
+                                    </Button>
+                                  </div>
+                                )}
+
+                                {/* Botão de cancelar (só aparece quando PENDING — ainda não atendida) */}
+                                {req.status === 'PENDING' && (
+                                  <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleCancelRequest(req)}
+                                      disabled={cancellingId === req.id}
+                                      className="flex items-center gap-1.5 text-xs font-semibold border-red-200 text-red-600 hover:bg-red-50 h-9"
+                                    >
+                                      {cancellingId === req.id ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+                                      Cancelar Solicitação
                                     </Button>
                                   </div>
                                 )}

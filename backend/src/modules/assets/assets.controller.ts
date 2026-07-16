@@ -219,6 +219,22 @@ export function assetsController(_app: FastifyInstance) {
       })
     },
 
+    async cancelLoanRequest(request: FastifyRequest, reply: FastifyReply) {
+      const params = request.params as { id: string }
+      const userId = request.currentUser.sub
+      const isOwnScoped = request.accessScope?.isOwnScoped ?? false
+      let loanRequest
+      try {
+        loanRequest = await assetsService.cancelLoanRequest(params.id, userId, isOwnScoped)
+      } catch (err: any) {
+        return reply.status(400).send({ message: err.message })
+      }
+      return reply.status(200).send({
+        message: 'Solicitação cancelada com sucesso.',
+        loanRequest
+      })
+    },
+
     async allocateLoanRequest(request: FastifyRequest, reply: FastifyReply) {
       const params = request.params as { id: string }
       const body = allocateAssetLoanRequestBodySchema.parse(request.body)

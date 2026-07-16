@@ -24,7 +24,7 @@ export interface AssetLoanRequest {
   }
   categoryId: string
   category: AssetCategory
-  status: 'PENDING' | 'LOANED' | 'RETURNING' | 'RETURNED' | 'REJECTED'
+  status: 'PENDING' | 'LOANED' | 'RETURNING' | 'RETURNED' | 'REJECTED' | 'CANCELLED'
   /** Agrupa unidades criadas juntas em um único pedido com múltiplos itens/quantidades. */
   batchId: string | null
   destinationWorksiteId: string | null
@@ -612,6 +612,12 @@ export const assetsApi = {
     return request('/assets/requests/batch', {
       method: 'POST',
       body: JSON.stringify(data)
+    })
+  },
+
+  cancelLoanRequest(requestId: string): Promise<{ message: string; loanRequest: AssetLoanRequest }> {
+    return request(`/assets/requests/${requestId}/cancel`, {
+      method: 'PATCH',
     })
   },
 

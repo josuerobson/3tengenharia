@@ -77,7 +77,8 @@ enum LoanRequestStatus {
   LOANED // Equipamento entregue ao colaborador
   RETURNING // Colaborador enviou a devolução, em trânsito
   RETURNED // Devolução aprovada e concluída pelo gestor
-  REJECTED // Solicitação rejeitada
+  REJECTED // Solicitação rejeitada pelo gestor
+  CANCELLED // Solicitação cancelada pelo próprio solicitante, antes de ser atendida
 }
 
 /// Opções de validação da devolução pelo gestor
