@@ -119,7 +119,9 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/',
     {
-      onRequest: [app.authenticate, app.requirePermission('timelogs.daily', 'READ')],
+      // Aceita timelogs.daily OU timelogs.report — Relatório por C.C. usa esta
+      // mesma listagem, sem endpoint proprio.
+      onRequest: [app.authenticate, app.requirePermission(['timelogs.daily', 'timelogs.report'], 'READ')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Listar lançamentos de horas',
@@ -210,7 +212,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   app.patch(
     '/:id/validate',
     {
-      onRequest: [app.authenticate, app.requirePermission('timelogs.daily', 'WRITE')],
+      onRequest: [app.authenticate, app.requirePermission(['timelogs.daily', 'timelogs.report'], 'WRITE')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Validar/aprovar um lançamento de horas',
@@ -250,7 +252,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   app.patch(
     '/:id',
     {
-      onRequest: [app.authenticate, app.requirePermission('timelogs.daily', 'WRITE')],
+      onRequest: [app.authenticate, app.requirePermission(['timelogs.daily', 'timelogs.report'], 'WRITE')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Atualizar um lançamento de horas',
@@ -295,7 +297,7 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   app.delete(
     '/:id',
     {
-      onRequest: [app.authenticate, app.requirePermission('timelogs.daily', 'WRITE')],
+      onRequest: [app.authenticate, app.requirePermission(['timelogs.daily', 'timelogs.report'], 'WRITE')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Excluir um lançamento de horas',
@@ -318,10 +320,12 @@ export async function timeLogRoutes(app: FastifyInstance): Promise<void> {
   )
 
   // ── GET /time-logs/team-allocation ─────────────────────────────────────────
+  // Aceita timelogs.allocation, timelogs.daily OU timelogs.teams — Registro
+  // Diário e a tela Equipes também usam esta rota, sem endpoint proprio.
   app.get(
     '/team-allocation',
     {
-      onRequest: [app.authenticate, app.requirePermission('timelogs.allocation', 'READ')],
+      onRequest: [app.authenticate, app.requirePermission(['timelogs.allocation', 'timelogs.daily', 'timelogs.teams'], 'READ')],
       schema: {
         tags: ['TimeLogs'],
         summary: 'Dados para alocação de equipes (obras, gestores e colaboradores)',

@@ -377,7 +377,12 @@ function getCurrentCoordinates(): Promise<string | null> {
 
 export default function TripStartPage() {
   const navigate = useNavigate()
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, isOwnScopedPage } = useAuth()
+  // Só pode escolher motorista/ver dados de outros se o perfil de acesso NÃO
+  // for "Total Pessoal" em Nova Viagem — antes isso usava o role legado
+  // (isManagerOrAdmin), que fica desatualizado assim que o perfil de acesso
+  // dinâmico é mais restritivo que o role legado do usuário.
+  const canActForOthers = !isOwnScopedPage('vehicles.trips.new')
 
   // ── Estados da API ─────────────────────────────────────────────────────────
   const [vehiclesList, setVehiclesList]       = useState<Vehicle[]>([])
@@ -436,16 +441,14 @@ export default function TripStartPage() {
   const [currentEmployeeProfile, setCurrentEmployeeProfile] = useState<ApiEmployee | null>(null)
 
   const selectedDriver = useMemo(() => {
-    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
-    if (isManagerOrAdmin) {
+    if (canActForOthers) {
       return employeesList.find(e => e.id === selectedDriverId)
     }
     return null
-  }, [employeesList, selectedDriverId, currentUser])
+  }, [employeesList, selectedDriverId, canActForOthers])
 
   const isCnhExpired = useMemo(() => {
-    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
-    const expiryStr = isManagerOrAdmin
+    const expiryStr = canActForOthers
       ? selectedDriver?.cnhExpirationDate
       : currentEmployeeProfile?.cnhExpirationDate
 
@@ -453,7 +456,7 @@ export default function TripStartPage() {
     const expiryDate = new Date(expiryStr)
     expiryDate.setHours(23, 59, 59, 999)
     return expiryDate < new Date()
-  }, [selectedDriver, currentEmployeeProfile, currentUser])
+  }, [selectedDriver, currentEmployeeProfile, canActForOthers])
 
   const requiresPhotos = useMemo(() => {
     const totalTrips = selectedVehicle?._count?.trips ?? 0
@@ -536,22 +539,21 @@ export default function TripStartPage() {
     setLoadingVehicles(true)
     setApiError(null)
     try {
-      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
       // Cada chamada tem seu próprio fallback — um 403 isolado (perfil sem
       // permissão pra uma das partes) não pode derrubar as demais que já
       // teriam funcionado.
       const [vehRes, tripsRes, empRes, worksitesRes, meRes, alertsRes] = await Promise.all([
         vehiclesApi.list().catch(() => ({ vehicles: [] as ApiVehicle[] })),
         tripsApi.list({ limit: 100 }).catch(() => ({ trips: [] as ApiTrip[], total: 0 })),
-        (isManagerOrAdmin ? assetsApi.listEmployees() : Promise.resolve([])).catch(() => [] as ApiEmployee[]),
+        (canActForOthers ? assetsApi.listEmployees() : Promise.resolve([])).catch(() => [] as ApiEmployee[]),
         assetsApi.listWorksites().catch(() => [] as ApiWorksite[]),
-        (!isManagerOrAdmin ? authApi.me() : Promise.resolve(null)).catch(() => null),
+        (!canActForOthers ? authApi.me() : Promise.resolve(null)).catch(() => null),
         maintenanceApi.listAllAlerts().catch(() => [] as ApiMaintenanceAlert[]),
       ])
       setVehiclesList(vehRes.vehicles)
       const openTrips = tripsRes.trips.filter(t => t.arrivalDateTime === null || t.finalKm === null)
       setOngoingTrips(openTrips)
-      if (isManagerOrAdmin && Array.isArray(empRes)) {
+      if (canActForOthers && Array.isArray(empRes)) {
         setEmployeesList(empRes)
       }
       if (Array.isArray(worksitesRes)) {
@@ -568,7 +570,7 @@ export default function TripStartPage() {
     } finally {
       setLoadingVehicles(false)
     }
-  }, [currentUser])
+  }, [canActForOthers])
 
   useEffect(() => {
     void fetchData()
@@ -636,8 +638,7 @@ export default function TripStartPage() {
     if (!destination.trim()) errors.destination = 'Informe o destino.'
     if (!selectedWorksiteId) errors.worksite = 'Selecione a obra / centro de custo.'
 
-    const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
-    if (isManagerOrAdmin && !selectedDriverId) {
+    if (canActForOthers && !selectedDriverId) {
       errors.driver = 'Selecione o motorista responsável pela viagem.'
     } else if (isCnhExpired) {
       errors.driver = 'A CNH do motorista está vencida. Não é possível iniciar a viagem.'
@@ -645,7 +646,7 @@ export default function TripStartPage() {
 
     setStep1Errors(errors)
     return Object.keys(errors).length === 0
-  }, [selectedVehicle, initialKm, origin, destination, currentUser, selectedDriverId, selectedWorksiteId, isCnhExpired])
+  }, [selectedVehicle, initialKm, origin, destination, canActForOthers, selectedDriverId, selectedWorksiteId, isCnhExpired])
 
   const handleOdometerPhotoAdd = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -724,7 +725,6 @@ export default function TripStartPage() {
     setIsSubmitting(true)
     setApiError(null)
     try {
-      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
       const coords = await getCurrentCoordinates()
       const selectedWorksite = worksitesList.find(w => w.id === selectedWorksiteId)
       const res = await tripsApi.start({
@@ -735,7 +735,7 @@ export default function TripStartPage() {
         purpose:     purpose.trim() || undefined,
         departureGeolocation: coords || undefined,
         worksiteId:  selectedWorksiteId || undefined,
-        ...(isManagerOrAdmin && selectedDriverId ? { driverEmployeeId: selectedDriverId } : {}),
+        ...(canActForOthers && selectedDriverId ? { driverEmployeeId: selectedDriverId } : {}),
         ...(requiresPhotos ? {
           departurePhotoFront: photoFront || undefined,
           departurePhotoBack:  photoBack || undefined,
@@ -999,7 +999,7 @@ export default function TripStartPage() {
             </div>
 
             {/* Motorista */}
-            {currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER') ? (
+            {canActForOthers ? (
               <div>
                 <Label htmlFor="driver" required>
                   Motorista
@@ -1188,8 +1188,7 @@ export default function TripStartPage() {
                   <p className="text-xs text-red-700 mt-0.5">
                     O motorista selecionado está com a CNH vencida (vencimento em:{' '}
                     {(() => {
-                      const isManagerOrAdmin = currentUser?.role === 'ADMIN' || currentUser?.role?.startsWith('MANAGER')
-                      const expiry = isManagerOrAdmin
+                      const expiry = canActForOthers
                         ? selectedDriver?.cnhExpirationDate
                         : currentUser?.cnhExpirationDate
                       return expiry ? new Date(expiry).toLocaleDateString('pt-BR') : ''

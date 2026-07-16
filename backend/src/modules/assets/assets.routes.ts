@@ -418,10 +418,13 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   )
 
   // ── FLUXO DE SOLICITAÇÃO (LOAN REQUESTS) ──────────────────────────────────
+  // Aceita assets.requests OU assets.warehouse.fulfillment — a aba "Solicitações
+  // & Devoluções" do Almoxarifado usa esta mesma listagem pra saber o que
+  // atender, então precisa funcionar mesmo sem acesso a "Minhas Solicitações".
   app.get(
     '/requests',
     {
-      onRequest: [app.authenticate, app.requirePermission('assets.requests', 'READ')],
+      onRequest: [app.authenticate, app.requirePermission(['assets.requests', 'assets.warehouse.fulfillment'], 'READ')],
       schema: {
         tags: ['Assets'],
         summary: 'Listar solicitações de empréstimo',
