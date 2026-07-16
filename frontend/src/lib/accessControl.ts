@@ -39,6 +39,11 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
   { key: 'admin.users', label: 'Usuários', group: 'Administração', supportsOwnScope: false },
   { key: 'admin.worksites', label: 'Cadastro de Obras', group: 'Administração', supportsOwnScope: false },
   { key: 'admin.accessControl', label: 'Controle de Acesso', group: 'Administração', supportsOwnScope: false },
+
+  { key: 'reports.vehicles', label: 'Relatórios > Controle de Veículos', group: 'Relatórios', supportsOwnScope: false },
+  { key: 'reports.assets', label: 'Relatórios > Ferramentas e Equipamentos', group: 'Relatórios', supportsOwnScope: false },
+  { key: 'reports.timelogs', label: 'Relatórios > Rateio de Horas', group: 'Relatórios', supportsOwnScope: false },
+  { key: 'reports.fiveS', label: 'Relatórios > 5S', group: 'Relatórios', supportsOwnScope: false },
 ]
 
 export const PAGE_KEYS = PAGE_DEFINITIONS.map((p) => p.key)

@@ -199,10 +199,12 @@ export async function fiveSRoutes(app: FastifyInstance): Promise<void> {
 
   // ── GET /5s/reports ───────────────────────────────────────────────────────────
   // Acesso: MANAGER, ADMIN — relatório gerencial com KPIs
+  // Aceita fiveS.panel OU reports.fiveS — o hub de Relatórios > 5S > "Auditoria
+  // 5S por Área" reaproveita esta mesma rota em vez de duplicar a lógica.
   app.get(
     '/reports',
     {
-      onRequest: [app.authenticate, app.requirePermission('fiveS.panel', 'READ')],
+      onRequest: [app.authenticate, app.requirePermission(['fiveS.panel', 'reports.fiveS'], 'READ')],
       schema: {
         tags:        ['5S'],
         summary:     'Relatório de auditorias 5S',

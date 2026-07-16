@@ -17,6 +17,7 @@ import { userRoutes }              from './modules/users/users.routes.js'
 import { worksiteRoutes }          from './modules/worksites/worksites.routes.js'
 import { dashboardRoutes }         from './modules/dashboard/dashboard.routes.js'
 import { accessProfileRoutes }     from './modules/accessProfiles/accessProfiles.routes.js'
+import { reportsRoutes }           from './modules/reports/reports.routes.js'
 import { env } from './lib/env.js'
 
 export async function buildApp() {
@@ -87,6 +88,7 @@ export async function buildApp() {
       await v1.register(worksiteRoutes,         { prefix: '/worksites' })  // Módulo: Obras
       await v1.register(dashboardRoutes,        { prefix: '/dashboard' })  // Módulo: Dashboard
       await v1.register(accessProfileRoutes,    { prefix: '/access-profiles' }) // Módulo: Perfis de Acesso
+      await v1.register(reportsRoutes,          { prefix: '/reports' })     // Módulo: Relatórios
     },
     { prefix: '/api/v1' },
   )

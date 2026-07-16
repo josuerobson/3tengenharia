@@ -33,6 +33,7 @@ import ProfilePage               from '@/pages/auth/ProfilePage'
 import WorksitesPage             from '@/pages/admin/WorksitesPage'
 import DashboardPage             from '@/pages/dashboard/DashboardPage'
 import AccessControlPage         from '@/pages/admin/AccessControlPage'
+import ReportsPage               from '@/pages/reports/ReportsPage'
 
 // ── Página placeholder genérica (substituir pelas páginas reais na Etapa 5) ──
 
@@ -101,6 +102,8 @@ export default function App() {
                 <Route path="5s/panel"     element={<RequirePage pageKey="fiveS.panel"><QualityValidationPanel5S /></RequirePage>} />
 
                 {/* Admin */}
+                <Route path="reports" element={<RequirePage pageKey={['reports.vehicles', 'reports.assets', 'reports.timelogs', 'reports.fiveS']}><ReportsPage /></RequirePage>} />
+
                 <Route path="admin/users"    element={<RequirePage pageKey="admin.users"><UsersPage /></RequirePage>} />
                 <Route path="admin/worksites" element={<RequirePage pageKey="admin.worksites"><WorksitesPage /></RequirePage>} />
                 <Route path="admin/access-control" element={<RequirePage pageKey="admin.accessControl"><AccessControlPage /></RequirePage>} />

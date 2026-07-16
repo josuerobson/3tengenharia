@@ -1232,6 +1232,97 @@ export const accessProfilesApi = {
   },
 }
 
+// ── Endpoints do módulo Relatórios ─────────────────────────────────────────────
+
+export interface VehicleUtilizationRow {
+  id: string
+  funcionario: string | null
+  veiculo: string
+  placa: string
+  worksite: string | null
+  kmInicial: number
+  kmFinal: number | null
+  kmRodados: number | null
+  origem: string
+  destino: string
+  descViagem: string | null
+  horarioSaida: string
+  horarioChegada: string | null
+  tempoTotal: string | null
+  sinistro: 'S' | 'N'
+  descSinistro: string | null
+  abastecimento: 'S' | 'N'
+  descAbastecimento: string | null
+  conforme: 'S' | 'N'
+}
+
+export interface AssetLoanReportRow {
+  id: string
+  dataEmprestimo: string | null
+  funcionario: string
+  categoria: string
+  codigoPatrimonio: string | null
+  centroDeCusto: string | null
+  dataPrevistaDevolucao: string | null
+  status: 'Pendente' | 'Emprestado' | 'Atrasado'
+  diasEmAtraso: number | null
+}
+
+export interface WorkedHoursRow {
+  id: string
+  centroDeCusto: string
+  worksiteId: string
+  funcionario: string
+  data: string
+  horarioChegada: string | null
+  horarioSaida: string | null
+  intervalo: string | null
+  totalHorasDia: number
+  horasExtras: number
+}
+
+export interface WorkedHoursSummaryRow {
+  worksiteId: string
+  centroDeCusto: string
+  totalHorasPeriodo: number
+  mediaDiaria: number
+}
+
+function buildQuery(params: Record<string, string | undefined>): string {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([k, v]) => {
+    if (v) query.set(k, v)
+  })
+  const qStr = query.toString()
+  return qStr ? `?${qStr}` : ''
+}
+
+export const reportsApi = {
+  vehicleUtilization(params: {
+    vehicleId?: string
+    worksiteId?: string
+    dateFrom?: string
+    dateTo?: string
+  }): Promise<{ rows: VehicleUtilizationRow[] }> {
+    return request(`/reports/vehicles/utilization${buildQuery(params)}`)
+  },
+
+  assetLoans(params: {
+    worksiteId?: string
+    status?: string
+  }): Promise<{ rows: AssetLoanReportRow[] }> {
+    return request(`/reports/assets/loans${buildQuery(params)}`)
+  },
+
+  workedHours(params: {
+    worksiteId?: string
+    employeeId?: string
+    dateFrom?: string
+    dateTo?: string
+  }): Promise<{ rows: WorkedHoursRow[]; summary: WorkedHoursSummaryRow[] }> {
+    return request(`/reports/timelogs/worked-hours${buildQuery(params)}`)
+  },
+}
 
 
 

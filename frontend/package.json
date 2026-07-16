@@ -13,6 +13,7 @@
   "dependencies": {
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
     "lucide-react": "^0.460.0",
     "pdf-lib": "^1.17.1",
     "react": "^18.3.1",

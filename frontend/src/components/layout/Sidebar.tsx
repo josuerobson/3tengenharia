@@ -42,6 +42,7 @@ import {
   ListChecks,
   Settings2,
   ClipboardList,
+  FileBarChart2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -200,6 +201,13 @@ const MENU_ITEMS: MenuItem[] = [
         pageKeys: ['fiveS.panel'],
       },
     ],
+  },
+  {
+    id: 'reports',
+    label: 'Relatórios',
+    icon: FileBarChart2,
+    path: '/reports',
+    pageKeys: ['reports.vehicles', 'reports.assets', 'reports.timelogs', 'reports.fiveS'],
   },
   {
     id: 'admin',
