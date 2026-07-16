@@ -62,6 +62,7 @@ Para rotas com `supportsOwnScope: true`, o controller calcula `ownerEmployeeId =
 - `exactOptionalPropertyTypes: true` no backend rejeita passar `undefined` explicitamente em objetos `data:` do Prisma. Padrão de correção: montar um objeto `updateData` (ou `any` quando o campo por campo fica repetitivo demais) e só atribuir a chave `if (body.x !== undefined)`.
 - Campos `Decimal` do Prisma (ex: `Asset.acquisitionValue`) precisam de `Number(x)` antes de serializar para JSON.
 - Toda rota Fastify com `schema.response` definido **descarta silenciosamente** qualquer campo do objeto retornado que não esteja explicitamente declarado no schema — um campo novo no Prisma/service não aparece na API até ser adicionado também no `response` da rota.
+- **Validação de campo obrigatório existe em duas camadas independentes**: o array `required: [...]` do `schema.body` de cada rota (Fastify valida isso via AJV **antes** do handler rodar) e o `.parse()` do Zod dentro do controller. Tornar um campo opcional só no Zod não é suficiente — se ele continuar no `required` do `schema.body` da rota, a requisição é rejeitada com 400 antes mesmo de chegar no Zod. Ao relaxar uma obrigatoriedade, procure os dois lugares.
 
 ## Padrões de UI reaproveitáveis
 
