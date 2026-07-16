@@ -2,13 +2,52 @@
 // Relatórios > Controle de Veículos > Utilização de Veículos por Período
 
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Loader2, Download, FileSpreadsheet, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Loader2, Download, FileSpreadsheet, AlertCircle, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { reportsApi, vehiclesApi, worksitesApi, type VehicleUtilizationRow, type ApiVehicle, type ApiWorksite } from '@/lib/api'
 import { exportReportToPdf, exportReportToExcel, type ReportColumn } from '@/lib/reportExport'
+
+function formatDateTime(value: string | null): string | null {
+  if (!value) return null
+  return new Date(value).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function LocationCell({
+  place,
+  dateTime,
+  geolocation,
+}: {
+  place: string
+  dateTime: string | null
+  geolocation: string | null
+}) {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-gray-900 font-medium">{place}</p>
+      {dateTime && <p className="text-xs text-gray-400">{dateTime}</p>}
+      {geolocation && (
+        <a
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(geolocation)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-semibold text-brand-primary hover:underline inline-flex items-center gap-1"
+        >
+          Google Maps
+          <ExternalLink className="w-2.5 h-2.5" />
+        </a>
+      )}
+    </div>
+  )
+}
 
 const COLUMNS: ReportColumn[] = [
   { key: 'funcionario', label: 'Funcionário' },
@@ -172,11 +211,27 @@ export default function VehicleUtilizationReport({ onBack }: { onBack: () => voi
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-gray-50 last:border-0">
-                  {COLUMNS.map((col) => (
-                    <td key={col.key} className="px-4 py-3 whitespace-nowrap text-gray-700">
-                      {(row as any)[col.key] ?? '—'}
-                    </td>
-                  ))}
+                  {COLUMNS.map((col) => {
+                    if (col.key === 'origem') {
+                      return (
+                        <td key={col.key} className="px-4 py-3 align-top">
+                          <LocationCell place={row.origem} dateTime={formatDateTime(row.horarioSaida)} geolocation={row.origemGeolocation} />
+                        </td>
+                      )
+                    }
+                    if (col.key === 'destino') {
+                      return (
+                        <td key={col.key} className="px-4 py-3 align-top">
+                          <LocationCell place={row.destino} dateTime={formatDateTime(row.horarioChegada)} geolocation={row.destinoGeolocation} />
+                        </td>
+                      )
+                    }
+                    return (
+                      <td key={col.key} className="px-4 py-3 whitespace-nowrap text-gray-700 align-top">
+                        {(row as any)[col.key] ?? '—'}
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>

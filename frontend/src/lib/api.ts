@@ -1244,7 +1244,9 @@ export interface VehicleUtilizationRow {
   kmFinal: number | null
   kmRodados: number | null
   origem: string
+  origemGeolocation: string | null
   destino: string
+  destinoGeolocation: string | null
   descViagem: string | null
   horarioSaida: string
   horarioChegada: string | null
