@@ -2,7 +2,7 @@
 // Relatórios > Controle de Veículos > Utilização de Veículos por Período
 
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Loader2, Download, FileSpreadsheet, AlertCircle, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Loader2, Download, FileSpreadsheet, AlertCircle, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -39,10 +39,11 @@ function LocationCell({
           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(geolocation)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs font-semibold text-brand-primary hover:underline inline-flex items-center gap-1"
+          title="Ver no Google Maps"
+          aria-label="Ver no Google Maps"
+          className="text-brand-primary hover:text-brand-primary/70 inline-flex items-center"
         >
-          Google Maps
-          <ExternalLink className="w-2.5 h-2.5" />
+          <MapPin className="w-3.5 h-3.5" />
         </a>
       )}
     </div>
