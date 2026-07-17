@@ -1,30 +1,43 @@
 // src/pages/reports/ReportsPage.tsx
 // Hub de Relatórios — Nível 1 do menu (Sidebar) leva aqui. Nível 2 são as abas
 // (módulos), Nível 3 é a grade de cards com os relatórios de cada módulo.
-// Fase 1: 1 relatório funcional por módulo (prova de conceito da infraestrutura);
-// os demais aparecem como "Em breve" — ver HANDOFF.md para o roadmap da Fase 2.
 
 import { useState } from 'react'
-import { FileBarChart2, Car, Wrench, Clock, ClipboardCheck, FileText, Lock } from 'lucide-react'
+import { FileBarChart2, Car, Wrench, Clock, ClipboardCheck, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { useAuth } from '@/contexts/AuthContext'
 import VehicleUtilizationReport from './VehicleUtilizationReport'
+import VehicleMaintenanceReport from './VehicleMaintenanceReport'
+import VehicleMileageHistoryReport from './VehicleMileageHistoryReport'
 import AssetLoansReport from './AssetLoansReport'
+import AssetUsageHistoryReport from './AssetUsageHistoryReport'
+import AssetInventoryReport from './AssetInventoryReport'
+import AssetMaintenanceReport from './AssetMaintenanceReport'
 import WorkedHoursReport from './WorkedHoursReport'
+import TimelogsMonthlySummaryReport from './TimelogsMonthlySummaryReport'
 import FiveSAuditReport from './FiveSAuditReport'
+import FiveSNonConformitiesReport from './FiveSNonConformitiesReport'
+import FiveSEvolutionReport from './FiveSEvolutionReport'
 
 type ModuleKey = 'vehicles' | 'assets' | 'timelogs' | 'fiveS'
 type ReportKey =
   | 'vehicle-utilization'
+  | 'vehicle-maintenance'
+  | 'vehicle-mileage-history'
   | 'asset-loans'
+  | 'asset-usage-history'
+  | 'asset-inventory'
+  | 'asset-maintenance'
   | 'worked-hours'
+  | 'timelogs-monthly-summary'
   | 'fiveS-audits'
+  | 'fiveS-nonconformities'
+  | 'fiveS-evolution'
 
 interface ReportDefinition {
   key: ReportKey
   label: string
-  available: boolean
 }
 
 interface ModuleDefinition {
@@ -42,9 +55,9 @@ const MODULES: ModuleDefinition[] = [
     icon: Car,
     pageKey: 'reports.vehicles',
     reports: [
-      { key: 'vehicle-utilization', label: 'Utilização de Veículos por Período', available: true },
-      { key: 'vehicle-utilization' as ReportKey, label: 'Manutenções Preventivas e Realizadas', available: false },
-      { key: 'vehicle-utilization' as ReportKey, label: 'Histórico de Quilometragem por Veículo', available: false },
+      { key: 'vehicle-utilization', label: 'Utilização de Veículos por Período' },
+      { key: 'vehicle-maintenance', label: 'Manutenções Preventivas e Realizadas' },
+      { key: 'vehicle-mileage-history', label: 'Histórico de Quilometragem por Veículo' },
     ],
   },
   {
@@ -53,10 +66,10 @@ const MODULES: ModuleDefinition[] = [
     icon: Wrench,
     pageKey: 'reports.assets',
     reports: [
-      { key: 'asset-loans', label: 'Empréstimos Ativos e Pendentes', available: true },
-      { key: 'asset-loans' as ReportKey, label: 'Histórico de Uso por Ferramenta', available: false },
-      { key: 'asset-loans' as ReportKey, label: 'Inventário de Ferramentas e Equipamentos', available: false },
-      { key: 'asset-loans' as ReportKey, label: 'Manutenções de Ferramentas', available: false },
+      { key: 'asset-loans', label: 'Empréstimos Ativos e Pendentes' },
+      { key: 'asset-usage-history', label: 'Histórico de Uso por Ferramenta' },
+      { key: 'asset-inventory', label: 'Inventário de Ferramentas e Equipamentos' },
+      { key: 'asset-maintenance', label: 'Manutenções de Ferramentas' },
     ],
   },
   {
@@ -65,8 +78,8 @@ const MODULES: ModuleDefinition[] = [
     icon: Clock,
     pageKey: 'reports.timelogs',
     reports: [
-      { key: 'worked-hours', label: 'Horas Trabalhadas', available: true },
-      { key: 'worked-hours' as ReportKey, label: 'Resumo Mensal de Rateio de Horas', available: false },
+      { key: 'worked-hours', label: 'Horas Trabalhadas' },
+      { key: 'timelogs-monthly-summary', label: 'Resumo Mensal de Rateio de Horas' },
     ],
   },
   {
@@ -75,18 +88,26 @@ const MODULES: ModuleDefinition[] = [
     icon: ClipboardCheck,
     pageKey: 'reports.fiveS',
     reports: [
-      { key: 'fiveS-audits', label: 'Auditoria 5S por Área', available: true },
-      { key: 'fiveS-audits' as ReportKey, label: 'Não Conformidades 5S — Pendentes e Resolvidas', available: false },
-      { key: 'fiveS-audits' as ReportKey, label: 'Evolução 5S por Período', available: false },
+      { key: 'fiveS-audits', label: 'Auditoria 5S por Área' },
+      { key: 'fiveS-nonconformities', label: 'Não Conformidades 5S — Pendentes e Resolvidas' },
+      { key: 'fiveS-evolution', label: 'Evolução 5S por Período' },
     ],
   },
 ]
 
 const REPORT_COMPONENTS: Record<ReportKey, React.ComponentType<{ onBack: () => void }>> = {
   'vehicle-utilization': VehicleUtilizationReport,
+  'vehicle-maintenance': VehicleMaintenanceReport,
+  'vehicle-mileage-history': VehicleMileageHistoryReport,
   'asset-loans': AssetLoansReport,
+  'asset-usage-history': AssetUsageHistoryReport,
+  'asset-inventory': AssetInventoryReport,
+  'asset-maintenance': AssetMaintenanceReport,
   'worked-hours': WorkedHoursReport,
+  'timelogs-monthly-summary': TimelogsMonthlySummaryReport,
   'fiveS-audits': FiveSAuditReport,
+  'fiveS-nonconformities': FiveSNonConformitiesReport,
+  'fiveS-evolution': FiveSEvolutionReport,
 }
 
 export default function ReportsPage() {
@@ -144,28 +165,18 @@ export default function ReportsPage() {
 
           {currentModule && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {currentModule.reports.map((report, idx) => (
+              {currentModule.reports.map((report) => (
                 <Card
-                  key={`${report.label}-${idx}`}
-                  onClick={() => report.available && setActiveReport(report.key)}
-                  className={cn(
-                    'p-4 flex flex-col gap-3 transition-colors',
-                    report.available
-                      ? 'cursor-pointer hover:border-brand-primary/40'
-                      : 'opacity-60 cursor-not-allowed',
-                  )}
+                  key={report.key}
+                  onClick={() => setActiveReport(report.key)}
+                  className="p-4 flex flex-col gap-3 transition-colors cursor-pointer hover:border-brand-primary/40"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="p-2.5 bg-brand-primary/10 rounded-xl text-brand-primary">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    {!report.available && <Lock className="w-4 h-4 text-gray-300" />}
+                  <div className="p-2.5 bg-brand-primary/10 rounded-xl text-brand-primary w-fit">
+                    <FileText className="w-5 h-5" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">{report.label}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {report.available ? 'Filtrar, visualizar e exportar' : 'Em breve'}
-                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">Filtrar, visualizar e exportar</p>
                   </div>
                 </Card>
               ))}

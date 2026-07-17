@@ -1296,6 +1296,85 @@ export interface WorkedHoursSummaryRow {
   mediaDiaria: number
 }
 
+export interface VehicleMaintenanceRow {
+  id: string
+  veiculo: string
+  placa: string
+  tipoManutencao: string
+  kmPrevista: number | null
+  kmAtual: number
+  status: 'Em dia' | 'Requer atenção' | 'Crítico'
+  dataUltima: string | null
+  dataPrevista: string | null
+  descManutencao: string | null
+}
+
+export interface VehicleMileageHistoryRow {
+  id: string
+  veiculo: string
+  placa: string
+  data: string
+  kmInicial: number
+  kmFinal: number
+  kmTotalPeriodo: number
+  kmAcumulado: number
+}
+
+export interface VehicleMileageHistorySummaryRow {
+  veiculo: string
+  placa: string
+  mediaDiaria: number
+}
+
+export interface AssetUsageHistoryRow {
+  id: string
+  codigoPatrimonio: string
+  categoria: string
+  vezesEmprestado: number
+  totalDiasEmUso: number
+  funcionariosQueMaisUtilizaram: string
+  manutencoesRealizadas: number
+  estadoAtual: string
+}
+
+export interface AssetInventoryRow {
+  id: string
+  codigoPatrimonio: string
+  descricao: string
+  categoria: string
+  marcaModelo: string
+  status: string
+  localizacao: string
+  ultimaManutencao: string | null
+}
+
+export interface AssetMaintenanceReportRow {
+  id: string
+  dataManutencao: string
+  categoriaPatrimonio: string
+  descricaoManutencao: string
+  custo: number | null
+  responsavelReparo: string
+  status: 'Concluído' | 'Pendente'
+}
+
+export interface TimelogsMonthlySummaryRow {
+  id: string
+  mes: string
+  obra: string
+  totalHoras: number
+  comparativoMesAnterior: number | null
+}
+
+export interface FiveSEvolutionRow {
+  id: string
+  mes: string
+  centroDeCusto: string
+  percentualConformidade: number
+  quantidadeNaoConformidades: number
+  quantidadeCorrecoes: number
+}
+
 function buildQuery(params: Record<string, string | undefined>): string {
   const query = new URLSearchParams()
   Object.entries(params).forEach(([k, v]) => {
@@ -1329,6 +1408,59 @@ export const reportsApi = {
     dateTo?: string
   }): Promise<{ rows: WorkedHoursRow[]; summary: WorkedHoursSummaryRow[] }> {
     return request(`/reports/timelogs/worked-hours${buildQuery(params)}`)
+  },
+
+  vehicleMaintenance(params: { vehicleId?: string }): Promise<{ rows: VehicleMaintenanceRow[] }> {
+    return request(`/reports/vehicles/maintenance${buildQuery(params)}`)
+  },
+
+  vehicleMileageHistory(params: {
+    vehicleId?: string
+    dateFrom?: string
+    dateTo?: string
+  }): Promise<{ rows: VehicleMileageHistoryRow[]; summary: VehicleMileageHistorySummaryRow[] }> {
+    return request(`/reports/vehicles/mileage-history${buildQuery(params)}`)
+  },
+
+  assetUsageHistory(params: {
+    assetId?: string
+    dateFrom?: string
+    dateTo?: string
+  }): Promise<{ rows: AssetUsageHistoryRow[] }> {
+    return request(`/reports/assets/usage-history${buildQuery(params)}`)
+  },
+
+  assetInventory(params: {
+    categoryId?: string
+    status?: string
+  }): Promise<{ rows: AssetInventoryRow[] }> {
+    return request(`/reports/assets/inventory${buildQuery(params)}`)
+  },
+
+  assetMaintenance(params: {
+    assetId?: string
+    categoryId?: string
+    dateFrom?: string
+    dateTo?: string
+  }): Promise<{ rows: AssetMaintenanceReportRow[] }> {
+    return request(`/reports/assets/maintenance${buildQuery(params)}`)
+  },
+
+  timelogsMonthlySummary(params: {
+    worksiteId?: string
+    dateFrom?: string
+    dateTo?: string
+  }): Promise<{ rows: TimelogsMonthlySummaryRow[] }> {
+    return request(`/reports/timelogs/monthly-summary${buildQuery(params)}`)
+  },
+
+  fiveSEvolution(params: {
+    worksiteId?: string
+    areaType?: string
+    dateFrom?: string
+    dateTo?: string
+  }): Promise<{ rows: FiveSEvolutionRow[] }> {
+    return request(`/reports/fiveS/evolution${buildQuery(params)}`)
   },
 }
 
